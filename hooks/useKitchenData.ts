@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, query, orderBy, writeBatch, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Ingredient, Recipe, Allergen } from '../types';
+import { Ingredient, Recipe, Dish, Allergen } from '../types';
 
 const DEFAULT_INGREDIENTS: Omit<Ingredient, 'id'>[] = [
   { name: 'Agar-agar', category: 'Dry store', supplier: 'Urban', packCost: 33.75, packSize: 500, packUnit: 'g', wastePercent: 0, allergens: [], kcalPer100: 306, stockLevel: 95 },
@@ -18,6 +18,7 @@ const DEFAULT_INGREDIENTS: Omit<Ingredient, 'id'>[] = [
 export const useKitchenData = () => {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [dishes, setDishes] = useState<Dish[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
@@ -38,25 +39,38 @@ export const useKitchenData = () => {
       setError(err.message);
       setConnectionStatus('error');
     });
-
     return () => unsubscribe();
   }, []);
 
   // Subscribe to Recipes
   useEffect(() => {
-    const q = query(collection(db, 'recipes'), orderBy('name'));
+    const q = query(collection(db, 'recipes'), orderBy('updatedAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Recipe[];
       setRecipes(data);
-      setLoading(false);
     }, (err) => {
       console.error("Error fetching recipes:", err);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Subscribe to Dishes
+  useEffect(() => {
+    const q = query(collection(db, 'dishes'), orderBy('updatedAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Dish[];
+      setDishes(data);
+      setLoading(false);
+    }, (err) => {
+      console.error("Error fetching dishes:", err);
       setLoading(false);
     });
-
     return () => unsubscribe();
   }, []);
 
@@ -105,7 +119,6 @@ export const useKitchenData = () => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
-      
       const docRef = await addDoc(collection(db, 'recipes'), newRecipeData);
       return { id: docRef.id, ...newRecipeData } as Recipe;
     } catch (err) {
@@ -136,29 +149,44 @@ export const useKitchenData = () => {
     }
   }, []);
 
+  // Dish CRUD
+  const saveDish = useCallback(async (dish: Partial<Dish>) => {
+    try {
+      const newDishData = {
+        ...dish,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      const docRef = await addDoc(collection(db, 'dishes'), newDishData);
+      return { id: docRef.id, ...newDishData } as Dish;
+    } catch (err) {
+      console.error("Error saving dish:", err);
+      throw err;
+    }
+  }, []);
+
   // Bulk Import logic
-  const bulkImport = useCallback(async (data: { ingredients: Ingredient[], recipes: Recipe[] }) => {
+  const bulkImport = useCallback(async (data: { ingredients: Ingredient[], recipes: Recipe[], dishes?: Dish[] }) => {
     setLoading(true);
     try {
       const batch = writeBatch(db);
-      
-      // We don't delete existing data to be safe, we just add the new items.
-      // If the user wants a clean slate, they should do it manually or we'd need a "clearAll" logic.
-      
       data.ingredients.forEach(ing => {
-        // Strip existing ID to avoid conflicts if importing to a new DB, 
-        // or keep it if we want to overwrite. For this backup utility, we use addDoc logic (new IDs).
         const { id, ...cleanIng } = ing;
         const ref = doc(collection(db, 'ingredients'));
         batch.set(ref, { ...cleanIng, updatedAt: new Date().toISOString() });
       });
-
       data.recipes.forEach(rec => {
         const { id, ...cleanRec } = rec;
         const ref = doc(collection(db, 'recipes'));
         batch.set(ref, { ...cleanRec, updatedAt: new Date().toISOString() });
       });
-
+      if (data.dishes) {
+        data.dishes.forEach(dish => {
+          const { id, ...cleanDish } = dish;
+          const ref = doc(collection(db, 'dishes'));
+          batch.set(ref, { ...cleanDish, updatedAt: new Date().toISOString() });
+        });
+      }
       await batch.commit();
     } catch (err: any) {
       console.error("Error in bulk import:", err);
@@ -168,22 +196,17 @@ export const useKitchenData = () => {
     }
   }, []);
 
-  // New function to seed the database if it's empty
   const seedDatabase = useCallback(async () => {
-    if (ingredients.length > 0) return; // Prevent double seeding
-    
+    if (ingredients.length > 0) return;
     setLoading(true);
     try {
       const batch = writeBatch(db);
       const collectionRef = collection(db, 'ingredients');
-      
       DEFAULT_INGREDIENTS.forEach(ing => {
-        const docRef = doc(collectionRef); // Generate new ID
+        const docRef = doc(collectionRef);
         batch.set(docRef, { ...ing, createdAt: new Date().toISOString() });
       });
-
       await batch.commit();
-      console.log("Database seeded successfully");
     } catch (err: any) {
       console.error("Error seeding database:", err);
       setError(err.message);
@@ -195,6 +218,7 @@ export const useKitchenData = () => {
   return {
     ingredients,
     recipes,
+    dishes,
     loading,
     error,
     connectionStatus,
@@ -204,6 +228,7 @@ export const useKitchenData = () => {
     saveRecipe,
     updateRecipe,
     deleteRecipe,
+    saveDish,
     seedDatabase,
     bulkImport
   };
