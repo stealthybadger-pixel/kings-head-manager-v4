@@ -1,0 +1,7 @@
+{
+  "name": "King's Head Kitchen Manager",
+  "description": "Professional kitchen management system for high-density data, cost tracking, and recipe building with strict 1px/0px design constraints.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
