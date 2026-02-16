@@ -1,41 +1,54 @@
 
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { GoogleGenAI, Type } from "@google/genai";
 import { useKitchenData } from '../hooks/useKitchenData';
 import { RecipeItem, Unit, Ingredient } from '../types';
-import { UI_STYLES } from '../constants';
 import { useConfirmation } from '../hooks/useConfirmation';
 
 interface ExtractedItem {
+  id: string;
   name: string;
   quantity: number;
   unit: string;
-  unit_price: number;
-  total_line_price: number;
-}
-
-interface ExtractedData {
-  title: string;
-  vendor_name: string;
-  date: string;
-  items: ExtractedItem[];
+  matchedIngredientId?: string;
 }
 
 interface OCRScannerProps {
-  onSuccess: (recipe: { name: string, items: RecipeItem[], instructions: string }) => void;
+  onAddItems: (items: RecipeItem[], instructions?: string) => void;
   onCancel: () => void;
+  onIngredientCreateRequest: (name: string) => void;
 }
 
-export const OCRScanner: React.FC<OCRScannerProps> = ({ onSuccess, onCancel }) => {
-  const { ingredients, addIngredient, updateIngredient } = useKitchenData();
+export const OCRScanner: React.FC<OCRScannerProps> = ({ onAddItems, onCancel, onIngredientCreateRequest }) => {
+  const { ingredients } = useKitchenData();
   const { confirm } = useConfirmation();
   
   const [isProcessing, setIsProcessing] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [stagedData, setStagedData] = useState<ExtractedData | null>(null);
+  const [stagedItems, setStagedItems] = useState<ExtractedItem[]>([]);
+  const [stagedInstructions, setStagedInstructions] = useState<string>('');
+  const [documentTitle, setDocumentTitle] = useState<string>('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let interval: any;
+    if (isProcessing) {
+      setProgress(0);
+      interval = setInterval(() => {
+        setProgress(prev => {
+          if (prev < 90) return prev + Math.random() * 15;
+          return prev;
+        });
+      }, 400);
+    } else {
+      setProgress(0);
+      clearInterval(interval);
+    }
+    return () => clearInterval(interval);
+  }, [isProcessing]);
 
   const sanitizeOCRValue = (val: any): number => {
     if (typeof val === 'number') return isNaN(val) ? 0 : val;
@@ -56,6 +69,12 @@ export const OCRScanner: React.FC<OCRScannerProps> = ({ onSuccess, onCancel }) =
     }
   };
 
+  const findMatch = (name: string): Ingredient | undefined => {
+    return ingredients.find(ing => 
+      ing.name.toLowerCase().trim() === name.toLowerCase().trim()
+    );
+  };
+
   const processImage = async () => {
     if (!previewUrl) return;
     setIsProcessing(true);
@@ -72,10 +91,11 @@ export const OCRScanner: React.FC<OCRScannerProps> = ({ onSuccess, onCancel }) =
             { inlineData: { mimeType: 'image/png', data: base64Data } },
             {
               text: `EXTRACT RECIPE DATA. 
-              MANDATORY: Look for a recipe title, dish name, or document header at the very top. 
-              Extract the vendor/supplier name, date, and all individual line items. 
-              For each item, extract the name, quantity, unit (g, kg, ml, l, ea), unit price, and total line price.
-              If a field is missing, return null. Format as pure JSON.`
+              Find the recipe title or document header. 
+              Extract all line items with their names, quantities, and units.
+              Crucially, extract the preparation method or instructions as a single block of text.
+              If no unit is visible, default to 'ea'. 
+              Return JSON strictly following the schema.`
             },
           ],
         },
@@ -84,9 +104,8 @@ export const OCRScanner: React.FC<OCRScannerProps> = ({ onSuccess, onCancel }) =
           responseSchema: {
             type: Type.OBJECT,
             properties: {
-              title: { type: Type.STRING, description: "The primary name of the recipe or document title" },
-              vendor_name: { type: Type.STRING },
-              date: { type: Type.STRING },
+              title: { type: Type.STRING },
+              method: { type: Type.STRING, description: "The cooking instructions or preparation steps." },
               items: {
                 type: Type.ARRAY,
                 items: {
@@ -94,131 +113,145 @@ export const OCRScanner: React.FC<OCRScannerProps> = ({ onSuccess, onCancel }) =
                   properties: {
                     name: { type: Type.STRING },
                     quantity: { type: Type.NUMBER },
-                    unit: { type: Type.STRING },
-                    unit_price: { type: Type.NUMBER },
-                    total_line_price: { type: Type.NUMBER }
+                    unit: { type: Type.STRING }
                   },
-                  required: ["name", "quantity", "unit", "total_line_price"]
+                  required: ["name", "quantity", "unit"]
                 }
               }
             },
-            required: ["items"]
+            required: ["items", "method"]
           }
         }
       });
 
       const result = JSON.parse(response.text || '{}');
-      setStagedData(result);
+      const itemsWithMatches = (result.items || []).map((item: any) => {
+        const match = findMatch(item.name);
+        return {
+          id: Math.random().toString(36).substr(2, 9),
+          ...item,
+          matchedIngredientId: match?.id
+        };
+      });
+
+      setStagedItems(itemsWithMatches);
+      setStagedInstructions(result.method || '');
+      setDocumentTitle(result.title || '');
+      setProgress(100);
     } catch (err: any) {
       console.error("OCR Error:", err);
       setError("SYSTEM ERROR EXTRACTION FAILED");
     } finally {
-      setIsProcessing(false);
+      setTimeout(() => setIsProcessing(false), 500);
     }
   };
 
-  const commitToRegistry = async () => {
-    if (!stagedData) return;
+  const deleteItem = (id: string) => {
+    setStagedItems(prev => prev.filter(item => item.id !== id));
+  };
 
-    const ok = await confirm(`ARE YOU SURE? THIS WILL UPDATE THE MASTER REGISTRY FOR ${stagedData.items.length} ITEMS.`);
-    if (!ok) return;
+  const updateMatch = (id: string, ingredientId: string) => {
+    setStagedItems(prev => prev.map(item => 
+      item.id === id ? { ...item, matchedIngredientId: ingredientId === 'none' ? undefined : ingredientId } : item
+    ));
+  };
 
-    try {
-      for (const item of stagedData.items) {
-        const existing = ingredients.find(ing => 
-          ing.name.toLowerCase().trim() === item.name.toLowerCase().trim()
-        );
+  const updateUnit = (id: string, newUnit: string) => {
+    setStagedItems(prev => prev.map(item => 
+      item.id === id ? { ...item, unit: newUnit } : item
+    ));
+  };
 
-        const data: Omit<Ingredient, 'id'> = {
-          name: item.name,
-          supplier: stagedData.vendor_name || 'OCR IMPORT',
-          category: existing?.category || 'Uncategorized',
-          packCost: sanitizeOCRValue(item.total_line_price),
-          packSize: sanitizeOCRValue(item.quantity),
-          packUnit: (['g', 'ml', 'kg', 'l', 'ea'].includes(item.unit?.toLowerCase()) ? item.unit.toLowerCase() : 'ea') as Unit,
-          wastePercent: existing?.wastePercent || 0,
-          allergens: existing?.allergens || [],
-          kcalPer100: existing?.kcalPer100 || 0,
-          stockLevel: existing?.stockLevel || 0
-        };
-
-        if (existing) {
-          await updateIngredient(existing.id, data);
-        } else {
-          await addIngredient(data);
-        }
+  const updateName = (id: string, newName: string) => {
+    setStagedItems(prev => prev.map(item => {
+      if (item.id === id) {
+        const match = findMatch(newName);
+        return { ...item, name: newName, matchedIngredientId: match?.id || item.matchedIngredientId };
       }
+      return item;
+    }));
+  };
 
-      onSuccess({
-        name: stagedData.title || `Import: ${stagedData.vendor_name || 'Document'} (${stagedData.date || 'New'})`,
-        items: stagedData.items.map(item => ({
-          type: 'ingredient',
-          ingredientId: ingredients.find(ing => ing.name === item.name)?.id || 'temp-' + Math.random(),
-          quantity: sanitizeOCRValue(item.quantity),
-          unit: (item.unit || 'ea') as Unit
-        })),
-        instructions: `OCR IMPORT. VENDOR: ${stagedData.vendor_name || 'NA'}. DATE: ${stagedData.date || 'NA'}.`
-      });
-    } catch (e) {
-      setError("COMMIT ERROR DATABASE WRITE FAILURE");
+  const handleAddToRecipe = async () => {
+    const validItems = stagedItems
+      .filter(item => !!item.matchedIngredientId)
+      .map(item => ({
+        type: 'ingredient' as const,
+        ingredientId: item.matchedIngredientId!,
+        quantity: sanitizeOCRValue(item.quantity),
+        unit: (['g', 'ml', 'kg', 'l', 'ea'].includes(item.unit?.toLowerCase()) ? item.unit.toLowerCase() : 'ea') as Unit
+      }));
+
+    if (validItems.length === 0 && !stagedInstructions) {
+      setError("NO DATA TO COMMIT");
+      return;
+    }
+
+    const ok = await confirm(`ARE YOU SURE? This will add ${validItems.length} items and instructions to your recipe build.`);
+    if (ok) {
+      onAddItems(validItems, stagedInstructions);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-[#0E1117]/98 flex items-center justify-center z-[100] p-0 md:p-8 backdrop-blur-lg font-mono">
-      <div className="w-full max-w-6xl bg-[#0E1117] border border-[#333333] shadow-2xl flex flex-col max-h-[95vh]">
+    <div className="fixed inset-0 bg-[#0E1117] flex items-center justify-center z-[200] p-0 md:p-8 font-mono !rounded-none overflow-hidden text-[#FAFAFA]">
+      <div className="w-full max-w-7xl bg-[#0E1117] border border-[#404040] flex flex-col h-full !rounded-none relative">
         
-        {/* Header */}
-        <div className="p-4 border-b border-[#333333] flex justify-between items-center bg-[#151921]">
+        {isProcessing && (
+          <div className="absolute top-0 left-0 w-full h-1 z-[300] bg-black">
+            <div 
+              className="h-full bg-[#FAFAFA] transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        )}
+
+        <div className="p-4 border-b border-[#404040] flex justify-between items-center bg-[#151921]">
           <div className="flex items-center gap-6">
-            <span className="text-[11px] font-bold text-[#FFFFFF] tracking-[0.4em] uppercase">V-SCANNER STAGE REVIEW</span>
-            {stagedData && (
-               <div className="flex items-center gap-4 border-l border-[#333] pl-6">
-                 <span className="text-[10px] text-[#BBBBBB] uppercase">
-                   TITLE <span className="text-[#FFFFFF] ml-2">{stagedData.title || 'NOT FOUND'}</span>
-                 </span>
-                 <span className="text-[10px] text-[#BBBBBB] uppercase">
-                   SOURCE <span className="text-[#FFFFFF] ml-2">{stagedData.vendor_name || 'NOT FOUND'}</span>
-                 </span>
-               </div>
+            <span className="text-[11px] font-bold text-[#FFFFFF] tracking-[0.4em] uppercase">OCR SCANNER STAGING</span>
+            {stagedItems.length > 0 && (
+              <span className="text-[10px] text-[#FAFAFA] uppercase border border-[#404040] px-3 py-1 bg-black">STATUS: PARSED</span>
             )}
           </div>
-          <button onClick={onCancel} className="text-[#BBBBBB] hover:text-[#FFFFFF] text-[10px] uppercase font-bold tracking-widest transition-colors">DISCARD</button>
+          <button onClick={onCancel} className="text-[#FAFAFA] text-[10px] uppercase font-bold tracking-widest border border-[#404040] px-5 py-2 hover:bg-white hover:text-black transition-all">DISCARD</button>
         </div>
 
-        <div className="flex-1 flex flex-col md:flex-row overflow-hidden divide-x divide-[#333333]">
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden divide-x divide-[#404040]">
           
-          {/* Left Panel */}
-          <div className="w-full md:w-2/5 flex flex-col bg-[#0b0e14]">
+          <div className="w-full md:w-80 flex flex-col bg-[#0b0e14]">
             {!previewUrl ? (
               <div 
                 onClick={() => fileInputRef.current?.click()}
-                className="flex-1 border-2 border-dashed border-[#222] m-6 flex flex-col items-center justify-center cursor-pointer hover:bg-[#111] transition-colors p-10 text-center"
+                className="flex-1 border border-dashed border-[#404040] m-6 flex flex-col items-center justify-center cursor-pointer hover:bg-[#151921] transition-colors p-10 text-center"
               >
-                <div className="text-[11px] font-bold text-[#FFFFFF] uppercase tracking-[0.2em] mb-6">AWAITING INPUT</div>
-                <div className="px-6 py-3 border border-[#444] text-[10px] text-[#FFFFFF] uppercase hover:border-white transition-all">SELECT FILE OR CAPTURE</div>
+                <div className="text-[11px] font-bold text-[#FAFAFA] uppercase tracking-[0.2em] mb-6">AWAITING INPUT</div>
+                <div className="px-6 py-3 border border-[#404040] text-[10px] text-[#FAFAFA] uppercase">CAPTURE_IMAGE</div>
               </div>
             ) : (
               <div className="flex-1 p-6 flex flex-col gap-6 overflow-hidden">
-                <div className="flex-1 bg-black border border-[#222] overflow-hidden relative">
-                   <img src={previewUrl} className="w-full h-full object-contain" alt="Preview" />
-                   <div className="absolute top-2 right-2 bg-black/80 text-[8px] text-[#FFFFFF] px-2 py-1 uppercase border border-[#333]">DOCUMENT FEED</div>
+                <div className="flex-1 bg-black border border-[#404040] overflow-hidden relative">
+                   <img src={previewUrl} className="w-full h-full object-contain opacity-80" alt="Preview" />
+                   {isProcessing && (
+                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                        <div className="text-[10px] text-white font-bold tracking-[0.5em] animate-pulse">ANALYZING_GEOMETRY</div>
+                     </div>
+                   )}
                 </div>
-                {!stagedData && (
+                {!stagedItems.length && !stagedInstructions && (
                   <button 
                     onClick={processImage}
                     disabled={isProcessing}
-                    className="w-full py-4 bg-[#FFFFFF] text-[#0E1117] text-[11px] font-bold uppercase tracking-[0.3em] hover:bg-[#F0F0F0] disabled:opacity-30 transition-all"
+                    className="w-full py-4 bg-[#FAFAFA] text-[#0E1117] text-[11px] font-bold uppercase tracking-[0.3em] disabled:opacity-30 hover:bg-white"
                   >
-                    {isProcessing ? "PROCESSING DATA" : "EXECUTE SCAN"}
+                    {isProcessing ? "PROCESSING_CORE" : "EXECUTE SCAN"}
                   </button>
                 )}
-                {stagedData && (
+                {(stagedItems.length > 0 || stagedInstructions) && (
                   <button 
-                    onClick={() => { setStagedData(null); setPreviewUrl(null); }}
-                    className="w-full py-4 border border-[#333] text-[#FFFFFF] text-[11px] font-bold uppercase tracking-[0.3em] hover:border-white transition-all"
+                    onClick={() => { setStagedItems([]); setStagedInstructions(''); setPreviewUrl(null); }}
+                    className="w-full py-4 border border-[#404040] text-[#FAFAFA] text-[11px] font-bold uppercase tracking-[0.3em] hover:border-white transition-all"
                   >
-                    RESET SCANNER
+                    RESET_SCANNER
                   </button>
                 )}
               </div>
@@ -226,65 +259,124 @@ export const OCRScanner: React.FC<OCRScannerProps> = ({ onSuccess, onCancel }) =
             <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
           </div>
 
-          {/* Right Panel */}
           <div className="flex-1 flex flex-col overflow-hidden bg-[#0E1117]">
-            {!stagedData ? (
+            {!stagedItems.length && !stagedInstructions ? (
               <div className="flex-1 flex items-center justify-center p-12 text-center">
                  <div className="max-w-md space-y-6">
-                    <div className="text-[12px] font-bold text-[#444444] uppercase tracking-[0.6em] animate-pulse">PENDING STREAM</div>
+                    <div className="text-[12px] font-bold text-[#404040] uppercase tracking-[0.6em]">WAITING_FOR_DATA_STREAM</div>
                     {isProcessing && (
-                      <div className="text-[10px] text-[#FFFFFF] uppercase leading-relaxed tracking-tight font-medium">
-                        VISION LAYER ACTIVE<br/>
-                        SCHEMA MAPPING<br/>
-                        PARSING LINE ITEMS
+                      <div className="text-[10px] text-[#FAFAFA] uppercase leading-relaxed tracking-tight">
+                        ANALYST_ENGINE: ACTIVE<br/>
+                        MAPPING_INVOICE_GEOMETRY<br/>
+                        PARSING_ENTITIES // {Math.floor(progress)}%
                       </div>
                     )}
                  </div>
               </div>
             ) : (
               <div className="flex-1 flex flex-col overflow-hidden">
-                <div className="p-4 bg-[#151921] border-b border-[#333333] flex justify-between items-center">
-                  <span className="text-[10px] font-bold text-[#FFFFFF] uppercase tracking-widest">EXTRACTED ITEM REGISTRY</span>
+                <div className="p-4 border-b border-[#404040] flex justify-between items-center bg-[#0b0e14]">
+                  <span className="text-[10px] font-bold text-[#FAFAFA] uppercase tracking-widest">
+                    {documentTitle || 'EXTRACTED DATASET'}
+                  </span>
                   {error && <span className="text-[10px] font-bold text-red-500 uppercase">{error}</span>}
                 </div>
+                
                 <div className="flex-1 overflow-y-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead className="sticky top-0 bg-[#0E1117] border-b border-[#333333] z-10">
-                      <tr>
-                        <th className="p-4 text-[9px] font-bold text-[#BBBBBB] uppercase border-r border-[#333]">ID</th>
-                        <th className="p-4 text-[9px] font-bold text-[#BBBBBB] uppercase border-r border-[#333]">DESCRIPTION</th>
-                        <th className="p-4 text-[9px] font-bold text-[#BBBBBB] uppercase border-r border-[#333] text-right">QTY</th>
-                        <th className="p-4 text-[9px] font-bold text-[#BBBBBB] uppercase border-r border-[#333]">UNIT</th>
-                        <th className="p-4 text-[9px] font-bold text-[#BBBBBB] uppercase text-right">TOTAL</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#1a1f26]">
-                      {stagedData.items.map((item, idx) => (
-                        <tr key={idx} className="hover:bg-[#1a1f26] transition-colors group">
-                          <td className="p-4 text-[11px] text-[#888888] border-r border-[#333]">{idx + 1}</td>
-                          <td className="p-4 text-[11px] text-[#FFFFFF] border-r border-[#333] font-bold tracking-tight">{item.name}</td>
-                          <td className="p-4 text-[11px] text-[#FFFFFF] border-r border-[#333] text-right font-mono">{item.quantity}</td>
-                          <td className="p-4 text-[11px] text-[#FFFFFF] border-r border-[#333] uppercase">{item.unit || 'EA'}</td>
-                          <td className="p-4 text-[11px] text-[#FFFFFF] text-right font-mono font-bold">£{sanitizeOCRValue(item.total_line_price).toFixed(2)}</td>
+                  <div className="p-4 bg-[#151921] border-b border-[#404040]">
+                    <label className="text-[9px] font-bold text-[#888] uppercase block mb-2">INGREDIENTS LIST</label>
+                    <table className="w-full text-left border-collapse border border-[#404040]">
+                      <thead className="bg-[#0E1117] border-b border-[#404040]">
+                        <tr>
+                          <th className="p-3 text-[9px] font-bold text-[#888] uppercase border-r border-[#404040]">DESCRIPTION</th>
+                          <th className="p-3 text-[9px] font-bold text-[#888] uppercase border-r border-[#404040] text-right">QTY</th>
+                          <th className="p-3 text-[9px] font-bold text-[#888] uppercase border-r border-[#404040]">UNIT</th>
+                          <th className="p-3 text-[9px] font-bold text-[#888] uppercase border-r border-[#404040]">REGISTRY MATCH</th>
+                          <th className="p-3 text-[9px] font-bold text-[#888] uppercase text-center w-12"></th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-[#404040]">
+                        {stagedItems.map((item) => (
+                          <tr key={item.id} className="hover:bg-[#1c222b] transition-colors border-b border-[#404040]">
+                            <td className="p-2 border-r border-[#404040]">
+                              <input 
+                                type="text"
+                                value={item.name}
+                                onChange={(e) => updateName(item.id, e.target.value)}
+                                className="w-full bg-transparent border border-transparent focus:border-[#404040] text-[#FAFAFA] text-[11px] p-1 outline-none font-bold"
+                              />
+                            </td>
+                            <td className="p-3 text-[11px] text-[#FAFAFA] border-r border-[#404040] text-right font-mono">
+                              {item.quantity}
+                            </td>
+                            <td className="p-2 border-r border-[#404040]">
+                              <select 
+                                value={item.unit?.toLowerCase() || 'ea'}
+                                onChange={(e) => updateUnit(item.id, e.target.value)}
+                                className="w-full bg-black border border-[#404040] text-[#FAFAFA] text-[10px] p-1 outline-none font-mono"
+                              >
+                                <option value="ea">EA</option>
+                                <option value="g">G</option>
+                                <option value="kg">KG</option>
+                                <option value="ml">ML</option>
+                                <option value="l">L</option>
+                              </select>
+                            </td>
+                            <td className="p-2 border-r border-[#404040]">
+                              <div className="flex flex-col gap-2">
+                                <select 
+                                  value={item.matchedIngredientId || 'none'}
+                                  onChange={(e) => updateMatch(item.id, e.target.value)}
+                                  className="w-full bg-black border border-[#404040] text-[#FAFAFA] text-[10px] p-1 outline-none font-mono"
+                                >
+                                  <option value="none">-- NO MATCH FOUND --</option>
+                                  {ingredients.map(ing => (
+                                    <option key={ing.id} value={ing.id}>{ing.name.toUpperCase()}</option>
+                                  ))}
+                                </select>
+                                {!item.matchedIngredientId && (
+                                  <button 
+                                    onClick={() => onIngredientCreateRequest(item.name)}
+                                    className="w-full py-1 border border-[#c8a96e] text-[#c8a96e] text-[8px] font-bold uppercase hover:bg-[#c8a96e] hover:text-black transition-all"
+                                  >
+                                    + CREATE IN REGISTRY
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                            <td className="p-3 text-center">
+                              <button 
+                                onClick={() => deleteItem(item.id)}
+                                className="text-red-500 hover:text-white transition-colors"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="p-4">
+                    <label className="text-[9px] font-bold text-[#888] uppercase block mb-2">PREPARATION METHOD / INSTRUCTIONS</label>
+                    <textarea 
+                      value={stagedInstructions}
+                      onChange={(e) => setStagedInstructions(e.target.value)}
+                      placeholder="Extracted method text will appear here..."
+                      className="w-full h-64 bg-black border border-[#404040] text-[#FAFAFA] text-[11px] p-4 outline-none focus:border-white font-sans leading-relaxed resize-none"
+                    />
+                  </div>
                 </div>
                 
-                {/* Footer Section */}
-                <div className="p-8 bg-[#151921] border-t border-[#333333] flex justify-between items-center shadow-2xl">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[9px] text-[#BBBBBB] uppercase font-bold tracking-widest">TOTAL VALUE</span>
-                    <span className="text-3xl text-[#FFFFFF] font-mono leading-none">
-                      £{stagedData.items.reduce((acc, i) => acc + sanitizeOCRValue(i.total_line_price), 0).toFixed(2)}
-                    </span>
-                  </div>
+                <div className="p-8 border-t border-[#404040] flex justify-end items-center bg-[#0b0e14]">
                   <button 
-                    onClick={commitToRegistry}
-                    className="px-12 py-4 bg-[#c8a96e] text-[#0E1117] text-[12px] font-bold uppercase tracking-[0.2em] hover:bg-white transition-all shadow-lg"
+                    onClick={handleAddToRecipe}
+                    className="px-16 py-4 bg-[#FAFAFA] text-[#0E1117] text-[12px] font-bold uppercase tracking-[0.2em] hover:bg-white transition-all shadow-xl !rounded-none"
                   >
-                    COMMIT TO REGISTRY
+                    PUSH TO RECIPE CARD
                   </button>
                 </div>
               </div>
@@ -292,10 +384,9 @@ export const OCRScanner: React.FC<OCRScannerProps> = ({ onSuccess, onCancel }) =
           </div>
         </div>
 
-        {/* System Metadata */}
-        <div className="p-3 border-t border-[#333333] bg-black flex justify-between items-center">
-           <div className="text-[8px] text-[#666666] uppercase tracking-[0.4em]">MODULE V-SCANNER PRO PROMPT KERNEL G3-FLASH</div>
-           <div className="text-[8px] text-[#666666] uppercase tracking-[0.4em]">REGISTRY {ingredients.length} MASTER ITEMS</div>
+        <div className="p-2 border-t border-[#404040] bg-black flex justify-between items-center">
+           <div className="text-[8px] text-[#404040] uppercase tracking-[0.4em]">OCR_STAGING_v10 // KERNEL_G3_FLASH</div>
+           <div className="text-[8px] text-[#404040] uppercase tracking-[0.4em]">STRICT_INSTRUCTIONS_ENABLED</div>
         </div>
       </div>
     </div>

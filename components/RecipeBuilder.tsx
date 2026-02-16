@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Ingredient, Recipe, RecipeItem, Unit } from '../types';
 import { useKitchenData } from '../hooks/useKitchenData';
@@ -28,6 +29,7 @@ interface RecipeBuilderProps {
   onSetLibraryTab: (tab: 'ingredients' | 'recipes') => void;
   onSetAvailableTabs: (tabs: ('ingredients' | 'recipes')[]) => void;
   isLibraryTabRecipes: boolean;
+  onPushIngredient?: (name?: string) => void;
 }
 
 const RecipeBuilder: React.FC<RecipeBuilderProps> = ({ 
@@ -36,7 +38,8 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
   clearStaged, 
   onSetLibraryTab,
   onSetAvailableTabs,
-  isLibraryTabRecipes
+  isLibraryTabRecipes,
+  onPushIngredient
 }) => {
   const { ingredients, recipes, saveRecipe, updateRecipe, deleteRecipe } = useKitchenData();
   const { confirm } = useConfirmation();
@@ -178,16 +181,13 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
     onSetLibraryTab('recipes'); 
   };
 
-  const handleOCRSuccess = (scannedRecipe: { name: string, items: RecipeItem[], instructions: string }) => {
-    setRecipeName(scannedRecipe.name);
-    setBatchSize(1);
-    setBatchUnit('kg');
-    setGridItems(scannedRecipe.items);
-    setInstructions(scannedRecipe.instructions);
+  const handleOCRItemsAdded = (newItems: RecipeItem[], ocrInstructions?: string) => {
+    setGridItems(prev => [...prev, ...newItems]);
+    if (ocrInstructions) {
+      setInstructions(ocrInstructions);
+    }
     setIsScanning(false);
-    setIsManualNew(true); // Treat OCR result as a new unsaved session
-    onSetAvailableTabs(['ingredients']);
-    onSetLibraryTab('ingredients');
+    setIsManualNew(true);
   };
 
   const calculateTotalCost = () => {
@@ -389,8 +389,9 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
 
       {isScanning && (
         <OCRScanner 
-          onSuccess={handleOCRSuccess} 
+          onAddItems={handleOCRItemsAdded} 
           onCancel={() => setIsScanning(false)} 
+          onIngredientCreateRequest={(name) => onPushIngredient?.(name)}
         />
       )}
     </div>
