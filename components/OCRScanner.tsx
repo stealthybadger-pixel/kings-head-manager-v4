@@ -14,13 +14,100 @@ interface ExtractedItem {
 }
 
 interface OCRScannerProps {
-  onAddItems: (items: RecipeItem[], instructions?: string) => void;
+  onAddItems: (items: any[], instructions?: string) => void;
   onCancel: () => void;
   onIngredientCreateRequest: (name: string) => void;
 }
 
+const SearchableIngredientDropdown: React.FC<{
+  currentId?: string;
+  onSelect: (id: string) => void;
+  ingredients: Ingredient[];
+  onCreateNew: () => void;
+  isCreating: boolean;
+}> = ({ currentId, onSelect, ingredients, onCreateNew, isCreating }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  const selectedIngredient = ingredients.find(i => i.id === currentId);
+  
+  const filtered = useMemo(() => {
+    return ingredients.filter(i => 
+      i.name.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [ingredients, search]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative w-full font-mono" ref={wrapperRef}>
+      <div 
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full bg-black border p-2 text-[10px] cursor-pointer flex justify-between items-center transition-colors ${selectedIngredient ? 'border-[#c8a96e] text-[#c8a96e]' : 'border-[#404040] text-[#666]'}`}
+      >
+        <span className="truncate uppercase font-bold">
+          {selectedIngredient ? selectedIngredient.name : 'MATCH_REQUIRED'}
+        </span>
+        <svg className={`w-3 h-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </div>
+
+      {isOpen && (
+        <div className="absolute top-full left-0 w-full z-[300] bg-[#0b0e14] border border-[#c8a96e] shadow-[0_10px_30px_rgba(0,0,0,0.5)] mt-1">
+          <input 
+            autoFocus
+            type="text"
+            placeholder="FILTER_REGISTRY..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full bg-[#151921] border-b border-[#c8a96e]/30 p-2 text-[10px] text-white outline-none placeholder:text-[#444]"
+          />
+          
+          {/* Quick Create Button moved to the TOP of the dropdown list */}
+          {!selectedIngredient && (
+            <div className="p-2 bg-black border-b border-[#c8a96e]/30">
+              <button 
+                disabled={isCreating}
+                onClick={() => { onCreateNew(); setIsOpen(false); }}
+                className={`w-full py-2 bg-transparent border border-[#c8a96e] text-[#c8a96e] text-[9px] font-bold uppercase tracking-widest hover:bg-[#c8a96e] hover:text-black transition-all ${isCreating ? 'opacity-50 animate-pulse' : ''}`}
+              >
+                {isCreating ? 'INITIALIZING_RECORD...' : '+ CREATE_IN_REGISTRY'}
+              </button>
+            </div>
+          )}
+
+          <div className="max-h-64 overflow-y-auto divide-y divide-[#1c222b]">
+            {filtered.length > 0 ? filtered.map(ing => (
+              <div 
+                key={ing.id}
+                onClick={() => { onSelect(ing.id); setIsOpen(false); }}
+                className="p-2 hover:bg-[#c8a96e]/10 cursor-pointer group"
+              >
+                <div className="text-[10px] text-white group-hover:text-[#c8a96e] font-bold uppercase truncate">{ing.name}</div>
+                <div className="text-[8px] text-[#444] uppercase">{ing.category} // {ing.supplier}</div>
+              </div>
+            )) : (
+              <div className="p-4 text-center text-[8px] text-[#444] uppercase">NO_RECORDS_MATCHED</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const OCRScanner: React.FC<OCRScannerProps> = ({ onAddItems, onCancel, onIngredientCreateRequest }) => {
-  const { ingredients } = useKitchenData();
+  const { ingredients, addIngredient } = useKitchenData();
   const { confirm } = useConfirmation();
   
   const [isProcessing, setIsProcessing] = useState(false);
@@ -30,6 +117,7 @@ export const OCRScanner: React.FC<OCRScannerProps> = ({ onAddItems, onCancel, on
   const [stagedItems, setStagedItems] = useState<ExtractedItem[]>([]);
   const [stagedInstructions, setStagedInstructions] = useState<string>('');
   const [documentTitle, setDocumentTitle] = useState<string>('');
+  const [creatingIds, setCreatingIds] = useState<Set<string>>(new Set());
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -172,6 +260,38 @@ export const OCRScanner: React.FC<OCRScannerProps> = ({ onAddItems, onCancel, on
     }));
   };
 
+  const handleInlineQuickCreate = async (stagedId: string, name: string) => {
+    setCreatingIds(prev => new Set(prev).add(stagedId));
+    try {
+      const newIng = await addIngredient({
+        name: name,
+        category: 'Sub-Recipe',
+        supplier: 'Internal',
+        packCost: 0,
+        packSize: 1000,
+        packUnit: 'g',
+        wastePercent: 0,
+        allergens: [],
+        kcalPer100: 0,
+        stockLevel: 0,
+        incomplete: true
+      });
+      
+      setStagedItems(prev => prev.map(item => 
+        item.id === stagedId ? { ...item, matchedIngredientId: newIng.id } : item
+      ));
+    } catch (err) {
+      console.error("Failed to quick-create ingredient:", err);
+      setError("REGISTRY WRITE FAILED");
+    } finally {
+      setCreatingIds(prev => {
+        const next = new Set(prev);
+        next.delete(stagedId);
+        return next;
+      });
+    }
+  };
+
   const handleAddToRecipe = async () => {
     const validItems = stagedItems
       .filter(item => !!item.matchedIngredientId)
@@ -195,12 +315,12 @@ export const OCRScanner: React.FC<OCRScannerProps> = ({ onAddItems, onCancel, on
 
   return (
     <div className="fixed inset-0 bg-[#0E1117] flex items-center justify-center z-[200] p-0 md:p-8 font-mono !rounded-none overflow-hidden text-[#FAFAFA]">
-      <div className="w-full max-w-7xl bg-[#0E1117] border border-[#404040] flex flex-col h-full !rounded-none relative">
+      <div className="w-full max-w-7xl bg-[#0E1117] border border-[#404040] flex flex-col h-full !rounded-none relative shadow-[0_0_100px_rgba(0,0,0,0.9)]">
         
         {isProcessing && (
           <div className="absolute top-0 left-0 w-full h-1 z-[300] bg-black">
             <div 
-              className="h-full bg-[#FAFAFA] transition-all duration-300"
+              className="h-full bg-[#c8a96e] transition-all duration-300"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -241,7 +361,7 @@ export const OCRScanner: React.FC<OCRScannerProps> = ({ onAddItems, onCancel, on
                   <button 
                     onClick={processImage}
                     disabled={isProcessing}
-                    className="w-full py-4 bg-[#FAFAFA] text-[#0E1117] text-[11px] font-bold uppercase tracking-[0.3em] disabled:opacity-30 hover:bg-white"
+                    className="w-full py-4 bg-[#FAFAFA] text-[#0E1117] text-[11px] font-bold uppercase tracking-[0.3em] disabled:opacity-30 hover:bg-white transition-all"
                   >
                     {isProcessing ? "PROCESSING_CORE" : "EXECUTE SCAN"}
                   </button>
@@ -322,27 +442,14 @@ export const OCRScanner: React.FC<OCRScannerProps> = ({ onAddItems, onCancel, on
                                 <option value="l">L</option>
                               </select>
                             </td>
-                            <td className="p-2 border-r border-[#404040]">
-                              <div className="flex flex-col gap-2">
-                                <select 
-                                  value={item.matchedIngredientId || 'none'}
-                                  onChange={(e) => updateMatch(item.id, e.target.value)}
-                                  className="w-full bg-black border border-[#404040] text-[#FAFAFA] text-[10px] p-1 outline-none font-mono"
-                                >
-                                  <option value="none">-- NO MATCH FOUND --</option>
-                                  {ingredients.map(ing => (
-                                    <option key={ing.id} value={ing.id}>{ing.name.toUpperCase()}</option>
-                                  ))}
-                                </select>
-                                {!item.matchedIngredientId && (
-                                  <button 
-                                    onClick={() => onIngredientCreateRequest(item.name)}
-                                    className="w-full py-1 border border-[#c8a96e] text-[#c8a96e] text-[8px] font-bold uppercase hover:bg-[#c8a96e] hover:text-black transition-all"
-                                  >
-                                    + CREATE IN REGISTRY
-                                  </button>
-                                )}
-                              </div>
+                            <td className="p-2 border-r border-[#404040] min-w-[200px]">
+                              <SearchableIngredientDropdown 
+                                currentId={item.matchedIngredientId}
+                                ingredients={ingredients}
+                                onSelect={(id) => updateMatch(item.id, id)}
+                                onCreateNew={() => handleInlineQuickCreate(item.id, item.name)}
+                                isCreating={creatingIds.has(item.id)}
+                              />
                             </td>
                             <td className="p-3 text-center">
                               <button 
@@ -385,7 +492,7 @@ export const OCRScanner: React.FC<OCRScannerProps> = ({ onAddItems, onCancel, on
         </div>
 
         <div className="p-2 border-t border-[#404040] bg-black flex justify-between items-center">
-           <div className="text-[8px] text-[#404040] uppercase tracking-[0.4em]">OCR_STAGING_v10 // KERNEL_G3_FLASH</div>
+           <div className="text-[8px] text-[#404040] uppercase tracking-[0.4em]">OCR_STAGING_v11 // KERNEL_G3_FLASH</div>
            <div className="text-[8px] text-[#404040] uppercase tracking-[0.4em]">STRICT_INSTRUCTIONS_ENABLED</div>
         </div>
       </div>

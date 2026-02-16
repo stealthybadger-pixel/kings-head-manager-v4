@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { Ingredient, Recipe, RecipeItem, Unit } from '../types';
 import { UI_STYLES, COLORS } from '../constants';
 
 interface StagingBoxProps {
   item: Ingredient | Recipe;
-  onAdd: (item: RecipeItem) => void;
+  onAdd: (item: any) => void;
   onCancel: () => void;
 }
 
@@ -18,7 +19,8 @@ const StagingBox: React.FC<StagingBoxProps> = ({ item, onAdd, onCancel }) => {
     if (isIngredient) {
       setUnit((item as Ingredient).packUnit);
     } else {
-      setUnit('ea'); 
+      // Correctly carry forward the sub-recipe's defined batch unit
+      setUnit((item as Recipe).batchUnit || 'ea'); 
     }
   }, [item, isIngredient]);
 
@@ -27,8 +29,6 @@ const StagingBox: React.FC<StagingBoxProps> = ({ item, onAdd, onCancel }) => {
     if (isNaN(numericQty) || numericQty <= 0) return;
 
     onAdd({
-      type: 'ingredient',
-      ingredientId: item.id,
       quantity: numericQty,
       unit: unit
     });
@@ -39,7 +39,9 @@ const StagingBox: React.FC<StagingBoxProps> = ({ item, onAdd, onCancel }) => {
       <div className="col-span-1 pb-1">
         <label className={UI_STYLES.label}>Selected Item</label>
         <div className="text-sm font-bold uppercase truncate text-[#c8a96e]">{item.name}</div>
-        <div className="text-[10px] text-[#666666] font-mono mt-0.5">ID: {item.id.slice(0, 8)}</div>
+        <div className="text-[10px] text-[#666666] font-mono mt-0.5">
+          {isIngredient ? 'REGISTRY_ING' : 'REGISTRY_REC'} // {item.id.slice(0, 8)}
+        </div>
       </div>
 
       <div>
@@ -73,7 +75,7 @@ const StagingBox: React.FC<StagingBoxProps> = ({ item, onAdd, onCancel }) => {
           onClick={handleAdd}
           className={`${UI_STYLES.button} flex-1 bg-[#c8a96e] text-black hover:bg-[#b8985e] border border-black/20`}
         >
-          Add to Grid
+          Add to Workspace
         </button>
         <button 
           onClick={onCancel}

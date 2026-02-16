@@ -1,18 +1,21 @@
+
 import React, { useState, useMemo } from 'react';
-import { Ingredient, Recipe } from '../types';
+import { Ingredient, Recipe, Dish } from '../types';
 import { useKitchenData } from '../hooks/useKitchenData';
 import { useConfirmation } from '../hooks/useConfirmation';
 import { UI_STYLES, COLORS } from '../constants';
 
 interface SidebarProps {
-  onSelectItem: (id: string, type: 'ingredient' | 'recipe') => void;
-  activeTab: 'ingredients' | 'recipes';
-  availableTabs: ('ingredients' | 'recipes')[];
-  onTabChange: (tab: 'ingredients' | 'recipes') => void;
+  onSelectItem: (id: string, type: 'ingredient' | 'recipe' | 'dish') => void;
+  activeTab: 'ingredients' | 'recipes' | 'dishes';
+  availableTabs: ('ingredients' | 'recipes' | 'dishes')[];
+  onTabChange: (tab: 'ingredients' | 'recipes' | 'dishes') => void;
+  onCreateRequest?: (name: string, type: 'ingredient' | 'recipe' | 'dish') => void;
+  incompleteOnly?: boolean;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ onSelectItem, activeTab, availableTabs, onTabChange }) => {
-  const { ingredients, recipes, loading, seedDatabase, connectionStatus } = useKitchenData();
+const Sidebar: React.FC<SidebarProps> = ({ onSelectItem, activeTab, availableTabs, onTabChange, onCreateRequest, incompleteOnly = false }) => {
+  const { ingredients, recipes, dishes, loading, seedDatabase, connectionStatus } = useKitchenData();
   const { confirm } = useConfirmation();
   const [search, setSearch] = useState('');
   const [filterSupplier, setFilterSupplier] = useState('ALL');
@@ -28,11 +31,14 @@ const Sidebar: React.FC<SidebarProps> = ({ onSelectItem, activeTab, availableTab
         const matchesSearch = i.name.toLowerCase().includes(term);
         const matchesSupplier = filterSupplier === 'ALL' || i.supplier === filterSupplier;
         const matchesCategory = filterCategory === 'ALL' || i.category === filterCategory;
-        return matchesSearch && matchesSupplier && matchesCategory;
+        const matchesIncomplete = !incompleteOnly || i.incomplete;
+        return matchesSearch && matchesSupplier && matchesCategory && matchesIncomplete;
       });
+    } else if (activeTab === 'recipes') {
+      return recipes.filter(r => r.name.toLowerCase().includes(term));
     }
-    return recipes.filter(r => r.name.toLowerCase().includes(term));
-  }, [ingredients, recipes, search, activeTab, filterSupplier, filterCategory]);
+    return dishes.filter(d => d.name.toLowerCase().includes(term));
+  }, [ingredients, recipes, dishes, search, activeTab, filterSupplier, filterCategory, incompleteOnly]);
 
   const handleSeed = async () => {
     const ok = await confirm("Initialize database with default ingredients? This will write to your Firestore.");
@@ -41,26 +47,29 @@ const Sidebar: React.FC<SidebarProps> = ({ onSelectItem, activeTab, availableTab
     }
   };
 
-  const showIngredientsTab = availableTabs.includes('ingredients');
-  const showRecipesTab = availableTabs.includes('recipes');
   const showTabSwitcher = availableTabs.length > 1;
 
   return (
     <div className="flex flex-col h-full bg-[#111111]">
       <div className="p-4 border-b border-[#333333] space-y-3">
-        <h2 className="text-xs font-bold uppercase tracking-widest text-[#c8a96e] mb-1 flex items-center gap-2">
-          Library
-          {!showTabSwitcher && (
-            <>
-              <span className="text-[#333333] font-normal">//</span>
-              <span className="text-[#888888]">{activeTab}</span>
-            </>
+        <h2 className="text-xs font-bold uppercase tracking-widest text-[#c8a96e] mb-1 flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            Library
+            {!showTabSwitcher && (
+              <>
+                <span className="text-[#333333] font-normal">//</span>
+                <span className="text-[#888888]">{activeTab}</span>
+              </>
+            )}
+          </div>
+          {activeTab === 'ingredients' && ingredients.some(i => i.incomplete) && (
+             <span className="text-[8px] font-mono text-red-500 animate-pulse">! INCOMPLETE_DETECTED</span>
           )}
         </h2>
         
         <input
           type="text"
-          placeholder="Search items..."
+          placeholder="Search library..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className={`w-full ${UI_STYLES.input} !text-xs !py-1.5`}
@@ -93,22 +102,15 @@ const Sidebar: React.FC<SidebarProps> = ({ onSelectItem, activeTab, availableTab
 
         {showTabSwitcher && (
           <div className="flex border border-[#333333] mt-2">
-            {showIngredientsTab && (
+            {availableTabs.map(tab => (
               <button
-                onClick={() => onTabChange('ingredients')}
-                className={`flex-1 text-[10px] uppercase font-bold py-2 ${activeTab === 'ingredients' ? 'bg-[#c8a96e] text-black' : 'text-[#888888] hover:bg-[#1c1c1c]'}`}
+                key={tab}
+                onClick={() => onTabChange(tab)}
+                className={`flex-1 text-[9px] uppercase font-bold py-2 border-r last:border-r-0 border-[#333333] ${activeTab === tab ? 'bg-[#c8a96e] text-black' : 'text-[#888888] hover:bg-[#1c1c1c]'}`}
               >
-                Ingredients
+                {tab}
               </button>
-            )}
-            {showRecipesTab && (
-              <button
-                onClick={() => onTabChange('recipes')}
-                className={`flex-1 text-[10px] uppercase font-bold py-2 border-l border-[#333333] ${activeTab === 'recipes' ? 'bg-[#c8a96e] text-black' : 'text-[#888888] hover:bg-[#1c1c1c]'}`}
-              >
-                Recipes
-              </button>
-            )}
+            ))}
           </div>
         )}
       </div>
@@ -117,48 +119,48 @@ const Sidebar: React.FC<SidebarProps> = ({ onSelectItem, activeTab, availableTab
         {loading ? (
           <div className="p-4 text-xs font-mono text-[#666666]">Loading data...</div>
         ) : filteredItems.length === 0 ? (
-          <div className="p-8 text-center">
-             <div className="text-[10px] text-[#666666] font-mono mb-4 uppercase tracking-widest">No items found</div>
-             {activeTab === 'ingredients' && (
-               <div className="space-y-2">
-                 {connectionStatus === 'connected' ? (
-                   <button 
-                    onClick={handleSeed}
-                    className={`${UI_STYLES.button} w-full border border-[#333333] text-[#c8a96e] hover:bg-[#333333]`}
-                   >
-                     Initialize Library
-                   </button>
-                 ) : (
-                    <div className="text-[9px] text-yellow-600 font-mono">
-                      {connectionStatus === 'connecting' ? 'Connecting to database...' : 'Check connection'}
-                    </div>
-                 )}
-               </div>
+          <div className="p-8 text-center flex flex-col items-center">
+             <div className="text-[10px] text-[#666666] font-mono mb-6 uppercase tracking-widest">No items found</div>
+             {search.length > 0 && onCreateRequest && (
+               <button 
+                onClick={() => onCreateRequest(search, activeTab === 'ingredients' ? 'ingredient' : activeTab === 'recipes' ? 'recipe' : 'dish')}
+                className="w-full py-4 border border-[#c8a96e] text-[#c8a96e] text-[10px] font-bold uppercase tracking-widest hover:bg-[#c8a96e] hover:text-black transition-all mb-4"
+               >
+                 + Create "{search}"
+               </button>
              )}
           </div>
         ) : (
-          filteredItems.map(item => (
-            <div
-              key={item.id}
-              onClick={() => onSelectItem(item.id, activeTab === 'ingredients' ? 'ingredient' : 'recipe')}
-              className="px-4 py-3 border-b border-[#333333] hover:bg-[#1c1c1c] cursor-pointer group transition-colors"
-            >
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-sm font-sans group-hover:text-white transition-colors uppercase tracking-tight truncate pr-2">{item.name}</span>
-                <span className="text-[10px] font-mono text-[#666666] flex-shrink-0">{item.id.slice(0, 4)}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[9px] uppercase font-bold px-1.5 py-0.5 border border-[#333333] text-[#666666]">
-                  {activeTab === 'ingredients' ? (item as Ingredient).category : 'Sub-Recipe'}
-                </span>
-                {activeTab === 'ingredients' && (
-                  <span className="text-[10px] font-mono text-[#c8a96e]">
-                    £{((item as Ingredient).packCost / (item as Ingredient).packSize).toFixed(4)}/{(item as Ingredient).packUnit}
+          filteredItems.map(item => {
+            const isIncomplete = activeTab === 'ingredients' && (item as Ingredient).incomplete;
+            return (
+              <div
+                key={item.id}
+                onClick={() => onSelectItem(item.id, activeTab === 'ingredients' ? 'ingredient' : activeTab === 'recipes' ? 'recipe' : 'dish')}
+                className={`px-4 py-3 border-b border-[#333333] hover:bg-[#1c1c1c] cursor-pointer group transition-colors ${isIncomplete ? 'bg-red-950/10' : ''}`}
+              >
+                <div className="flex justify-between items-center mb-1">
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    {isIncomplete && <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse flex-shrink-0" />}
+                    <span className={`text-sm font-sans uppercase tracking-tight truncate ${isIncomplete ? 'text-red-400 group-hover:text-red-200' : 'group-hover:text-white'} transition-colors`}>
+                      {item.name}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono text-[#666666] flex-shrink-0">{item.id.slice(0, 4)}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-[9px] uppercase font-bold px-1.5 py-0.5 border border-[#333333] ${isIncomplete ? 'text-red-800 border-red-900/40' : 'text-[#666666]'}`}>
+                    {activeTab === 'ingredients' ? (item as Ingredient).category : activeTab === 'recipes' ? 'Recipe' : 'Dish'}
                   </span>
-                )}
+                  {activeTab === 'ingredients' && (
+                    <span className={`text-[10px] font-mono ${isIncomplete ? 'text-red-900' : 'text-[#c8a96e]'}`}>
+                      £{((item as Ingredient).packCost / (item as Ingredient).packSize).toFixed(4)}/{(item as Ingredient).packUnit}
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>

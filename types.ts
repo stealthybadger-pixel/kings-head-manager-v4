@@ -30,13 +30,14 @@ export interface Ingredient {
   allergens: Allergen[];
   kcalPer100: number;
   stockLevel: number;
+  incomplete?: boolean; // Flag for items created via OCR/Quick-add that need full data
   createdAt?: string;
   updatedAt?: string;
 }
 
 export interface RecipeItem {
-  type: 'ingredient';
-  ingredientId: string;
+  type: 'ingredient' | 'recipe';
+  id: string; // References either Ingredient.id or Recipe.id
   quantity: number;
   unit: Unit;
 }

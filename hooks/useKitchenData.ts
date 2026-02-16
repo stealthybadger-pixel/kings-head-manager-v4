@@ -23,7 +23,6 @@ export const useKitchenData = () => {
   const [error, setError] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
 
-  // Subscribe to Ingredients
   useEffect(() => {
     const q = query(collection(db, 'ingredients'), orderBy('name'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -42,7 +41,6 @@ export const useKitchenData = () => {
     return () => unsubscribe();
   }, []);
 
-  // Subscribe to Recipes
   useEffect(() => {
     const q = query(collection(db, 'recipes'), orderBy('updatedAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -57,7 +55,6 @@ export const useKitchenData = () => {
     return () => unsubscribe();
   }, []);
 
-  // Subscribe to Dishes
   useEffect(() => {
     const q = query(collection(db, 'dishes'), orderBy('updatedAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -74,7 +71,6 @@ export const useKitchenData = () => {
     return () => unsubscribe();
   }, []);
 
-  // Ingredient CRUD
   const addIngredient = useCallback(async (ingredient: Omit<Ingredient, 'id'>) => {
     try {
       const newIng = {
@@ -82,7 +78,8 @@ export const useKitchenData = () => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
-      await addDoc(collection(db, 'ingredients'), newIng);
+      const docRef = await addDoc(collection(db, 'ingredients'), newIng);
+      return { id: docRef.id, ...newIng } as Ingredient;
     } catch (err) {
       console.error("Error adding ingredient:", err);
       throw err;
@@ -111,7 +108,6 @@ export const useKitchenData = () => {
     }
   }, []);
 
-  // Recipe CRUD
   const saveRecipe = useCallback(async (recipe: Partial<Recipe>) => {
     try {
       const newRecipeData = {
@@ -149,7 +145,6 @@ export const useKitchenData = () => {
     }
   }, []);
 
-  // Dish CRUD
   const saveDish = useCallback(async (dish: Partial<Dish>) => {
     try {
       const newDishData = {
@@ -165,7 +160,28 @@ export const useKitchenData = () => {
     }
   }, []);
 
-  // Bulk Import logic
+  const updateDish = useCallback(async (id: string, dish: Partial<Dish>) => {
+    try {
+      const dishRef = doc(db, 'dishes', id);
+      await updateDoc(dishRef, {
+        ...dish,
+        updatedAt: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error("Error updating dish:", err);
+      throw err;
+    }
+  }, []);
+
+  const deleteDish = useCallback(async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'dishes', id));
+    } catch (err) {
+      console.error("Error deleting dish:", err);
+      throw err;
+    }
+  }, []);
+
   const bulkImport = useCallback(async (data: { ingredients: Ingredient[], recipes: Recipe[], dishes?: Dish[] }) => {
     setLoading(true);
     try {
@@ -229,6 +245,8 @@ export const useKitchenData = () => {
     updateRecipe,
     deleteRecipe,
     saveDish,
+    updateDish,
+    deleteDish,
     seedDatabase,
     bulkImport
   };
