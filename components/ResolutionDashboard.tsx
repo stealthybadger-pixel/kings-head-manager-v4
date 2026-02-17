@@ -5,7 +5,7 @@ import { useConfirmation } from '../hooks/useConfirmation';
 import { Recipe, RecipeItem, Unit, Ingredient } from '../types';
 import { parseRecipeContent, ParsedRecipe, ParsedIngredient } from '../utils/parser';
 import { UI_STYLES, APPROVED_SUPPLIERS } from '../constants';
-import { detectCategory, detectSupplierFromCategory } from '../utils/intelligence';
+import { detectCategory, detectSupplierFromCategory, normalizeName } from '../utils/intelligence';
 import { splitDocument, analyzeBulkCommit, executeBulkCommit, BulkCommitAnalysis } from '../services/batchProcessor';
 
 export const ResolutionDashboard: React.FC = () => {
@@ -97,6 +97,53 @@ export const ResolutionDashboard: React.FC = () => {
   const selectedRecipe = useMemo(() => {
     return recipes.find(r => r.id === selectedRecipeId);
   }, [selectedRecipeId, recipes]);
+
+  // --- EDIT & RESOLUTION LOGIC ---
+
+  const handleNameChange = (index: number, newName: string) => {
+    if (!parseResult) return;
+    
+    const updatedIngredients = [...parseResult.ingredients];
+    const item = { ...updatedIngredients[index] };
+    
+    item.name = newName;
+    
+    // Live Match Check
+    const normalized = normalizeName(newName).toLowerCase();
+    const match = ingredients.find(i => normalizeName(i.name).toLowerCase() === normalized);
+    
+    item.matchedId = match ? match.id : undefined;
+    updatedIngredients[index] = item;
+    
+    const matchedCount = updatedIngredients.filter(i => i.matchedId).length;
+    
+    setParseResult({
+        ...parseResult,
+        ingredients: updatedIngredients,
+        matchRate: matchedCount / updatedIngredients.length
+    });
+  };
+
+  const handleResetName = (index: number) => {
+    if (!parseResult) return;
+    const updatedIngredients = [...parseResult.ingredients];
+    const item = { ...updatedIngredients[index] };
+    item.name = item.originalName; // Revert to raw
+    
+    // Live Match Check for raw name
+    const normalized = normalizeName(item.name).toLowerCase();
+    const match = ingredients.find(i => normalizeName(i.name).toLowerCase() === normalized);
+    
+    item.matchedId = match ? match.id : undefined;
+    updatedIngredients[index] = item;
+    
+    const matchedCount = updatedIngredients.filter(i => i.matchedId).length;
+    setParseResult({
+        ...parseResult,
+        ingredients: updatedIngredients,
+        matchRate: matchedCount / updatedIngredients.length
+    });
+  };
 
   // --- BULK COMMIT ACTIONS ---
 
@@ -251,6 +298,7 @@ export const ResolutionDashboard: React.FC = () => {
       });
       if (parseResult) {
         const updatedIngredients = parseResult.ingredients.map(ing => {
+          // Check against both originalName (for unmodified items) and current name (for edited items)
           if (ing.name === creationData.originalName || ing.name === normalizedName) {
             return { ...ing, matchedId: newIng.id, name: normalizedName, normalizedName: normalizedName.toLowerCase() };
           }
@@ -519,7 +567,8 @@ export const ResolutionDashboard: React.FC = () => {
                 <div className="text-[8px] text-[#666] font-mono">NO PENDING ACTIONS</div>
              </div>
           ) : (
-            pendingRecipes.map(r => (
+            <>
+            {pendingRecipes.slice(0, 20).map(r => (
               <div 
                 key={r.id}
                 onClick={() => { setSelectedRecipeId(r.id); setParseResult(null); }}
@@ -534,7 +583,13 @@ export const ResolutionDashboard: React.FC = () => {
                    <div className="text-[8px] font-mono text-[#444]">{new Date(r.updatedAt || '').toLocaleDateString()}</div>
                 </div>
               </div>
-            ))
+            ))}
+            {pendingRecipes.length > 20 && (
+                <div className="p-4 text-center text-[10px] text-[#666] font-mono border-b border-[#333] bg-[#111]">
+                    + {pendingRecipes.length - 20} MORE PENDING ITEMS
+                </div>
+            )}
+            </>
           )}
         </div>
         {pendingRecipes.length > 0 && (
@@ -618,7 +673,23 @@ export const ResolutionDashboard: React.FC = () => {
                                         <td className="p-2 text-[10px] font-mono text-[#888] border-r border-[#333]">{ing.unit}</td>
                                         <td className="p-2 text-[10px] font-mono text-white border-r border-[#333]">
                                           {ing.originalName !== ing.name && <div className="text-[#888] line-through text-[9px] mb-0.5">{ing.originalName}</div>}
-                                          {ing.name}
+                                          <div className="flex items-center gap-2 group/edit">
+                                            <input 
+                                                type="text" 
+                                                value={ing.name}
+                                                onChange={(e) => handleNameChange(idx, e.target.value)}
+                                                className="bg-transparent border border-[#333333] text-[#C8A96E] px-2 py-1 w-full outline-none focus:border-[#C8A96E] text-[10px] font-mono transition-colors rounded-none"
+                                            />
+                                            {ing.name !== ing.originalName && (
+                                                <button 
+                                                    onClick={() => handleResetName(idx)}
+                                                    title="Reset to raw text"
+                                                    className="text-[#333] hover:text-[#C8A96E] opacity-0 group-hover/edit:opacity-100 transition-all"
+                                                >
+                                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                                </button>
+                                            )}
+                                          </div>
                                           {ing.mappedNote && <div className="text-[8px] text-[#c8a96e] mt-0.5 font-bold">NOTE: "{ing.mappedNote}"</div>}
                                         </td>
                                         <td className="p-2">

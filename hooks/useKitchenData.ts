@@ -78,18 +78,36 @@ const DEFAULT_INGREDIENTS: Omit<Ingredient, 'id'>[] = [
 ];
 
 // Utility to recursively strip undefined values which cause Firestore updateDoc to fail
+// HARDENED: Prevents "Maximum call stack size exceeded" by ignoring non-plain objects
 const cleanObject = (obj: any): any => {
+  // Primitives and null
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+
+  // Handle Date specifically (common in this app)
+  if (obj instanceof Date) {
+    return obj.toISOString();
+  }
+
+  // Arrays: Recurse mapped
   if (Array.isArray(obj)) {
     return obj.map(v => cleanObject(v));
-  } else if (obj !== null && typeof obj === 'object') {
-    return Object.entries(obj).reduce((acc, [k, v]) => {
-      if (v !== undefined) {
-        acc[k] = cleanObject(v);
-      }
-      return acc;
-    }, {} as any);
   }
-  return obj;
+
+  // Guard against complex objects (Firestore References, Class Instances, etc.)
+  // Only recurse into Plain Objects (POJOs)
+  if (obj.constructor !== Object && obj.constructor !== undefined) {
+    return obj; 
+  }
+
+  // Plain Objects: Recurse entries
+  return Object.entries(obj).reduce((acc, [k, v]) => {
+    if (v !== undefined) {
+      acc[k] = cleanObject(v);
+    }
+    return acc;
+  }, {} as any);
 };
 
 export const useKitchenData = () => {

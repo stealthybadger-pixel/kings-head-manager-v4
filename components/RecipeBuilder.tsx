@@ -42,25 +42,34 @@ const GridItemSelect: React.FC<{
   
   useEffect(() => {
     if (selectedItem && !isOpen) {
-      setSearch(selectedItem.name);
+      if (search !== selectedItem.name) {
+        setSearch(selectedItem.name);
+      }
     } else if (!selectedItem && !isOpen && value) {
-       setSearch('UNKNOWN ITEM');
+       if (search !== 'UNKNOWN ITEM') {
+         setSearch('UNKNOWN ITEM');
+       }
     } else if (!value && !isOpen) {
-       setSearch('');
+       if (search !== '') {
+         setSearch('');
+       }
     }
-  }, [selectedItem, isOpen, value]);
+  }, [selectedItem, isOpen, value, search]);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
         setIsOpen(false);
-        if (selectedItem) setSearch(selectedItem.name);
-        else setSearch('');
+        if (selectedItem) {
+            if (search !== selectedItem.name) setSearch(selectedItem.name);
+        } else {
+            if (search !== '') setSearch('');
+        }
       }
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
-  }, [selectedItem]);
+  }, [selectedItem, search]);
 
   const filtered = useMemo(() => {
     if (!search && isOpen) return options.slice(0, 100);
@@ -141,8 +150,6 @@ const GridItemSelect: React.FC<{
     </div>
   );
 };
-
-// ... (Rest of component Props and implementation same as before until grid loop) ...
 
 interface RecipeBuilderProps {
   stagedItemId: string | null;
