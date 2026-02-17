@@ -53,8 +53,8 @@ export const generatePrepCorrectionReport = (recipes: Recipe[], ingredientsDB: I
     // Conflict Handling: Skip active unless force is true
     if (!force && recipe.status === 'active') return;
 
-    // Re-run the enhanced parser
-    const newParse = parseRecipeContent(recipe.raw_text, ingredientsDB);
+    // Re-run the enhanced parser with title guard
+    const newParse = parseRecipeContent(recipe.raw_text, ingredientsDB, recipe.name);
 
     // Identify items that have extracted notes using the new parser logic
     newParse.ingredients.forEach(p => {
@@ -94,7 +94,8 @@ export const applyPrepCorrections = async (
     chunk.forEach((recipe, idx) => {
       if (!recipe.raw_text) return;
       
-      const newParse = parseRecipeContent(recipe.raw_text, ingredientsDB);
+      // Pass recipe.name to enable title guard during bulk correction
+      const newParse = parseRecipeContent(recipe.raw_text, ingredientsDB, recipe.name);
       
       const newItems: RecipeItem[] = newParse.ingredients.map(p => {
         let note = p.mappedNote;
@@ -171,7 +172,8 @@ export const analyzeBulkCommit = (
   pendingRecipes.forEach(pending => {
     if (!pending.raw_text) return; // Skip empty stuff
 
-    const parsed = parseRecipeContent(pending.raw_text, ingredientsDB);
+    // Pass pending.name for title guard
+    const parsed = parseRecipeContent(pending.raw_text, ingredientsDB, pending.name);
     const pendingNameNorm = normalizeName(pending.name).toLowerCase();
     
     // Check for collision
@@ -239,21 +241,6 @@ export const executeBulkCommit = async (
         instructions: action.instructions,
         status: action.items.some(it => !it.id) ? 'needs_resolution' : 'active',
         updatedAt: new Date().toISOString(),
-        // Keep raw_text as "Original Bill of Lading" in both cases
-        // For Update: we might want to update raw_text on the target if it's a replacement? 
-        // Logic: Yes, if we are overwriting, we update the raw_text too to match the new version.
-        // Wait, prompt says "DO NOT overwrite the raw_text". 
-        // "Field Protection: DO NOT overwrite the raw_text. We need that as our 'Original Bill of Lading'..."
-        // BUT, if we are merging a NEW pending file into an OLD active file, the pending file HAS the raw text.
-        // The old active file might have OLD raw text. 
-        // If we don't overwrite, the old active file has old text but new items. Mismatch.
-        // HOWEVER, strict adherence: "Ensure that raw_text remains untouched so we can always re-parse"
-        // If 'id is new' (CREATE), we keep the pending doc's raw_text.
-        // If 'id exists' (UPDATE), we are updating *targetId*. 
-        // If we don't update raw_text on targetId, it keeps its old text.
-        // BUT we are *merging*. 
-        // Let's follow strict instruction: "DO NOT overwrite the raw_text."
-        // This implies for UPDATE operations, we only update parsed fields.
       };
 
       if (action.type === 'UPDATE') {

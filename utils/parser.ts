@@ -116,7 +116,7 @@ const isMethodLine = (line: string): boolean => {
   return false;
 };
 
-export const parseRecipeContent = (text: string, ingredientsDB: Ingredient[]): ParsedRecipe => {
+export const parseRecipeContent = (text: string, ingredientsDB: Ingredient[], recipeTitle?: string): ParsedRecipe => {
   if (!text) return { ingredients: [], method: [], matchRate: 0 };
 
   const lines = text.split('\n').map(l => l.trim()).filter(l => l);
@@ -125,6 +125,9 @@ export const parseRecipeContent = (text: string, ingredientsDB: Ingredient[]): P
   const methodLines: string[] = [];
   
   let parsingMethodSection = false;
+  
+  // Guard: Normalize title for comparison
+  const normalizedTitle = recipeTitle ? normalizeName(recipeTitle) : null;
 
   for (const line of lines) {
     // Check for Section Headers that force a switch
@@ -155,6 +158,13 @@ export const parseRecipeContent = (text: string, ingredientsDB: Ingredient[]): P
       
       // Name Normalization
       const normalized = normalizeName(cleanName);
+
+      // TITLE GUARD: Prevent parsing the recipe title as an ingredient of itself
+      // e.g. "Pork Cheek" inside "Pork Cheek" recipe
+      if (normalizedTitle && (normalized === normalizedTitle || cleanName.toLowerCase() === recipeTitle?.toLowerCase().trim())) {
+         console.debug(`[GUARD] REMOVED TITLE "${recipeTitle}" FROM INGREDIENTS`);
+         continue; 
+      }
 
       // Strict Matching (No Auto-Correct)
       // We check if any ingredient in DB has a normalized name that strictly matches

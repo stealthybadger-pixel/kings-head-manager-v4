@@ -124,6 +124,26 @@ export const ResolutionDashboard: React.FC = () => {
     });
   };
 
+  const handleQtyChange = (index: number, newQty: number) => {
+    if (!parseResult) return;
+    const updatedIngredients = [...parseResult.ingredients];
+    updatedIngredients[index] = { 
+        ...updatedIngredients[index], 
+        qty: isNaN(newQty) ? 0 : newQty 
+    };
+    setParseResult({ ...parseResult, ingredients: updatedIngredients });
+  };
+
+  const handleUnitChange = (index: number, newUnit: Unit) => {
+    if (!parseResult) return;
+    const updatedIngredients = [...parseResult.ingredients];
+    updatedIngredients[index] = { 
+        ...updatedIngredients[index], 
+        unit: newUnit 
+    };
+    setParseResult({ ...parseResult, ingredients: updatedIngredients });
+  };
+
   const handleResetName = (index: number) => {
     if (!parseResult) return;
     const updatedIngredients = [...parseResult.ingredients];
@@ -190,7 +210,8 @@ export const ResolutionDashboard: React.FC = () => {
 
   const handleTestParse = () => {
     if (!selectedRecipe?.raw_text) return;
-    const result = parseRecipeContent(selectedRecipe.raw_text, ingredients);
+    // Guard: Pass recipe name to parser to exclude self-reference
+    const result = parseRecipeContent(selectedRecipe.raw_text, ingredients, selectedRecipe.name);
     setParseResult(result);
     setCommitError(null);
   };
@@ -669,8 +690,28 @@ export const ResolutionDashboard: React.FC = () => {
                                   <tbody className="divide-y divide-[#222]">
                                     {parseResult.ingredients.map((ing, idx) => (
                                       <tr key={idx} className={`hover:bg-[#1a1a1a] ${!ing.matchedId ? 'bg-red-950/10' : ''}`}>
-                                        <td className="p-2 text-[10px] font-mono text-white border-r border-[#333] text-right">{ing.qty}</td>
-                                        <td className="p-2 text-[10px] font-mono text-[#888] border-r border-[#333]">{ing.unit}</td>
+                                        <td className="p-2 text-[10px] font-mono text-white border-r border-[#333] text-right">
+                                            <input 
+                                                type="number"
+                                                step="0.01"
+                                                value={ing.qty}
+                                                onChange={(e) => handleQtyChange(idx, parseFloat(e.target.value))}
+                                                className="bg-[#111111] border border-[#333333] text-right w-16 text-[#c8a96e] focus:border-[#c8a96e] outline-none text-[10px] font-mono p-1 rounded-none"
+                                            />
+                                        </td>
+                                        <td className="p-2 text-[10px] font-mono text-[#888] border-r border-[#333]">
+                                            <select 
+                                                value={ing.unit}
+                                                onChange={(e) => handleUnitChange(idx, e.target.value as Unit)}
+                                                className="bg-[#111111] border border-[#333333] text-[#888] focus:border-[#c8a96e] outline-none text-[10px] font-mono p-1 w-full rounded-none"
+                                            >
+                                                <option value="ea">ea</option>
+                                                <option value="g">g</option>
+                                                <option value="kg">kg</option>
+                                                <option value="ml">ml</option>
+                                                <option value="l">l</option>
+                                            </select>
+                                        </td>
                                         <td className="p-2 text-[10px] font-mono text-white border-r border-[#333]">
                                           {ing.originalName !== ing.name && <div className="text-[#888] line-through text-[9px] mb-0.5">{ing.originalName}</div>}
                                           <div className="flex items-center gap-2 group/edit">

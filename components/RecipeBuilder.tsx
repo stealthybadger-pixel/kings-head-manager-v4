@@ -258,21 +258,26 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
   useEffect(() => {
     if (stagedItemType === 'recipe' && stagedObject && !isEditing && !isManualNew) {
       const r = stagedObject as Recipe;
-      setRecipeName(r.name);
-      setBatchSize(r.batchSize || 1);
-      setBatchUnit(r.batchUnit || 'kg');
-      setGridItems(r.items || []);
-      setInstructions(r.instructions || '');
-      setActiveRecipeId(r.id);
+      // Stability Check: Only update if ID has changed to prevent render loops on object ref changes
+      if (activeRecipeId !== r.id) {
+        setRecipeName(r.name);
+        setBatchSize(r.batchSize || 1);
+        setBatchUnit(r.batchUnit || 'kg');
+        setGridItems(r.items || []);
+        setInstructions(r.instructions || '');
+        setActiveRecipeId(r.id);
+      }
     } else if (!stagedItemId && !isEditing && !isManualNew) {
       // Reset if nothing selected and not editing
-      setRecipeName('New Recipe');
-      setBatchSize(1);
-      setGridItems([]);
-      setInstructions('');
-      setActiveRecipeId(null);
+      if (activeRecipeId !== null) {
+        setRecipeName('New Recipe');
+        setBatchSize(1);
+        setGridItems([]);
+        setInstructions('');
+        setActiveRecipeId(null);
+      }
     }
-  }, [stagedObject, stagedItemId, stagedItemType, isEditing, isManualNew]);
+  }, [stagedObject, stagedItemId, stagedItemType, isEditing, isManualNew, activeRecipeId]);
 
   const enterEditMode = () => {
     setIsEditing(true);
@@ -397,9 +402,19 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
     return pref?.packUnit || 'g';
   };
 
-  const calculateRecursiveUnitCost = (rid: string): number => {
+  const calculateRecursiveUnitCost = (rid: string, visited = new Set<string>()): number => {
+    // 1. Guard: Check if we've been here before
+    if (visited.has(rid)) {
+      console.warn(`[CIRCULAR_REF_DETECTED] Recipe ${rid} references itself.`);
+      return 0;
+    }
+    
+    // 2. Track: Add current ID to visited set
+    const newVisited = new Set(visited).add(rid);
+
     const rec = recipes.find(r => r.id === rid);
     if (!rec) return 0;
+    
     const batchCost = rec.items.reduce((acc, item) => {
       // Robust ID check
       const itemId = item.id || (item as any).ingredientId || (item as any).recipeId;
@@ -410,7 +425,8 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
         if (!ing) return acc;
         return acc + (getConvertedQuantity(item.quantity, item.unit, getIngredientPackUnit(ing)) * getIngredientCost(ing));
       } else {
-        return acc + (item.quantity * calculateRecursiveUnitCost(itemId));
+        // 3. Recurse: Pass the new set
+        return acc + (item.quantity * calculateRecursiveUnitCost(itemId, newVisited));
       }
     }, 0);
     return rec.batchSize > 0 ? batchCost / rec.batchSize : 0;
@@ -426,7 +442,9 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
       if (!ing) return acc;
       return acc + (getConvertedQuantity(item.quantity, item.unit, getIngredientPackUnit(ing)) * getIngredientCost(ing));
     }
-    return acc + (item.quantity * calculateRecursiveUnitCost(itemId));
+    // Initialize recursion guard with active ID to catch immediate parent-child loops
+    const visited = activeRecipeId ? new Set([activeRecipeId]) : new Set<string>();
+    return acc + (item.quantity * calculateRecursiveUnitCost(itemId, visited));
   }, 0);
   
   const unitCost = batchSize > 0 ? totalCostBase / batchSize : 0;
@@ -536,7 +554,9 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
                        cost = getConvertedQuantity(item.quantity, item.unit, getIngredientPackUnit(ing)) * getIngredientCost(ing);
                      }
                   } else if (rawId) {
-                     cost = item.quantity * calculateRecursiveUnitCost(rawId);
+                     // Pass visited set to prevent infinite loop on item render
+                     const visited = activeRecipeId ? new Set([activeRecipeId]) : new Set<string>();
+                     cost = item.quantity * calculateRecursiveUnitCost(rawId, visited);
                   }
                   
                   // Apply scaling to display cost
@@ -599,7 +619,13 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
                           <option value="g">g</option><option value="ml">ml</option><option value="kg">kg</option><option value="l">l</option><option value="ea">ea</option>
                         </select>
                       </div>
-                      <div className="w-24 text-right px-4 border-l border-[#333] ml-4 text-xs font-mono text-[#c8a96e]">£{cost.toFixed(4)}</div>
+                      <div className="w-24 text-right px-4 border-l border-[#333] ml-4 text-xs font-mono text-[#c8a96e]">
+                        £{cost.toFixed(4)}
+                        {/* Error Indicator for Loop/Zero */}
+                        {item.type === 'recipe' && cost === 0 && item.quantity > 0 && (
+                           <div className="h-px bg-red-500 w-full mt-0.5 opacity-50" title="Cost Error: Circular Reference or Missing Data"></div>
+                        )}
+                      </div>
                       <div className="flex gap-1 ml-2">
                         {onPushRecipe && item.type === 'recipe' && component && (
                           <button onClick={() => onPushRecipe(component.name)} className="p-2 text-[#4a5568] hover:text-white transition-colors">
