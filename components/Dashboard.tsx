@@ -127,7 +127,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           className="bg-[#1a1a1a] border border-[#333333] p-1.5 md:p-2 text-left hover:border-[#c8a96e] transition-all group"
         >
           <div className="flex justify-between items-start">
-            <div className="text-[8px] font-bold uppercase tracking-widest text-[#888888]">Dish Development</div>
+            <div className="text-[8px] font-bold uppercase tracking-widest text-[#888888]">DISH LIBRARY</div>
             <div className="text-[10px] text-[#444] font-mono">03</div>
           </div>
           <div className="text-xl md:text-2xl font-mono text-[#e0e0e0] group-hover:text-[#c8a96e] transition-colors">{dishes.length}</div>

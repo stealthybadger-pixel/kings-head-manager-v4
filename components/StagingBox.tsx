@@ -7,9 +7,10 @@ interface StagingBoxProps {
   item: Ingredient | Recipe;
   onAdd: (item: any) => void;
   onCancel: () => void;
+  submitLabel?: string;
 }
 
-const StagingBox: React.FC<StagingBoxProps> = ({ item, onAdd, onCancel }) => {
+const StagingBox: React.FC<StagingBoxProps> = ({ item, onAdd, onCancel, submitLabel = "Add to Build" }) => {
   const [qty, setQty] = useState<string>('0');
   const [unit, setUnit] = useState<Unit>('g');
 
@@ -40,7 +41,7 @@ const StagingBox: React.FC<StagingBoxProps> = ({ item, onAdd, onCancel }) => {
         <label className={UI_STYLES.label}>Selected Item</label>
         <div className="text-sm font-bold uppercase truncate text-[#c8a96e]">{item.name}</div>
         <div className="text-[10px] text-[#666666] font-mono mt-0.5">
-          {isIngredient ? 'REGISTRY_ING' : 'REGISTRY_REC'} // {item.id?.slice(0, 8)}
+          {isIngredient ? 'REGISTRY_ING' : 'REGISTRY_REC'}
         </div>
       </div>
 
@@ -75,7 +76,7 @@ const StagingBox: React.FC<StagingBoxProps> = ({ item, onAdd, onCancel }) => {
           onClick={handleAdd}
           className={`${UI_STYLES.button} flex-1 bg-[#c8a96e] text-black hover:bg-[#b8985e] border border-black/20`}
         >
-          Add to Build
+          {submitLabel}
         </button>
         <button 
           onClick={onCancel}

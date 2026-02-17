@@ -6,6 +6,7 @@ export const COLORS = {
   borderLight: '#404040',
   accent: '#c8a96e', // Gold
   warning: '#ff4d4d', // Red
+  petrol: '#005f73', // Petrol Blue for Active/Edit states
   text: '#e0e0e0',
   textMuted: '#888888',
   recipe: '#4a5568', // Desaturated slate blue for recipes

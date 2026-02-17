@@ -1,10 +1,10 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Dish, DishItem, Unit, Recipe, Ingredient, Allergen } from '../types';
 import { useKitchenData } from '../hooks/useKitchenData';
 import { useConfirmation } from '../hooks/useConfirmation';
 import { UI_STYLES, COLORS } from '../constants';
-import StagingBox from './StagingBox';
+import { SourceTag } from './SourceTag';
 
 const getConvertedQuantity = (quantity: number, fromUnit: Unit, toUnit: Unit): number => {
   if (fromUnit === toUnit) return quantity;
@@ -15,6 +15,111 @@ const getConvertedQuantity = (quantity: number, fromUnit: Unit, toUnit: Unit): n
   return quantity; 
 };
 
+interface SearchOption {
+  id: string;
+  name: string;
+  type: 'ingredient' | 'recipe';
+  sub: string;
+  unit: Unit;
+}
+
+const GridItemSelect: React.FC<{
+  value: string;
+  type: 'ingredient' | 'recipe';
+  options: SearchOption[];
+  onSelect: (option: SearchOption) => void;
+  isEditing: boolean;
+  placeholder?: string;
+}> = ({ value, type, options, onSelect, isEditing, placeholder }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  const selectedItem = options.find(o => o.id === value && o.type === type);
+  
+  useEffect(() => {
+    if (selectedItem && !isOpen) {
+      setSearch(selectedItem.name);
+    } else if (!selectedItem && !isOpen && value) {
+       setSearch('UNKNOWN ITEM');
+    }
+  }, [selectedItem, isOpen, value]);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+        if (selectedItem) setSearch(selectedItem.name);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [selectedItem]);
+
+  const filtered = useMemo(() => {
+    if (!search && isOpen) return options.slice(0, 100);
+    const lower = search.toLowerCase();
+    return options
+      .filter(o => o.name.toLowerCase().includes(lower))
+      .sort((a, b) => {
+         const aStarts = a.name.toLowerCase().startsWith(lower);
+         const bStarts = b.name.toLowerCase().startsWith(lower);
+         if (aStarts && !bStarts) return -1;
+         if (!aStarts && bStarts) return 1;
+         return a.name.localeCompare(b.name);
+      })
+      .slice(0, 20);
+  }, [options, search, isOpen]);
+
+  if (!isEditing) {
+     return (
+       <div className={`text-xs font-bold uppercase ${!selectedItem && value ? 'text-red-500' : 'text-white'}`}>
+         {selectedItem ? selectedItem.name : (placeholder || (value ? 'UNKNOWN ITEM' : 'INVALID'))}
+         {!selectedItem && value && <span className="ml-2 text-[8px] bg-red-900/30 text-red-500 px-1 border border-red-900">DELETED</span>}
+       </div>
+     );
+  }
+
+  return (
+    <div ref={wrapperRef} className="relative w-full">
+      <input
+        type="text"
+        value={search}
+        onFocus={() => setIsOpen(true)}
+        onChange={(e) => { setSearch(e.target.value); setIsOpen(true); }}
+        placeholder={placeholder}
+        className={`w-full bg-transparent text-xs font-bold uppercase outline-none px-2 py-1 transition-colors ${isOpen ? 'border border-[#005f73] bg-[#111]' : 'border border-transparent'}`}
+      />
+      {isOpen && (
+        <div className="absolute top-full left-0 w-full z-[999] bg-[#111] border border-[#333] max-h-48 overflow-y-auto shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
+           {filtered.length > 0 ? filtered.map(opt => (
+             <div 
+               key={`${opt.type}-${opt.id}`}
+               onMouseDown={(e) => {
+                 e.preventDefault(); // Prevent blur before click
+                 onSelect(opt); 
+                 setIsOpen(false); 
+                 setSearch(opt.name);
+               }}
+               className="px-2 py-2 hover:bg-[#005f73] hover:text-white cursor-pointer flex justify-between items-center group border-b border-[#222] last:border-0"
+             >
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-bold uppercase text-[#e0e0e0] group-hover:text-white">
+                    <SourceTag type={opt.type} className="mr-2" />
+                    {opt.name}
+                  </span>
+                  <span className="text-[8px] font-mono text-[#666] group-hover:text-[#ccc]">{opt.sub}</span>
+                </div>
+             </div>
+           )) : (
+             <div className="p-2 text-[9px] text-[#666] uppercase">No matches found</div>
+           )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 interface DishBuilderProps {
   onPushRecipe: (name?: string) => void;
   onPushIngredient: (name?: string) => void;
@@ -23,13 +128,21 @@ interface DishBuilderProps {
   clearStaged: () => void;
   onSetLibraryTab: (tab: any) => void;
   onSetAvailableTabs: (tabs: any) => void;
+  onModeChange: (isEditing: boolean) => void;
+  onInspect?: (id: string, type: 'ingredient' | 'recipe') => void;
+  inspectedItem?: {id: string, type: 'ingredient' | 'recipe'} | null;
 }
 
 export const DishBuilder: React.FC<DishBuilderProps> = ({ 
-  onPushRecipe, onPushIngredient, stagedItemId, stagedItemType, clearStaged, onSetLibraryTab, onSetAvailableTabs
+  onPushRecipe, onPushIngredient, stagedItemId, stagedItemType, clearStaged, onSetLibraryTab, onSetAvailableTabs, onModeChange, onInspect, inspectedItem
 }) => {
   const { ingredients, recipes, dishes, saveDish, updateDish, deleteDish } = useKitchenData();
   const { confirm } = useConfirmation();
+  
+  // Refs for focus and scroll
+  const quantityRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const scrollBottomRef = useRef<HTMLDivElement>(null);
+  const [focusTarget, setFocusTarget] = useState<number | null>(null);
 
   const [dishName, setDishName] = useState('New Service Dish');
   const [targetGP, setTargetGP] = useState(70);
@@ -44,6 +157,54 @@ export const DishBuilder: React.FC<DishBuilderProps> = ({
     : stagedItemType === 'recipe' 
       ? recipes.find(r => r.id === stagedItemId)
       : dishes.find(d => d.id === stagedItemId);
+
+  // Sync state with parent App (Sidebar Control)
+  // Reverts to DishList in Browse Mode, Switches to Hybrid in Edit Mode
+  useEffect(() => {
+    onModeChange(isEditing);
+    if (isEditing) {
+       onSetAvailableTabs(['ingredients', 'recipes']);
+       onSetLibraryTab('ingredients'); // Default tab, but Sidebar isHybrid handles display
+    } else {
+       onSetAvailableTabs(['dishes']);
+       onSetLibraryTab('dishes');
+    }
+  }, [isEditing, onModeChange, onSetAvailableTabs, onSetLibraryTab]);
+
+  // Direct Injection Logic
+  useEffect(() => {
+    if (isEditing && stagedItemId && stagedObject && stagedItemType !== 'dish') {
+      let defaultUnit: Unit = 'ea';
+      if ('packUnit' in stagedObject) {
+         defaultUnit = stagedObject.packUnit;
+      } else if ('batchUnit' in stagedObject) {
+         defaultUnit = (stagedObject as Recipe).batchUnit || 'ea';
+      }
+
+      const newItem: DishItem = {
+        id: stagedItemId,
+        type: stagedItemType as 'ingredient' | 'recipe',
+        quantity: 0,
+        unit: defaultUnit
+      };
+
+      setItems(prev => {
+        const next = [...prev, newItem];
+        setFocusTarget(next.length - 1);
+        return next;
+      });
+      clearStaged();
+    }
+  }, [stagedItemId, isEditing, stagedObject, stagedItemType, clearStaged]);
+
+  // Handle Focus & Scroll
+  useEffect(() => {
+    if (focusTarget !== null && quantityRefs.current[focusTarget]) {
+      quantityRefs.current[focusTarget]?.focus();
+      scrollBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+      setFocusTarget(null);
+    }
+  }, [items, focusTarget]);
 
   // Sync View Mode
   useEffect(() => {
@@ -64,8 +225,6 @@ export const DishBuilder: React.FC<DishBuilderProps> = ({
 
   const enterEditMode = () => {
     setIsEditing(true);
-    onSetAvailableTabs(['ingredients', 'recipes']);
-    onSetLibraryTab('ingredients');
   };
 
   const handleStartNew = () => {
@@ -75,12 +234,10 @@ export const DishBuilder: React.FC<DishBuilderProps> = ({
     setItems([]);
     setInstructions('');
     setActiveDishId(null);
-    onSetAvailableTabs(['ingredients', 'recipes']);
-    onSetLibraryTab('ingredients');
   };
 
   const handleDiscard = async () => {
-    if (await confirm("Discard changes?")) {
+    if (await confirm("DISCARD CHANGES? All progress on the pass will be lost.")) {
       setIsEditing(false);
       if (!stagedItemId) {
         setDishName('New Service Dish');
@@ -89,18 +246,14 @@ export const DishBuilder: React.FC<DishBuilderProps> = ({
     }
   };
 
-  const addItem = (newItem: any) => {
-    setItems(prev => [...prev, {
-      id: stagedItemId!,
-      type: stagedItemType as 'ingredient' | 'recipe',
-      quantity: newItem.quantity,
-      unit: newItem.unit
-    }]);
-    clearStaged();
-  };
-
   const updateItem = (idx: number, updates: Partial<DishItem>) => {
     setItems(prev => prev.map((item, i) => i === idx ? { ...item, ...updates } : item));
+  };
+  
+  const swapItem = (idx: number, option: SearchOption) => {
+    setItems(prev => prev.map((item, i) => 
+      i === idx ? { ...item, id: option.id, type: option.type, unit: option.unit } : item
+    ));
   };
 
   const getIngredientCost = (ing: Ingredient) => {
@@ -162,6 +315,25 @@ export const DishBuilder: React.FC<DishBuilderProps> = ({
     });
     return Array.from(allergenSet).sort();
   }, [items, ingredients, recipes]);
+  
+  // Build Unified Search Options for Inline Swap
+  const searchOptions: SearchOption[] = useMemo(() => {
+    const i = ingredients.map(ing => ({ 
+      id: ing.id, 
+      name: ing.name, 
+      type: 'ingredient' as const, 
+      sub: ing.category,
+      unit: ing.suppliers.find(s=>s.isPreferred)?.packUnit || 'g' as Unit
+    }));
+    const r = recipes.map(rec => ({ 
+      id: rec.id, 
+      name: rec.name, 
+      type: 'recipe' as const, 
+      sub: 'Sub-Recipe',
+      unit: rec.batchUnit
+    }));
+    return [...i, ...r].sort((a, b) => a.name.localeCompare(b.name));
+  }, [ingredients, recipes]);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -197,126 +369,145 @@ export const DishBuilder: React.FC<DishBuilderProps> = ({
   const isViewMode = !isEditing && !!stagedItemId && stagedItemType === 'dish';
 
   return (
-    <div className="flex flex-col h-full bg-[#111111] overflow-hidden">
-      <div className="p-4 border-b border-[#333333] bg-[#1c1c1c] flex flex-wrap gap-4 justify-between items-center">
-        <div className="flex flex-col">
-          <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#888888]">Dish Details</span>
-          <input 
-            value={dishName} readOnly={!isEditing} onChange={e => setDishName(e.target.value)}
-            className={`bg-transparent border-b border-[#333333] focus:border-[#c8a96e] text-lg font-sans font-bold px-1 outline-none w-80 ${!isEditing ? 'opacity-50' : ''}`}
-            placeholder="DISH NAME"
-          />
+    <div className="flex flex-col h-full bg-[#111111] overflow-hidden p-2 relative">
+      {/* THE STAGING ENVELOPE */}
+      <div className={`flex flex-col h-full bg-[#111111] overflow-hidden transition-all duration-0 ${isEditing ? 'border-2 border-[#005f73]' : 'border border-[#333333]'}`}>
+        
+        <div className="p-4 border-b border-[#333333] bg-[#1c1c1c] flex flex-wrap gap-4 justify-between items-center">
+          <div className="flex flex-col">
+            <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#888888]">Dish Details</span>
+            <input 
+              value={dishName} readOnly={!isEditing} onChange={e => setDishName(e.target.value)}
+              className={`bg-transparent border-b border-[#333333] focus:border-[#c8a96e] text-lg font-sans font-bold px-1 outline-none w-80 text-[#c8a96e] ${!isEditing ? 'opacity-50' : ''}`}
+              placeholder="DISH NAME"
+            />
+          </div>
+          <div className="flex gap-4 items-center">
+            <div className={`text-right ${!isEditing ? 'opacity-30' : ''}`}>
+               <div className={UI_STYLES.label}>Target GP %</div>
+               <input type="number" disabled={!isEditing} value={targetGP} onChange={e => setTargetGP(parseInt(e.target.value) || 0)} className="bg-transparent text-right font-mono text-xl text-[#c8a96e] w-16 outline-none" />
+            </div>
+            <div className="flex gap-2">
+              {isEditing ? (
+                <>
+                  <button onClick={handleDiscard} className={`${UI_STYLES.button} border border-[#333333] text-[#888888] hover:text-white`}>Discard</button>
+                  <button onClick={handleSave} disabled={items.length === 0 || isSaving} className={`${UI_STYLES.button} bg-[#005f73] hover:bg-[#004a5d] text-white disabled:opacity-20`}>{isSaving ? 'COMMITTING...' : 'Save Changes'}</button>
+                </>
+              ) : (
+                <>
+                  <button onClick={handleStartNew} className={`${UI_STYLES.button} border border-[#333333] text-[#e0e0e0] hover:bg-[#c8a96e] hover:text-black`}>New</button>
+                  {isViewMode && (
+                    <>
+                      <button onClick={enterEditMode} className={`${UI_STYLES.button} border border-[#333333] text-[#e0e0e0] hover:bg-[#c8a96e] hover:text-black`}>Edit</button>
+                      <button onClick={handleDelete} className={`${UI_STYLES.button} border border-[#333333] text-[#888] hover:bg-red-900 hover:text-red-500`}>Delete</button>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
         </div>
-        <div className="flex gap-4 items-center">
-          <div className={`text-right ${!isEditing ? 'opacity-30' : ''}`}>
-             <div className={UI_STYLES.label}>Target GP %</div>
-             <input type="number" disabled={!isEditing} value={targetGP} onChange={e => setTargetGP(parseInt(e.target.value) || 0)} className="bg-transparent text-right font-mono text-xl text-[#c8a96e] w-16 outline-none" />
-          </div>
-          <div className="flex gap-2">
-            {isEditing ? (
-              <>
-                <button onClick={handleDiscard} className={`${UI_STYLES.button} border border-[#333333] text-[#888888] hover:text-white`}>Discard</button>
-                <button onClick={handleSave} disabled={items.length === 0 || isSaving} className={`${UI_STYLES.button} bg-[#c8a96e] text-black disabled:opacity-20`}>{isSaving ? 'COMMITTING...' : 'Save Changes'}</button>
-              </>
-            ) : (
-              <>
-                <button onClick={handleStartNew} className={`${UI_STYLES.button} border border-[#333333] text-[#e0e0e0] hover:bg-[#c8a96e] hover:text-black`}>New Plate</button>
-                {isViewMode && (
-                  <>
-                    <button onClick={enterEditMode} className={`${UI_STYLES.button} border border-[#333333] text-[#e0e0e0] hover:bg-[#c8a96e] hover:text-black`}>Edit</button>
-                    <button onClick={handleDelete} className={`${UI_STYLES.button} border border-[#333333] text-[#888] hover:bg-red-900 hover:text-red-500`}>Delete</button>
-                  </>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      </div>
 
-      <div className="p-4 border-b border-[#333333] bg-[#0d0d0d] min-h-[120px]">
-        {stagedObject && isEditing && stagedItemType !== 'dish' ? (
-          <StagingBox item={stagedObject as any} onAdd={addItem} onCancel={clearStaged} />
-        ) : (
-          <div className="flex h-full items-center justify-center border border-dashed border-[#333333] p-6 text-center">
-            <span className="text-[10px] uppercase font-bold text-[#444] tracking-[0.3em]">
-              {isEditing ? 'Select components from library to add' : 'Awaiting dish initialization'}
-            </span>
-          </div>
-        )}
-      </div>
+        <div className={`flex-1 overflow-y-auto p-4 md:p-8 space-y-8 transition-opacity ${!isEditing ? 'opacity-80 pointer-events-none' : ''}`}>
+          {items.length > 0 && (
+            <>
+              <div className="border border-[#333333] divide-y divide-[#333333] bg-[#0d0d0d]">
+                {items.map((item, idx) => {
+                  const rawId = item.id || (item as any).ingredientId || (item as any).recipeId;
+                  const component = item.type === 'ingredient' 
+                    ? ingredients.find(i => i.id === rawId) 
+                    : recipes.find(r => r.id === rawId);
+                    
+                  let cost = item.type === 'ingredient' 
+                    ? getConvertedQuantity(item.quantity, item.unit, getIngredientPackUnit(component as Ingredient)) * (component ? getIngredientCost(component as Ingredient) : 0)
+                    : item.quantity * calculateRecipeUnitCost(rawId);
 
-      <div className={`flex-1 overflow-y-auto p-4 md:p-8 space-y-8 transition-opacity ${!isEditing ? 'opacity-80 pointer-events-none' : ''}`}>
-        <div className="border border-[#333333] divide-y divide-[#333333] bg-[#0d0d0d]">
-          {items.length === 0 ? (
-            <div className="p-16 text-center text-[#444] font-mono text-xs uppercase opacity-40">NO_COMPONENTS_ADDED</div>
-          ) : (
-            items.map((item, idx) => {
-              const rawId = item.id || (item as any).ingredientId || (item as any).recipeId;
-              const component = item.type === 'ingredient' 
-                ? ingredients.find(i => i.id === rawId) 
-                : recipes.find(r => r.id === rawId);
-                
-              let cost = item.type === 'ingredient' 
-                ? getConvertedQuantity(item.quantity, item.unit, getIngredientPackUnit(component as Ingredient)) * (component ? getIngredientCost(component as Ingredient) : 0)
-                : item.quantity * calculateRecipeUnitCost(rawId);
+                  const isMissing = !component && !!rawId;
+                  const displayName = component?.name || (rawId ? 'UNKNOWN ITEM' : 'INVALID_DATA');
+                  const isInspecting = inspectedItem?.id === rawId;
 
-              const isMissing = !component && !!rawId;
-              const displayName = component?.name || (rawId ? `UNKNOWN_ID [${rawId.slice(0,6)}]` : 'INVALID_DATA');
+                  return (
+                    <div key={idx} className="p-4 flex justify-between items-center group hover:bg-[#1c1c1c] transition-colors">
+                      <div className="flex items-center gap-4 flex-1">
+                        <span className="text-[10px] font-mono text-[#444] w-6">{idx+1}</span>
+                        {/* Source Tag */}
+                        <SourceTag 
+                          type={item.type} 
+                          active={isInspecting}
+                          onClick={(e) => {
+                             if (onInspect) onInspect(rawId, item.type);
+                          }}
+                        />
 
-              return (
-                <div key={idx} className="p-4 flex justify-between items-center group hover:bg-[#1c1c1c] transition-colors">
-                  <div className="flex items-center gap-6 flex-1">
-                    <span className="text-[10px] font-mono text-[#444] w-6">{idx+1}</span>
-                    <div className="flex flex-col">
-                      <span className={`text-[11px] font-bold uppercase ${isMissing ? 'text-red-500' : 'text-[#e0e0e0]'}`}>
-                        {displayName}
-                        {isMissing && <span className="ml-2 text-[8px] bg-red-900/30 text-red-500 px-1 border border-red-900">DELETED</span>}
-                      </span>
-                      <span className="text-[8px] font-mono text-[#666] uppercase">{item.type} // {rawId?.slice(0, 8)}</span>
+                        <div className="flex-1">
+                          <GridItemSelect 
+                            value={rawId}
+                            type={item.type}
+                            options={searchOptions}
+                            onSelect={(opt) => swapItem(idx, opt)}
+                            isEditing={isEditing}
+                            placeholder={component?.name || "SELECT_ITEM"}
+                          />
+                          <span className="text-[8px] font-mono text-[#666] uppercase mt-1 block">{item.type}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-8">
+                        <div className="flex items-center gap-2">
+                          <input 
+                            ref={el => (quantityRefs.current[idx] = el)}
+                            type="number" 
+                            value={item.quantity} 
+                            onChange={(e) => updateItem(idx, { quantity: parseFloat(e.target.value) || 0 })} 
+                            className="bg-transparent text-right font-mono text-xs text-white w-16 outline-none" 
+                          />
+                          <select value={item.unit} onChange={(e) => updateItem(idx, { unit: e.target.value as Unit })} className="bg-transparent text-[10px] font-mono text-[#888] outline-none">
+                            <option value="g">g</option><option value="ml">ml</option><option value="kg">kg</option><option value="l">l</option><option value="ea">ea</option>
+                          </select>
+                        </div>
+                        <div className="text-right min-w-[80px] text-sm font-mono text-[#c8a96e]">£{cost.toFixed(4)}</div>
+                        <div className="flex gap-1">
+                          {onPushRecipe && item.type === 'recipe' && component && (
+                            <button onClick={() => onPushRecipe(component.name)} className="p-2 text-[#4a5568] hover:text-white transition-colors">
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                            </button>
+                          )}
+                          <button onClick={() => setItems(prev => prev.filter((_, i) => i !== idx))} className="text-[#444] hover:text-red-500 p-2"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+                        </div>
+                      </div>
                     </div>
+                  );
+                })
+              }
+              </div>
+              <div ref={scrollBottomRef}></div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                     <label className={UI_STYLES.label}>Allergen Risk Profile</label>
+                     <div className="flex flex-wrap gap-2">
+                        {aggregatedAllergens.length === 0 ? <span className="text-[10px] text-[#444] font-mono uppercase">NO_RISKS</span> : aggregatedAllergens.map(a => <span key={a} className="px-3 py-1.5 border border-[#333] bg-[#1c1c1c] text-[#888] text-[9px] font-bold uppercase">{a}</span>)}
+                     </div>
                   </div>
-                  <div className="flex items-center gap-8">
-                    <div className="flex items-center gap-2">
-                      <input type="number" value={item.quantity} onChange={(e) => updateItem(idx, { quantity: parseFloat(e.target.value) || 0 })} className="bg-transparent text-right font-mono text-xs text-white border-b border-[#333] w-16 outline-none" />
-                      <select value={item.unit} onChange={(e) => updateItem(idx, { unit: e.target.value as Unit })} className="bg-transparent text-[10px] font-mono text-[#888] outline-none">
-                        <option value="g">g</option><option value="ml">ml</option><option value="kg">kg</option><option value="l">l</option><option value="ea">ea</option>
-                      </select>
-                    </div>
-                    <div className="text-right min-w-[80px] text-sm font-mono text-[#c8a96e]">£{cost.toFixed(4)}</div>
-                    <div className="flex gap-1">
-                      {onPushRecipe && item.type === 'recipe' && component && (
-                        <button onClick={() => onPushRecipe(component.name)} className="p-2 text-[#4a5568] hover:text-white transition-colors">
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                        </button>
-                      )}
-                      <button onClick={() => setItems(prev => prev.filter((_, i) => i !== idx))} className="text-[#444] hover:text-red-500 p-2"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
-                    </div>
+                  <div className="space-y-4">
+                     <label className={UI_STYLES.label}>The Build</label>
+                     <textarea 
+                        value={instructions} 
+                        onChange={e => setInstructions(e.target.value)} 
+                        className={`w-full h-32 bg-transparent outline-none resize-none font-sans text-sm text-[#e0e0e0] placeholder-[#444]`} 
+                        placeholder="Plating instructions..." 
+                     />
                   </div>
-                </div>
-              );
-            })
+              </div>
+            </>
           )}
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="space-y-4">
-               <label className={UI_STYLES.label}>Allergen Risk Profile</label>
-               <div className="flex flex-wrap gap-2">
-                  {aggregatedAllergens.length === 0 ? <span className="text-[10px] text-[#444] font-mono uppercase">NO_RISKS</span> : aggregatedAllergens.map(a => <span key={a} className="px-3 py-1.5 border border-[#333] bg-[#1c1c1c] text-[#888] text-[9px] font-bold uppercase">{a}</span>)}
-               </div>
-            </div>
-            <div className="space-y-4">
-               <label className={UI_STYLES.label}>The Build</label>
-               <textarea value={instructions} onChange={e => setInstructions(e.target.value)} className={`w-full h-32 ${UI_STYLES.input} resize-none`} placeholder="Plating instructions..." />
-            </div>
-        </div>
-      </div>
 
-      <div className={`p-6 border-t border-[#333333] bg-[#1c1c1c] flex justify-between items-center gap-8 ${!isEditing ? 'opacity-100' : ''}`}>
-         <div className="flex gap-16">
-            <div><label className={UI_STYLES.label}>Plate Cost</label><div className="text-3xl font-mono text-white">£{dishFinancials.totalCost.toFixed(4)}</div></div>
-            <div><label className={UI_STYLES.label}>Retail (@{targetGP}%)</label><div className="text-3xl font-mono text-[#c8a96e]">£{dishFinancials.sellPrice.toFixed(2)}</div></div>
-         </div>
-         <div className="text-right text-[10px] font-mono text-[#666] uppercase">Telemetry: {isEditing ? 'ACTIVE' : 'IDLE'}</div>
+        <div className={`p-6 border-t border-[#333333] bg-[#1c1c1c] flex justify-between items-center gap-8 ${!isEditing ? 'opacity-100' : ''}`}>
+           <div className="flex gap-16">
+              <div><label className={UI_STYLES.label}>Plate Cost</label><div className="text-3xl font-mono text-white">£{dishFinancials.totalCost.toFixed(4)}</div></div>
+              <div><label className={UI_STYLES.label}>Retail (@{targetGP}%)</label><div className="text-3xl font-mono text-[#c8a96e]">£{dishFinancials.sellPrice.toFixed(2)}</div></div>
+           </div>
+           <div className="text-right text-[10px] font-mono text-[#666] uppercase">Telemetry: {isEditing ? 'ACTIVE' : 'IDLE'}</div>
+        </div>
       </div>
     </div>
   );

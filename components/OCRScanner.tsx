@@ -5,6 +5,7 @@ import { useKitchenData } from '../hooks/useKitchenData';
 import { RecipeItem, Unit, Ingredient } from '../types';
 import { useConfirmation } from '../hooks/useConfirmation';
 import { detectAllergens, estimateKcal, detectCategory, detectSupplierFromCategory, getLevenshteinDistance } from '../utils/intelligence';
+import { SourceTag } from './SourceTag';
 
 interface ExtractedItem {
   id: string;
@@ -18,6 +19,7 @@ interface OCRScannerProps {
   onAddItems: (items: any[], instructions?: string, title?: string) => void;
   onCancel: () => void;
   onIngredientCreateRequest: (name: string) => void;
+  onInspect?: (id: string, type: 'ingredient' | 'recipe') => void;
 }
 
 const SearchableIngredientDropdown: React.FC<{
@@ -139,7 +141,7 @@ const SearchableIngredientDropdown: React.FC<{
   );
 };
 
-export const OCRScanner: React.FC<OCRScannerProps> = ({ onAddItems, onCancel, onIngredientCreateRequest }) => {
+export const OCRScanner: React.FC<OCRScannerProps> = ({ onAddItems, onCancel, onIngredientCreateRequest, onInspect }) => {
   const { ingredients, addIngredient } = useKitchenData();
   const { confirm } = useConfirmation();
   
@@ -466,7 +468,17 @@ export const OCRScanner: React.FC<OCRScannerProps> = ({ onAddItems, onCancel, on
                       <tbody className="divide-y divide-[#404040]">
                         {stagedItems.map((item) => (
                           <tr key={item.id} className="hover:bg-[#1c222b] transition-colors border-b border-[#404040]">
-                            <td className="p-2 border-r border-[#404040]">
+                            <td className="p-2 border-r border-[#404040] flex items-center gap-2">
+                              {/* Source Tag for Review Table */}
+                              <SourceTag 
+                                type="ingredient" 
+                                className="opacity-70 hover:opacity-100"
+                                onClick={(e) => {
+                                  if (item.matchedIngredientId && onInspect) {
+                                    onInspect(item.matchedIngredientId, 'ingredient');
+                                  }
+                                }}
+                              />
                               <input 
                                 type="text"
                                 value={item.name}

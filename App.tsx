@@ -8,6 +8,7 @@ import { IngredientManager } from './components/IngredientManager';
 import { DishBuilder } from './components/DishBuilder';
 import { Dashboard } from './components/Dashboard';
 import { Settings } from './components/Settings';
+import { DataInspector } from './components/DataInspector';
 import { ConfirmationProvider } from './hooks/useConfirmation';
 import { useRecursiveBuilder } from './hooks/useRecursiveBuilder';
 import { db } from './firebase';
@@ -19,6 +20,12 @@ const App: React.FC = () => {
   const [libraryTab, setLibraryTab] = useState<'ingredients' | 'recipes' | 'dishes'>('ingredients');
   const [availableTabs, setAvailableTabs] = useState<('ingredients' | 'recipes' | 'dishes')[]>(['ingredients', 'recipes']);
   const [configError, setConfigError] = useState(false);
+  
+  // Global Inspector State
+  const [inspectedItem, setInspectedItem] = useState<{id: string, type: 'ingredient' | 'recipe'} | null>(null);
+
+  // Track Dish Builder Mode for Sidebar Pivot
+  const [isDishEditing, setIsDishEditing] = useState(false);
 
   const { pushLevel, popLevel, currentLevel, isNested, depth } = useRecursiveBuilder();
 
@@ -37,6 +44,7 @@ const App: React.FC = () => {
 
   const handleDashboardNavigate = (view: string, targetId?: string) => {
     setCurrentView(view);
+    setIsDishEditing(false); // Reset editing state on nav
     if (targetId) {
       const type = view === 'kitchen' ? 'recipe' : 'ingredient';
       setSelectedItemId(targetId);
@@ -70,6 +78,8 @@ const App: React.FC = () => {
     setCurrentView(view);
     setSelectedItemId(null);
     setSelectionType('ingredient');
+    setIsDishEditing(false); // Reset editing state on nav
+    setInspectedItem(null); // Close inspector on nav change
     
     // Context-aware default tab selection
     if (view === 'kitchen') {
@@ -93,6 +103,10 @@ const App: React.FC = () => {
     });
   }, [pushLevel]);
 
+  const handleInspect = useCallback((id: string, type: 'ingredient' | 'recipe') => {
+    setInspectedItem({ id, type });
+  }, []);
+
   if (configError) {
     return (
       <div className="flex h-screen w-full bg-[#111111] items-center justify-center p-8 text-[#e0e0e0] font-sans">
@@ -111,6 +125,15 @@ const App: React.FC = () => {
       <div className="flex flex-col h-screen w-full bg-[#111111] overflow-hidden select-none font-sans">
         <Navigation activeView={currentView} onViewChange={handleViewChange} />
         <div className="flex-1 relative overflow-hidden">
+            {/* GLOBAL INSPECTOR OVERLAY */}
+            {inspectedItem && (
+              <DataInspector 
+                id={inspectedItem.id} 
+                type={inspectedItem.type} 
+                onClose={() => setInspectedItem(null)} 
+              />
+            )}
+
             {currentView === 'dashboard' && <Dashboard onNavigate={handleDashboardNavigate} />}
             {(currentView === 'service' || currentView === 'kitchen') && (
               <div className="flex h-full w-full">
@@ -119,8 +142,12 @@ const App: React.FC = () => {
                       onSelectItem={handleSelectItem} 
                       activeTab={libraryTab}
                       availableTabs={availableTabs}
+                      allTabs={availableTabs}
                       onTabChange={setLibraryTab}
                       onCreateRequest={handleRecursiveAddRequest}
+                      isHybrid={currentView === 'service' && isDishEditing}
+                      onInspect={handleInspect}
+                      inspectedItem={inspectedItem}
                     />
                   </div>
                   <div className="flex-1 h-full overflow-hidden">
@@ -133,6 +160,9 @@ const App: React.FC = () => {
                         onPushRecipe={(name) => pushLevel('recipe', { name })}
                         onSetLibraryTab={setLibraryTab}
                         onSetAvailableTabs={setAvailableTabs}
+                        onModeChange={setIsDishEditing}
+                        onInspect={handleInspect}
+                        inspectedItem={inspectedItem}
                       />
                     ) : (
                       <RecipeBuilder 
@@ -144,6 +174,8 @@ const App: React.FC = () => {
                         isLibraryTabRecipes={libraryTab === 'recipes'}
                         onPushIngredient={(name) => pushLevel('ingredient', { name })}
                         onPushRecipe={(name) => pushLevel('recipe', { name })}
+                        onInspect={handleInspect}
+                        inspectedItem={inspectedItem}
                       />
                     )}
                   </div>
@@ -164,7 +196,14 @@ const App: React.FC = () => {
                     {currentLevel.level === 'recipe' && (
                       <div className="flex h-full">
                         <div className="w-72 border-r border-[#333] flex-shrink-0">
-                          <Sidebar onSelectItem={handleSelectItem} activeTab="ingredients" availableTabs={['ingredients']} onTabChange={()=>{}} />
+                          <Sidebar 
+                            onSelectItem={handleSelectItem} 
+                            activeTab="ingredients" 
+                            availableTabs={['ingredients']} 
+                            onTabChange={()=>{}} 
+                            onInspect={handleInspect}
+                            inspectedItem={inspectedItem}
+                          />
                         </div>
                         <div className="flex-1 overflow-y-auto">
                           <RecipeBuilder 
@@ -172,6 +211,8 @@ const App: React.FC = () => {
                             clearStaged={()=>setSelectedItemId(null)} onSetLibraryTab={()=>{}} onSetAvailableTabs={()=>{}} 
                             isLibraryTabRecipes={false} isRecursive initialName={currentLevel.initialData?.name}
                             onComplete={(id) => { if (currentLevel.onComplete) currentLevel.onComplete(id, 'recipe'); popLevel(); }}
+                            onInspect={handleInspect}
+                            inspectedItem={inspectedItem}
                           />
                         </div>
                       </div>
@@ -185,7 +226,7 @@ const App: React.FC = () => {
             )}
         </div>
       </div>
-    </div>
+    </ConfirmationProvider>
   );
 };
 
