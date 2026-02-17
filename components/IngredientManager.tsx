@@ -2,21 +2,27 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useKitchenData } from '../hooks/useKitchenData';
 import { useConfirmation } from '../hooks/useConfirmation';
-import { Ingredient, Unit, Allergen } from '../types';
-import { UI_STYLES } from '../constants';
+import { Ingredient, Unit, Allergen, IngredientSupplier } from '../types';
+import { UI_STYLES, APPROVED_SUPPLIERS } from '../constants';
+import { detectAllergens, detectCategory, detectSupplierFromCategory, normalizeName } from '../utils/intelligence';
+import { lookupKcal } from '../utils/nutritionLookup';
 
 const INITIAL_FORM_STATE: Omit<Ingredient, 'id'> = {
   name: '',
   category: 'Dry Store',
-  supplier: 'Internal',
-  packCost: 0,
-  packSize: 1000,
-  packUnit: 'g',
+  suppliers: [{
+    name: 'Internal',
+    packCost: 0,
+    packSize: 1000,
+    packUnit: 'g',
+    isPreferred: true
+  }],
   wastePercent: 0,
   allergens: [],
   kcalPer100: 0,
   stockLevel: 0,
-  incomplete: false
+  incomplete: false,
+  audited: false
 };
 
 interface IngredientManagerProps {
@@ -45,25 +51,69 @@ export const IngredientManager: React.FC<IngredientManagerProps> = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Omit<Ingredient, 'id'>>({
     ...INITIAL_FORM_STATE,
-    name: initialName
+    name: initialName,
+    suppliers: INITIAL_FORM_STATE.suppliers.map(s => ({...s})) // Deep copy
   });
   const [originalFormData, setOriginalFormData] = useState<Omit<Ingredient, 'id'>>({
     ...INITIAL_FORM_STATE,
-    name: initialName
+    name: initialName,
+    suppliers: INITIAL_FORM_STATE.suppliers.map(s => ({...s})) // Deep copy
   });
-  const [isAddingNewSupplier, setIsAddingNewSupplier] = useState(false);
-  const [newSupplierName, setNewSupplierName] = useState('');
+  const [suggestedAllergens, setSuggestedAllergens] = useState<Allergen[]>([]);
+  const [isAutoDetecting, setIsAutoDetecting] = useState(false);
+  
+  // Nutrition Lookup State
+  const [isKcalLookingUp, setIsKcalLookingUp] = useState(false);
+  const [kcalSource, setKcalSource] = useState<'COFID' | 'USDA' | null>(null);
 
   // Dirty check
   const isDirty = useMemo(() => {
     return JSON.stringify(formData) !== JSON.stringify(originalFormData);
   }, [formData, originalFormData]);
 
-  // Derived unique lists for filters - ensuring "Internal" is represented if present
-  const suppliers = useMemo(() => ['ALL', ...Array.from(new Set(ingredients.map(i => i.supplier))).filter(s => s !== 'Generic').sort()], [ingredients]);
-  const categories = useMemo(() => ['ALL', 'Sub-Recipe', ...Array.from(new Set(ingredients.map(i => i.category))).sort()], [ingredients]);
+  const uniqueSuppliers = useMemo(() => {
+    const all = new Set<string>();
+    ingredients.forEach(i => i.suppliers.forEach(s => all.add(s.name)));
+    return ['ALL', ...Array.from(all).sort()];
+  }, [ingredients]);
 
-  // Handle deep-linking
+  const categories = useMemo(() => ['ALL', 'Dry Store', 'Sub-Recipe', 'Dairy', 'Meat', 'Fish', 'Vegetable', 'Fruit', 'Frozen', 'Alcohol', 'Non-Food'], []);
+
+  // Intelligence: Name Watcher
+  useEffect(() => {
+    if (formData.name && !editingId) {
+      setIsAutoDetecting(true);
+      
+      // Synchronous Detection
+      const category = detectCategory(formData.name);
+      const supplierName = detectSupplierFromCategory(category);
+      const allergens = detectAllergens(formData.name);
+      
+      setSuggestedAllergens(allergens);
+      
+      // Only auto-set supplier if user hasn't messed with it much (i.e., it's still default Internal)
+      setFormData(prev => {
+        const isDefaultSupplier = prev.suppliers.length === 1 && prev.suppliers[0].name === 'Internal';
+        const newSuppliers = isDefaultSupplier 
+          ? [{ ...prev.suppliers[0], name: supplierName }]
+          : prev.suppliers;
+
+        return {
+          ...prev,
+          category,
+          suppliers: newSuppliers,
+          allergens: [...new Set([...prev.allergens, ...allergens])]
+        };
+      });
+      
+      setTimeout(() => setIsAutoDetecting(false), 300);
+
+      // Async Kcal Lookup (Debounced)
+      const timer = setTimeout(() => handleManualKcalLookup(formData.name), 800);
+      return () => clearTimeout(timer);
+    }
+  }, [formData.name, editingId]);
+
   useEffect(() => {
     if (initialEditId && ingredients.length > 0) {
       const target = ingredients.find(i => i.id === initialEditId);
@@ -73,10 +123,27 @@ export const IngredientManager: React.FC<IngredientManagerProps> = ({
     }
   }, [initialEditId, ingredients]);
 
+  const handleManualKcalLookup = async (name: string) => {
+    if (!name) return;
+    setIsKcalLookingUp(true);
+    setKcalSource(null);
+    try {
+      const result = await lookupKcal(name);
+      if (result) {
+        setFormData(prev => ({ ...prev, kcalPer100: result.value }));
+        setKcalSource(result.source);
+      }
+    } catch (e) {
+      console.error("Kcal lookup failed", e);
+    } finally {
+      setIsKcalLookingUp(false);
+    }
+  };
+
   const filteredIngredients = useMemo(() => {
     return ingredients.filter(i => {
       const matchesSearch = i.name.toLowerCase().includes(search.toLowerCase());
-      const matchesSupplier = filterSupplier === 'ALL' || i.supplier === filterSupplier;
+      const matchesSupplier = filterSupplier === 'ALL' || i.suppliers.some(s => s.name === filterSupplier);
       const matchesCategory = filterCategory === 'ALL' || i.category === filterCategory;
       const matchesIncomplete = !filterIncomplete || i.incomplete;
       return matchesSearch && matchesSupplier && matchesCategory && matchesIncomplete;
@@ -89,23 +156,22 @@ export const IngredientManager: React.FC<IngredientManagerProps> = ({
       if (!ok) return;
     }
 
-    const data = {
+    const data: Omit<Ingredient, 'id'> = {
       name: ing.name,
       category: ing.category,
-      supplier: ing.supplier,
-      packCost: ing.packCost,
-      packSize: ing.packSize,
-      packUnit: ing.packUnit,
+      suppliers: ing.suppliers.map(s => ({ ...s })), // Deep copy suppliers
       wastePercent: ing.wastePercent,
       allergens: ing.allergens || [],
       kcalPer100: ing.kcalPer100 || 0,
       stockLevel: ing.stockLevel,
-      incomplete: ing.incomplete || false
+      incomplete: ing.incomplete || false,
+      audited: ing.audited || false
     };
     setFormData(data);
     setOriginalFormData(data);
     setEditingId(ing.id);
-    setIsAddingNewSupplier(false);
+    setSuggestedAllergens([]); 
+    setKcalSource(null); 
   };
 
   const handleResetForm = async () => {
@@ -113,10 +179,17 @@ export const IngredientManager: React.FC<IngredientManagerProps> = ({
       const ok = await confirm("Discard all unsaved changes?");
       if (!ok) return;
     }
-    setFormData({ ...INITIAL_FORM_STATE, name: initialName });
-    setOriginalFormData({ ...INITIAL_FORM_STATE, name: initialName });
+    // Correct deep copy logic to prevent state collisions
+    const resetState = {
+       ...INITIAL_FORM_STATE,
+       name: initialName,
+       suppliers: INITIAL_FORM_STATE.suppliers.map(s => ({ ...s }))
+    };
+    setFormData(resetState);
+    setOriginalFormData(resetState);
     setEditingId(null);
-    setIsAddingNewSupplier(false);
+    setSuggestedAllergens([]);
+    setKcalSource(null);
   };
 
   const handleDelete = async (id: string, name: string, e: React.MouseEvent) => {
@@ -125,26 +198,68 @@ export const IngredientManager: React.FC<IngredientManagerProps> = ({
     if (ok) {
       await deleteIngredient(id);
       if (editingId === id) {
-        setFormData(INITIAL_FORM_STATE);
-        setOriginalFormData(INITIAL_FORM_STATE);
-        setEditingId(null);
+        handleResetForm();
       }
     }
+  };
+
+  const handleNameBlur = () => {
+    if (formData.name) {
+      const normalized = normalizeName(formData.name);
+      if (normalized !== formData.name) {
+        setFormData(prev => ({ ...prev, name: normalized }));
+      }
+    }
+  };
+
+  const updateSupplier = (index: number, field: keyof IngredientSupplier, value: any) => {
+    setFormData(prev => {
+      const newSuppliers = [...prev.suppliers];
+      newSuppliers[index] = { ...newSuppliers[index], [field]: value };
+      return { ...prev, suppliers: newSuppliers };
+    });
+  };
+
+  const togglePreferredSupplier = (index: number) => {
+    setFormData(prev => {
+      const newSuppliers = prev.suppliers.map((s, i) => ({
+        ...s,
+        isPreferred: i === index
+      }));
+      return { ...prev, suppliers: newSuppliers };
+    });
+  };
+
+  const addSupplier = () => {
+    setFormData(prev => ({
+      ...prev,
+      // Default to first approved supplier
+      suppliers: [...prev.suppliers, { name: APPROVED_SUPPLIERS[0], packCost: 0, packSize: 1, packUnit: 'kg', isPreferred: false }]
+    }));
+  };
+
+  const removeSupplier = (index: number) => {
+    if (formData.suppliers.length <= 1) return; // Prevent deleting last supplier
+    setFormData(prev => {
+      const newSuppliers = prev.suppliers.filter((_, i) => i !== index);
+      // Ensure one is preferred
+      if (!newSuppliers.some(s => s.isPreferred)) {
+        newSuppliers[0].isPreferred = true;
+      }
+      return { ...prev, suppliers: newSuppliers };
+    });
   };
 
   const handleSave = async () => {
     if (!formData.name) return;
 
-    let finalFormData = { ...formData };
-    if (isAddingNewSupplier && newSupplierName.trim()) {
-      finalFormData.supplier = newSupplierName.trim();
-    }
-
-    // Auto-resolve incomplete flag if basic data is provided
-    if (finalFormData.incomplete && finalFormData.packCost > 0 && finalFormData.packSize > 0) {
-      finalFormData.incomplete = false;
-    }
-
+    let finalFormData = { 
+      ...formData, 
+      name: normalizeName(formData.name), 
+      audited: true, 
+      incomplete: false 
+    };
+    
     try {
       if (editingId) {
         await updateIngredient(editingId, finalFormData);
@@ -156,21 +271,34 @@ export const IngredientManager: React.FC<IngredientManagerProps> = ({
         }
       }
       if (!isRecursive) {
-        setFormData(INITIAL_FORM_STATE);
-        setOriginalFormData(INITIAL_FORM_STATE);
+        // Deep copy reset state
+        const resetState = {
+           ...INITIAL_FORM_STATE,
+           name: initialName,
+           suppliers: INITIAL_FORM_STATE.suppliers.map(s => ({ ...s }))
+        };
+        setFormData(resetState);
+        setOriginalFormData(resetState);
         setEditingId(null);
-        setNewSupplierName('');
-        setIsAddingNewSupplier(false);
+        setSuggestedAllergens([]);
+        setKcalSource(null);
       }
     } catch (e) {
       console.error(e);
     }
   };
 
+  const showIncompleteWarning = useMemo(() => {
+    if (!formData.incomplete) return false;
+    // Warning if preferred supplier has 0 cost
+    const pref = formData.suppliers.find(s => s.isPreferred) || formData.suppliers[0];
+    if (pref.name === 'Internal') return false;
+    return pref.packCost === 0;
+  }, [formData.incomplete, formData.suppliers]);
+
   return (
     <div className={`flex h-full bg-[#111111] text-[#e0e0e0] divide-x divide-[#333333] ${isRecursive ? 'overflow-hidden' : ''}`}>
       
-      {/* LEFT COLUMN: Ingredient List */}
       {!isRecursive && (
         <div className="w-80 flex flex-col bg-[#0d0d0d]">
           <div className="p-4 border-b border-[#333333] space-y-3">
@@ -190,7 +318,7 @@ export const IngredientManager: React.FC<IngredientManagerProps> = ({
                    onChange={e => setFilterSupplier(e.target.value)}
                    className={`${UI_STYLES.input} !py-1 !px-2 !text-[10px]`}
                  >
-                   {suppliers.map(s => <option key={s} value={s}>{s}</option>)}
+                   {uniqueSuppliers.map(s => <option key={s} value={s}>{s}</option>)}
                  </select>
               </div>
               <div className="flex flex-col">
@@ -216,101 +344,155 @@ export const IngredientManager: React.FC<IngredientManagerProps> = ({
               <div className="p-12 text-center text-[#666666] font-mono text-[10px] uppercase">No items match filters</div>
             ) : (
               <div className="divide-y divide-[#1a1a1a]">
-                {filteredIngredients.map((ing) => (
-                  <div 
-                    key={ing.id} 
-                    onClick={() => handleEdit(ing)}
-                    className={`p-3 cursor-pointer group transition-all flex justify-between items-center ${
-                      editingId === ing.id ? 'bg-[#c8a96e]/10 border-l-2 border-l-[#c8a96e]' : 'hover:bg-[#151515] border-l-2 border-l-transparent'
-                    } ${ing.incomplete ? 'bg-red-950/5' : ''}`}
-                  >
-                    <div className="flex flex-col overflow-hidden">
-                      <div className={`text-xs uppercase tracking-wide font-medium flex items-center gap-2 ${editingId === ing.id ? 'text-[#c8a96e]' : 'text-[#888888] group-hover:text-white'}`}>
-                        {ing.incomplete && <div className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />}
-                        {ing.name}
+                {filteredIngredients.map((ing) => {
+                  const pref = ing.suppliers.find(s => s.isPreferred) || ing.suppliers[0];
+                  return (
+                    <div 
+                      key={ing.id} 
+                      onClick={() => handleEdit(ing)}
+                      className={`p-3 cursor-pointer group transition-all flex justify-between items-center ${
+                        editingId === ing.id ? 'bg-[#c8a96e]/10 border-l-2 border-l-[#c8a96e]' : 'hover:bg-[#151515] border-l-2 border-l-transparent'
+                      } ${ing.incomplete ? 'bg-red-950/5' : ''}`}
+                    >
+                      <div className="flex flex-col overflow-hidden">
+                        <div className={`text-xs uppercase tracking-wide font-medium flex items-center gap-2 ${editingId === ing.id ? 'text-[#c8a96e]' : 'text-[#888888] group-hover:text-white'}`}>
+                          {ing.incomplete && <div className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />}
+                          {ing.name}
+                          {ing.audited && <div className="w-1 h-1 rounded-full bg-[#c8a96e] opacity-40 ml-1" title="Verified" />}
+                        </div>
+                        <div className="text-[8px] font-mono text-[#444] mt-0.5">{ing.category} // {pref?.name}</div>
                       </div>
-                      <div className="text-[8px] font-mono text-[#444] mt-0.5">{ing.category} // {ing.supplier}</div>
+                      {ing.incomplete && <span className="text-[7px] font-mono text-red-500 uppercase border border-red-900 px-1">STUB</span>}
                     </div>
-                    {ing.incomplete && <span className="text-[7px] font-mono text-red-500 uppercase border border-red-900 px-1">STUB</span>}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
           <div className="p-3 border-t border-[#333333] bg-[#111111]">
              <button onClick={handleResetForm} className="w-full py-2 text-[10px] font-bold uppercase tracking-widest text-[#666666] hover:text-[#c8a96e] border border-dashed border-[#333333] hover:border-[#c8a96e] transition-all">
-               + New Entry
+               + Add Ingredient
              </button>
           </div>
         </div>
       )}
 
-      {/* RIGHT COLUMN: Persistent Editor Panel */}
       <div className="flex-1 flex flex-col bg-[#111111] overflow-hidden">
-        {formData.incomplete && (
+        {showIncompleteWarning && (
           <div className="bg-red-950/40 border-b border-red-900 p-2 text-center flex items-center justify-center gap-4">
             <span className="text-[9px] font-bold text-red-500 uppercase tracking-[0.4em] animate-pulse">! DATA_RECONCILIATION_REQUIRED</span>
-            <span className="text-[8px] text-red-400 uppercase font-mono">This item was created as a stub via OCR. Add pricing and yield data to resolve.</span>
+            <span className="text-[8px] text-red-400 uppercase font-mono">Stub record detected. Complete pricing and yield data to finalize the registry entry.</span>
           </div>
         )}
 
         <div className="p-4 border-b border-[#333333] flex justify-between items-center bg-[#1c1c1c]">
           <h3 className="text-xs font-bold uppercase tracking-widest text-[#c8a96e]">
-            {editingId ? `Edit: ${formData.name}` : isRecursive ? `Define New: ${initialName}` : 'New Ingredient Specification'}
+            {editingId ? `Edit: ${formData.name}` : isRecursive ? `Define New: ${initialName}` : 'Ingredient Details'}
           </h3>
           <div className="flex items-center gap-4">
-            {isDirty && <span className="text-[9px] font-mono text-yellow-500 animate-pulse uppercase">Unsaved Changes</span>}
+            {isAutoDetecting && <span className="text-[9px] font-mono text-[#c8a96e] animate-pulse uppercase tracking-widest">Running Intelligence...</span>}
+            {isDirty && !isAutoDetecting && <span className="text-[9px] font-mono text-yellow-500 animate-pulse uppercase">Unsaved Changes</span>}
             {editingId && (
-              <button onClick={(e) => handleDelete(editingId, formData.name, e)} className="text-[9px] font-bold uppercase text-red-800 hover:text-red-500 transition-colors">Terminate Entry</button>
+              <button onClick={(e) => handleDelete(editingId, formData.name, e)} className="text-[9px] font-bold uppercase text-red-800 hover:text-red-500 transition-colors">Delete</button>
             )}
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-8 w-full space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
             <div className="md:col-span-1">
-              <label className={UI_STYLES.label}>Full Identity Name</label>
-              <input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className={`w-full ${UI_STYLES.input} text-base`} placeholder="e.g. Maldon Sea Salt" />
+              <label className={UI_STYLES.label}>Ingredient Name</label>
+              <input 
+                value={formData.name} 
+                onChange={e => setFormData({...formData, name: e.target.value})} 
+                onBlur={handleNameBlur}
+                className={`w-full ${UI_STYLES.input} text-base`} 
+                placeholder="e.g. Maldon Sea Salt" 
+              />
             </div>
             <div>
               <label className={UI_STYLES.label}>Category</label>
               <select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className={`w-full ${UI_STYLES.input}`}>
-                <option>Dry Store</option>
-                <option>Sub-Recipe</option>
-                <option>Dairy</option>
-                <option>Meat</option>
-                <option>Fish</option>
-                <option>Vegetable</option>
-                <option>Fruit</option>
-                <option>Frozen</option>
-                <option>Alcohol</option>
-                <option>Non-Food</option>
+                {categories.filter(c => c !== 'ALL').map(c => <option key={c} value={c}>{c}</option>)}
               </select>
-            </div>
-            <div>
-              <label className={UI_STYLES.label}>Supplier Link</label>
-              {isAddingNewSupplier ? (
-                <div className="flex gap-1">
-                  <input autoFocus value={newSupplierName} onChange={e => setNewSupplierName(e.target.value)} className={`flex-1 ${UI_STYLES.input} !text-[11px]`} placeholder="Supplier..." />
-                  <button onClick={() => setIsAddingNewSupplier(false)} className="px-1 text-[#666666] hover:text-white font-mono text-xs">X</button>
-                </div>
-              ) : (
-                <select value={formData.supplier} onChange={e => e.target.value === 'NEW' ? setIsAddingNewSupplier(true) : setFormData({...formData, supplier: e.target.value})} className={`w-full ${UI_STYLES.input}`}>
-                  <option value="Internal">Internal</option>
-                  {suppliers.filter(s => s !== 'ALL' && s !== 'Internal' && s !== 'Generic').map(s => <option key={s} value={s}>{s}</option>)}
-                  <option value="NEW">+ NEW SUPPLIER</option>
-                </select>
-              )}
             </div>
           </div>
 
-          <div className={`bg-[#1c1c1c] border p-4 space-y-6 ${formData.incomplete ? 'border-red-900/50' : 'border-[#333333]'}`}>
-            <h4 className={`text-[10px] font-bold uppercase tracking-widest border-b pb-2 ${formData.incomplete ? 'text-red-400 border-red-900/40' : 'text-[#888888] border-[#333333]'}`}>Unit & Pack Economics</h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div><label className={UI_STYLES.label}>Pack Cost (£)</label><input type="number" step="0.01" value={formData.packCost} onChange={e => setFormData({...formData, packCost: parseFloat(e.target.value) || 0})} className={`w-full ${UI_STYLES.input}`} /></div>
-              <div><label className={UI_STYLES.label}>Pack Size</label><input type="number" value={formData.packSize} onChange={e => setFormData({...formData, packSize: parseFloat(e.target.value) || 1})} className={`w-full ${UI_STYLES.input}`} /></div>
-              <div><label className={UI_STYLES.label}>Pack Unit</label><select value={formData.packUnit} onChange={e => setFormData({...formData, packUnit: e.target.value as Unit})} className={`w-full ${UI_STYLES.input}`}><option value="g">G (g)</option><option value="ml">ML (ml)</option><option value="kg">KG (kg)</option><option value="l">L (l)</option><option value="ea">EA (ea)</option></select></div>
-              <div><label className={UI_STYLES.label}>Current Stock</label><input type="number" value={formData.stockLevel} onChange={e => setFormData({...formData, stockLevel: parseFloat(e.target.value) || 0})} className={`w-full ${UI_STYLES.input}`} /></div>
+          {/* Suppliers Panel */}
+          <div className={`bg-[#1c1c1c] border p-4 space-y-4 ${showIncompleteWarning ? 'border-red-900/50' : 'border-[#333333]'}`}>
+            <div className="flex justify-between items-center border-b border-[#333333] pb-2">
+              <h4 className={`text-[10px] font-bold uppercase tracking-widest ${showIncompleteWarning ? 'text-red-400' : 'text-[#888888]'}`}>Supply Chain & Economics</h4>
+              <button onClick={addSupplier} className="text-[9px] uppercase font-bold text-[#c8a96e] hover:text-white">+ Add Supplier</button>
+            </div>
+            
+            <div className="space-y-3">
+              {formData.suppliers.map((supplier, idx) => {
+                const unitCost = supplier.packSize > 0 ? supplier.packCost / supplier.packSize : 0;
+                return (
+                  <div key={idx} className={`grid grid-cols-12 gap-2 items-center p-2 border ${supplier.isPreferred ? 'border-[#c8a96e] bg-[#c8a96e]/5' : 'border-[#333333] bg-[#151515]'}`}>
+                    <div className="col-span-1 flex justify-center">
+                       <input 
+                         type="radio" 
+                         checked={supplier.isPreferred} 
+                         onChange={() => togglePreferredSupplier(idx)}
+                         className="accent-[#c8a96e] cursor-pointer"
+                         title="Set as Preferred Supplier"
+                       />
+                    </div>
+                    <div className="col-span-3">
+                      <label className="text-[7px] font-mono text-[#666] uppercase block mb-1">Supplier Name</label>
+                      <select 
+                        value={supplier.name}
+                        onChange={(e) => updateSupplier(idx, 'name', e.target.value)}
+                        className={`w-full ${UI_STYLES.input} !text-[10px] !py-1 !px-2`}
+                      >
+                         {!APPROVED_SUPPLIERS.includes(supplier.name) && supplier.name && (
+                            <option value={supplier.name} disabled>{supplier.name} (Invalid)</option>
+                         )}
+                         {APPROVED_SUPPLIERS.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-[7px] font-mono text-[#666] uppercase block mb-1">Cost (£)</label>
+                      <input 
+                        type="number" step="0.01"
+                        value={supplier.packCost}
+                        onChange={(e) => updateSupplier(idx, 'packCost', parseFloat(e.target.value) || 0)}
+                        className={`w-full ${UI_STYLES.input} !text-[10px] !py-1 !px-2`}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-[7px] font-mono text-[#666] uppercase block mb-1">Pack Size</label>
+                      <input 
+                        type="number"
+                        value={supplier.packSize}
+                        onChange={(e) => updateSupplier(idx, 'packSize', parseFloat(e.target.value) || 0)}
+                        className={`w-full ${UI_STYLES.input} !text-[10px] !py-1 !px-2`}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-[7px] font-mono text-[#666] uppercase block mb-1">Unit</label>
+                      <select 
+                        value={supplier.packUnit}
+                        onChange={(e) => updateSupplier(idx, 'packUnit', e.target.value)}
+                        className={`w-full ${UI_STYLES.input} !text-[10px] !py-1 !px-2`}
+                      >
+                        <option value="g">g</option><option value="ml">ml</option><option value="kg">kg</option><option value="l">l</option><option value="ea">ea</option>
+                      </select>
+                    </div>
+                    <div className="col-span-2 flex flex-col items-end justify-between h-full">
+                       <button onClick={() => removeSupplier(idx)} className="text-[#444] hover:text-red-500 mb-1">
+                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                       </button>
+                       <span className="text-[9px] font-mono text-[#c8a96e]">£{unitCost.toFixed(4)}/{supplier.packUnit}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4 pt-2 border-t border-[#333333]">
+              <div><label className={UI_STYLES.label}>Current Stock ({formData.suppliers.find(s=>s.isPreferred)?.packUnit || 'units'})</label><input type="number" value={formData.stockLevel} onChange={e => setFormData({...formData, stockLevel: parseFloat(e.target.value) || 0})} className={`w-full ${UI_STYLES.input}`} /></div>
             </div>
           </div>
 
@@ -323,23 +505,39 @@ export const IngredientManager: React.FC<IngredientManagerProps> = ({
               </div>
             </div>
             <div>
-               <label className={UI_STYLES.label}>Energy Density (kcal/100g)</label>
-               <input type="number" value={formData.kcalPer100} onChange={e => setFormData({...formData, kcalPer100: parseFloat(e.target.value) || 0})} className={`w-full ${UI_STYLES.input}`} />
+               <label className={UI_STYLES.label}>
+                 Energy Density (kcal/100g)
+                 {kcalSource && <span className="ml-2 text-[8px] font-mono text-[#444] uppercase tracking-widest border border-[#333] px-1 bg-[#222] text-[#888]">{kcalSource}</span>}
+               </label>
+               <div className="relative flex gap-2">
+                 <input type="number" value={formData.kcalPer100} onChange={e => { setFormData({...formData, kcalPer100: parseFloat(e.target.value) || 0}); setKcalSource(null); }} className={`flex-1 ${UI_STYLES.input}`} />
+                 <button 
+                  onClick={() => handleManualKcalLookup(formData.name)}
+                  className="px-3 border border-[#333] hover:border-[#c8a96e] text-[#666] hover:text-[#c8a96e] text-[9px] font-bold uppercase"
+                 >
+                   SEARCH
+                 </button>
+                 {isKcalLookingUp && <div className="absolute inset-0 bg-[#1c1c1c]/90 text-[#666] text-[10px] font-mono flex items-center px-3 animate-pulse border border-[#333]">LOOKING_UP...</div>}
+               </div>
             </div>
           </div>
 
           <div className="space-y-4">
             <label className={UI_STYLES.label}>Allergen Risk Declaration</label>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              {Object.values(Allergen).map((allergen) => (
-                <label key={allergen} className={`flex items-center p-2 border text-[9px] cursor-pointer transition-all ${formData.allergens.includes(allergen) ? 'bg-[#c8a96e]/10 border-[#c8a96e] text-[#c8a96e]' : 'bg-[#1c1c1c] border-[#333333] text-[#666666] hover:border-[#888888]'}`}>
-                  <input type="checkbox" className="hidden" checked={formData.allergens.includes(allergen)} onChange={() => {
-                    const cur = formData.allergens;
-                    setFormData({...formData, allergens: cur.includes(allergen) ? cur.filter(a => a !== allergen) : [...cur, allergen]});
-                  }} />
-                  <span className="truncate uppercase font-bold">{allergen}</span>
-                </label>
-              ))}
+              {Object.values(Allergen).map((allergen) => {
+                const isSuggested = suggestedAllergens.includes(allergen);
+                return (
+                  <label key={allergen} className={`flex items-center justify-between p-2 border text-[9px] cursor-pointer transition-all ${formData.allergens.includes(allergen) ? 'bg-[#c8a96e]/10 border-[#c8a96e] text-[#c8a96e]' : 'bg-[#1c1c1c] border-[#333333] text-[#666666] hover:border-[#888888]'} ${isSuggested ? 'ring-1 ring-[#c8a96e]/50 ring-inset' : ''}`}>
+                    <input type="checkbox" className="hidden" checked={formData.allergens.includes(allergen)} onChange={() => {
+                      const cur = formData.allergens;
+                      setFormData({...formData, allergens: cur.includes(allergen) ? cur.filter(a => a !== allergen) : [...cur, allergen]});
+                    }} />
+                    <span className="truncate uppercase font-bold">{allergen}</span>
+                    {isSuggested && !formData.allergens.includes(allergen) && <span className="text-[7px] text-[#c8a96e] font-mono tracking-tighter">[AUTO_DETECT]</span>}
+                  </label>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -353,7 +551,7 @@ export const IngredientManager: React.FC<IngredientManagerProps> = ({
             onClick={handleSave} 
             className={`${UI_STYLES.button} bg-[#c8a96e] text-black hover:bg-[#b8985e] px-8 font-bold border border-black/20 disabled:opacity-20`}
           >
-            {editingId ? 'Update Entry' : isRecursive ? 'Create & Add to Dish' : 'Commit New Entry'}
+            {editingId ? 'Save Changes' : isRecursive ? 'Save & Add' : 'Save Changes'}
           </button>
         </div>
       </div>

@@ -21,7 +21,12 @@ const Sidebar: React.FC<SidebarProps> = ({ onSelectItem, activeTab, availableTab
   const [filterSupplier, setFilterSupplier] = useState('ALL');
   const [filterCategory, setFilterCategory] = useState('ALL');
 
-  const suppliers = useMemo(() => ['ALL', ...Array.from(new Set(ingredients.map(i => i.supplier))).sort()], [ingredients]);
+  const suppliers = useMemo(() => {
+    const all = new Set<string>();
+    ingredients.forEach(i => i.suppliers.forEach(s => all.add(s.name)));
+    return ['ALL', ...Array.from(all).sort()];
+  }, [ingredients]);
+
   const categories = useMemo(() => ['ALL', ...Array.from(new Set(ingredients.map(i => i.category))).sort()], [ingredients]);
 
   const filteredItems = useMemo(() => {
@@ -29,7 +34,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onSelectItem, activeTab, availableTab
     if (activeTab === 'ingredients') {
       return ingredients.filter(i => {
         const matchesSearch = i.name.toLowerCase().includes(term);
-        const matchesSupplier = filterSupplier === 'ALL' || i.supplier === filterSupplier;
+        const matchesSupplier = filterSupplier === 'ALL' || i.suppliers.some(s => s.name === filterSupplier);
         const matchesCategory = filterCategory === 'ALL' || i.category === filterCategory;
         const matchesIncomplete = !incompleteOnly || i.incomplete;
         return matchesSearch && matchesSupplier && matchesCategory && matchesIncomplete;
@@ -51,7 +56,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onSelectItem, activeTab, availableTab
 
   return (
     <div className="flex flex-col h-full bg-[#111111]">
-      <div className="p-4 border-b border-[#333333] space-y-3">
+      <div className="p-4 border-b border-[#333333] flex flex-col gap-3">
         <h2 className="text-xs font-bold uppercase tracking-widest text-[#c8a96e] mb-1 flex justify-between items-center">
           <div className="flex items-center gap-2">
             Library
@@ -75,33 +80,37 @@ const Sidebar: React.FC<SidebarProps> = ({ onSelectItem, activeTab, availableTab
           className={`w-full ${UI_STYLES.input} !text-xs !py-1.5`}
         />
 
-        {activeTab === 'ingredients' && (
-          <div className="grid grid-cols-2 gap-2">
-            <div className="flex flex-col">
-              <label className="text-[8px] font-bold uppercase text-[#666666] mb-1">Supplier</label>
-              <select 
-                value={filterSupplier}
-                onChange={e => setFilterSupplier(e.target.value)}
-                className={`${UI_STYLES.input} !py-1 !px-2 !text-[9px] w-full`}
-              >
-                {suppliers.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
+        <div className="h-10 w-full">
+          {activeTab === 'ingredients' ? (
+            <div className="grid grid-cols-2 gap-2 h-full">
+              <div className="flex flex-col justify-end">
+                <label className="text-[8px] font-bold uppercase text-[#666666] mb-1">Supplier</label>
+                <select 
+                  value={filterSupplier}
+                  onChange={e => setFilterSupplier(e.target.value)}
+                  className={`${UI_STYLES.input} !py-1 !px-2 !text-[9px] w-full`}
+                >
+                  {suppliers.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col justify-end">
+                <label className="text-[8px] font-bold uppercase text-[#666666] mb-1">Category</label>
+                <select 
+                  value={filterCategory}
+                  onChange={e => setFilterCategory(e.target.value)}
+                  className={`${UI_STYLES.input} !py-1 !px-2 !text-[9px] w-full`}
+                >
+                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
             </div>
-            <div className="flex flex-col">
-              <label className="text-[8px] font-bold uppercase text-[#666666] mb-1">Category</label>
-              <select 
-                value={filterCategory}
-                onChange={e => setFilterCategory(e.target.value)}
-                className={`${UI_STYLES.input} !py-1 !px-2 !text-[9px] w-full`}
-              >
-                {categories.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-          </div>
-        )}
+          ) : (
+            <div className="h-full w-full"></div>
+          )}
+        </div>
 
         {showTabSwitcher && (
-          <div className="flex border border-[#333333] mt-2">
+          <div className="flex border border-[#333333]">
             {availableTabs.map(tab => (
               <button
                 key={tab}
@@ -126,13 +135,24 @@ const Sidebar: React.FC<SidebarProps> = ({ onSelectItem, activeTab, availableTab
                 onClick={() => onCreateRequest(search, activeTab === 'ingredients' ? 'ingredient' : activeTab === 'recipes' ? 'recipe' : 'dish')}
                 className="w-full py-4 border border-[#c8a96e] text-[#c8a96e] text-[10px] font-bold uppercase tracking-widest hover:bg-[#c8a96e] hover:text-black transition-all mb-4"
                >
-                 + Create "{search}"
+                 + Add "{search}"
                </button>
              )}
           </div>
         ) : (
           filteredItems.map(item => {
             const isIncomplete = activeTab === 'ingredients' && (item as Ingredient).incomplete;
+            
+            let displayCost = '0.0000';
+            let displayUnit = 'unit';
+            if (activeTab === 'ingredients') {
+              const ing = item as Ingredient;
+              const pref = ing.suppliers.find(s => s.isPreferred) || ing.suppliers[0];
+              const cost = pref ? pref.packCost / (pref.packSize || 1) : 0;
+              displayCost = cost.toFixed(4);
+              displayUnit = pref?.packUnit || 'g';
+            }
+
             return (
               <div
                 key={item.id}
@@ -146,7 +166,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onSelectItem, activeTab, availableTab
                       {item.name}
                     </span>
                   </div>
-                  <span className="text-[10px] font-mono text-[#666666] flex-shrink-0">{item.id.slice(0, 4)}</span>
+                  <span className="text-[10px] font-mono text-[#666666] flex-shrink-0">{item.id?.slice(0, 4)}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={`text-[9px] uppercase font-bold px-1.5 py-0.5 border border-[#333333] ${isIncomplete ? 'text-red-800 border-red-900/40' : 'text-[#666666]'}`}>
@@ -154,7 +174,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onSelectItem, activeTab, availableTab
                   </span>
                   {activeTab === 'ingredients' && (
                     <span className={`text-[10px] font-mono ${isIncomplete ? 'text-red-900' : 'text-[#c8a96e]'}`}>
-                      £{((item as Ingredient).packCost / (item as Ingredient).packSize).toFixed(4)}/{(item as Ingredient).packUnit}
+                      £{displayCost}/{displayUnit}
                     </span>
                   )}
                 </div>

@@ -12,7 +12,7 @@ export const Navigation: React.FC<NavigationProps> = ({ activeView, onViewChange
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'service', label: 'Dish Development' },
-    { id: 'kitchen', label: 'Recipe Development' },
+    { id: 'kitchen', label: 'Recipe Library' },
     { id: 'ingredients', label: 'Master Ingredient List' },
     { id: 'settings', label: 'System Settings' },
   ];
@@ -41,7 +41,7 @@ export const Navigation: React.FC<NavigationProps> = ({ activeView, onViewChange
         </div>
         <div className="flex items-center gap-4">
            <div className="w-2 h-2 rounded-full bg-green-900 border border-green-500 animate-pulse"></div>
-           <div className="text-[9px] font-mono text-[#444444]">V1.0.7</div>
+           <div className="text-[9px] font-mono text-[#444444]">V1.1.2</div>
         </div>
       </div>
 

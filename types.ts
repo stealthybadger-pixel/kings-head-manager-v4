@@ -18,21 +18,34 @@ export enum Allergen {
   LUPIN = 'Lupin'
 }
 
-export interface Ingredient {
-  id: string;
+export interface IngredientSupplier {
   name: string;
-  supplier: string;
-  category: string;
   packCost: number;
   packSize: number;
   packUnit: Unit;
+  isPreferred: boolean;
+  notes?: string;
+}
+
+export interface Ingredient {
+  id: string;
+  name: string;
+  suppliers: IngredientSupplier[];
+  category: string;
   wastePercent: number;
   allergens: Allergen[];
   kcalPer100: number;
   stockLevel: number;
   incomplete?: boolean; // Flag for items created via OCR/Quick-add that need full data
+  audited?: boolean; // Flag to indicate data has been manually reviewed/verified
   createdAt?: string;
   updatedAt?: string;
+  
+  // Legacy fields for migration safety (optional in new types, but present in old DB records)
+  supplier?: string;
+  packCost?: number;
+  packSize?: number;
+  packUnit?: Unit;
 }
 
 export interface RecipeItem {

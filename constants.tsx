@@ -18,3 +18,11 @@ export const UI_STYLES = {
   label: 'text-[10px] uppercase font-bold text-[#888888] mb-1 block',
   panel: 'bg-[#111111] border border-[#333333]',
 };
+
+export const APPROVED_SUPPLIERS = [
+  'David Catt',
+  'Urban',
+  'Cranbrook',
+  'Crouch',
+  'Internal'
+];

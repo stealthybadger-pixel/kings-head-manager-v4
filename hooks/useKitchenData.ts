@@ -5,14 +5,76 @@ import { db } from '../firebase';
 import { Ingredient, Recipe, Dish, Allergen } from '../types';
 
 const DEFAULT_INGREDIENTS: Omit<Ingredient, 'id'>[] = [
-  { name: 'Agar-agar', category: 'Dry store', supplier: 'Urban', packCost: 33.75, packSize: 500, packUnit: 'g', wastePercent: 0, allergens: [], kcalPer100: 306, stockLevel: 95 },
-  { name: 'Beef Mince', category: 'Meat', supplier: 'Crouch', packCost: 9.00, packSize: 1000, packUnit: 'g', wastePercent: 15, allergens: [], kcalPer100: 250, stockLevel: 5000 },
-  { name: 'Double Cream', category: 'Dairy', supplier: 'David Catt', packCost: 4.50, packSize: 1000, packUnit: 'ml', wastePercent: 0, allergens: [Allergen.MILK], kcalPer100: 450, stockLevel: 2000 },
-  { name: 'Red Wine', category: 'Alcohol', supplier: 'Urban', packCost: 12.00, packSize: 750, packUnit: 'ml', wastePercent: 0, allergens: [Allergen.SULPHITES], kcalPer100: 85, stockLevel: 3000 },
-  { name: 'Agar-agar Powder', category: 'Dry store', supplier: 'Urban', packCost: 45.00, packSize: 1000, packUnit: 'g', wastePercent: 0, allergens: [], kcalPer100: 300, stockLevel: 100 },
-  { name: 'Butter Unsalted', category: 'Dairy', supplier: 'David Catt', packCost: 2.50, packSize: 250, packUnit: 'g', wastePercent: 0, allergens: [Allergen.MILK], kcalPer100: 717, stockLevel: 1000 },
-  { name: 'Flour (Plain)', category: 'Dry store', supplier: 'Urban', packCost: 1.20, packSize: 1000, packUnit: 'g', wastePercent: 0, allergens: [Allergen.WHEAT], kcalPer100: 364, stockLevel: 5000 },
-  { name: 'Eggs (Large)', category: 'Dairy', supplier: 'David Catt', packCost: 0.30, packSize: 1, packUnit: 'ea', wastePercent: 0, allergens: [Allergen.EGGS], kcalPer100: 155, stockLevel: 120 }
+  { 
+    name: 'Agar-agar', 
+    category: 'Dry Store', 
+    suppliers: [{ name: 'Urban', packCost: 33.75, packSize: 500, packUnit: 'g', isPreferred: true }], 
+    wastePercent: 0, 
+    allergens: [], 
+    kcalPer100: 306, 
+    stockLevel: 95, 
+    audited: true 
+  },
+  { 
+    name: 'Beef Mince', 
+    category: 'Meat', 
+    suppliers: [{ name: 'Crouch', packCost: 9.00, packSize: 1000, packUnit: 'g', isPreferred: true }], 
+    wastePercent: 15, 
+    allergens: [], 
+    kcalPer100: 250, 
+    stockLevel: 5000, 
+    audited: true 
+  },
+  { 
+    name: 'Double Cream', 
+    category: 'Dairy', 
+    suppliers: [{ name: 'David Catt', packCost: 4.50, packSize: 1000, packUnit: 'ml', isPreferred: true }], 
+    wastePercent: 0, 
+    allergens: [Allergen.MILK], 
+    kcalPer100: 450, 
+    stockLevel: 2000, 
+    audited: true 
+  },
+  { 
+    name: 'Red Wine', 
+    category: 'Alcohol', 
+    suppliers: [{ name: 'Urban', packCost: 12.00, packSize: 750, packUnit: 'ml', isPreferred: true }], 
+    wastePercent: 0, 
+    allergens: [Allergen.SULPHITES], 
+    kcalPer100: 85, 
+    stockLevel: 3000, 
+    audited: true 
+  },
+  { 
+    name: 'Butter Unsalted', 
+    category: 'Dairy', 
+    suppliers: [{ name: 'David Catt', packCost: 2.50, packSize: 250, packUnit: 'g', isPreferred: true }], 
+    wastePercent: 0, 
+    allergens: [Allergen.MILK], 
+    kcalPer100: 717, 
+    stockLevel: 1000, 
+    audited: true 
+  },
+  { 
+    name: 'Flour (Plain)', 
+    category: 'Dry Store', 
+    suppliers: [{ name: 'Urban', packCost: 1.20, packSize: 1000, packUnit: 'g', isPreferred: true }], 
+    wastePercent: 0, 
+    allergens: [Allergen.WHEAT], 
+    kcalPer100: 364, 
+    stockLevel: 5000, 
+    audited: true 
+  },
+  { 
+    name: 'Eggs (Large)', 
+    category: 'Dairy', 
+    suppliers: [{ name: 'David Catt', packCost: 0.30, packSize: 1, packUnit: 'ea', isPreferred: true }], 
+    wastePercent: 0, 
+    allergens: [Allergen.EGGS], 
+    kcalPer100: 155, 
+    stockLevel: 120, 
+    audited: true 
+  }
 ];
 
 export const useKitchenData = () => {
@@ -26,10 +88,29 @@ export const useKitchenData = () => {
   useEffect(() => {
     const q = query(collection(db, 'ingredients'), orderBy('name'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Ingredient[];
+      const data = snapshot.docs.map(doc => {
+        const raw = doc.data();
+        // In-memory migration for legacy data model
+        if (!raw.suppliers && raw.supplier) {
+          return {
+            id: doc.id,
+            ...raw,
+            suppliers: [{
+              name: raw.supplier,
+              packCost: raw.packCost,
+              packSize: raw.packSize,
+              packUnit: raw.packUnit,
+              isPreferred: true
+            }]
+          };
+        }
+        return {
+          id: doc.id,
+          ...raw,
+          // Ensure suppliers array exists if completely missing
+          suppliers: raw.suppliers || []
+        };
+      }) as Ingredient[];
       setIngredients(data);
       setConnectionStatus('connected');
       setError(null);
@@ -78,6 +159,12 @@ export const useKitchenData = () => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
+      // Clean up legacy fields if they accidentally crept in
+      if ('supplier' in newIng) delete (newIng as any).supplier;
+      if ('packCost' in newIng) delete (newIng as any).packCost;
+      if ('packSize' in newIng) delete (newIng as any).packSize;
+      if ('packUnit' in newIng) delete (newIng as any).packUnit;
+
       const docRef = await addDoc(collection(db, 'ingredients'), newIng);
       return { id: docRef.id, ...newIng } as Ingredient;
     } catch (err) {
@@ -89,10 +176,22 @@ export const useKitchenData = () => {
   const updateIngredient = useCallback(async (id: string, ingredient: Partial<Ingredient>) => {
     try {
       const docRef = doc(db, 'ingredients', id);
-      await updateDoc(docRef, {
+      const updateData = {
         ...ingredient,
         updatedAt: new Date().toISOString()
-      });
+      };
+      // Ensure we don't write legacy fields back if we are updating to new model
+      if (ingredient.suppliers) {
+        // We are updating the structured data, so let's try to remove legacy fields from the update payload
+        // Note: Firestore update only updates specified fields. To delete legacy fields, we'd need FieldValue.delete()
+        // For now, we just don't include them in the new data payload.
+        delete (updateData as any).supplier;
+        delete (updateData as any).packCost;
+        delete (updateData as any).packSize;
+        delete (updateData as any).packUnit;
+      }
+
+      await updateDoc(docRef, updateData);
     } catch (err) {
       console.error("Error updating ingredient:", err);
       throw err;
@@ -189,7 +288,7 @@ export const useKitchenData = () => {
       data.ingredients.forEach(ing => {
         const { id, ...cleanIng } = ing;
         const ref = doc(collection(db, 'ingredients'));
-        batch.set(ref, { ...cleanIng, updatedAt: new Date().toISOString() });
+        batch.set(ref, { ...cleanIng, audited: true, updatedAt: new Date().toISOString() });
       });
       data.recipes.forEach(rec => {
         const { id, ...cleanRec } = rec;

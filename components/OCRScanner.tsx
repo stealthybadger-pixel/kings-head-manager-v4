@@ -4,6 +4,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { useKitchenData } from '../hooks/useKitchenData';
 import { RecipeItem, Unit, Ingredient } from '../types';
 import { useConfirmation } from '../hooks/useConfirmation';
+import { detectAllergens, estimateKcal, detectCategory, detectSupplierFromCategory, getLevenshteinDistance } from '../utils/intelligence';
 
 interface ExtractedItem {
   id: string;
@@ -14,7 +15,7 @@ interface ExtractedItem {
 }
 
 interface OCRScannerProps {
-  onAddItems: (items: any[], instructions?: string) => void;
+  onAddItems: (items: any[], instructions?: string, title?: string) => void;
   onCancel: () => void;
   onIngredientCreateRequest: (name: string) => void;
 }
@@ -25,18 +26,48 @@ const SearchableIngredientDropdown: React.FC<{
   ingredients: Ingredient[];
   onCreateNew: () => void;
   isCreating: boolean;
-}> = ({ currentId, onSelect, ingredients, onCreateNew, isCreating }) => {
+  ocrName: string;
+}> = ({ currentId, onSelect, ingredients, onCreateNew, isCreating, ocrName }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   const selectedIngredient = ingredients.find(i => i.id === currentId);
   
-  const filtered = useMemo(() => {
-    return ingredients.filter(i => 
-      i.name.toLowerCase().includes(search.toLowerCase())
-    );
-  }, [ingredients, search]);
+  const sortedAndFiltered = useMemo(() => {
+    const query = search.trim() || ocrName.trim();
+    if (!query) return ingredients.slice(0, 50); // Fallback to first 50 if absolutely nothing
+
+    const qLower = query.toLowerCase();
+
+    // Score ingredients based on similarity
+    const scored = ingredients.map(ing => {
+       const iName = ing.name.toLowerCase();
+       let score = 0;
+       
+       // Priority 1: Exact Match
+       if (iName === qLower) score = 1000;
+       // Priority 2: Starts With
+       else if (iName.startsWith(qLower)) score = 500;
+       // Priority 3: Contains (word boundary preferred but simple includes for now)
+       else if (iName.includes(qLower)) score = 100;
+       // Priority 4: Levenshtein Distance (Closer = Higher Score)
+       else {
+         const dist = getLevenshteinDistance(iName, qLower);
+         // Penalize distance. Max likely name length ~20-30 chars.
+         // A distance of 1 is -1, distance of 10 is -10.
+         score = -dist; 
+       }
+       
+       return { ing, score };
+    });
+
+    // Sort descending by score
+    scored.sort((a, b) => b.score - a.score);
+
+    // Return top 50 matches to keep UI snappy
+    return scored.map(s => s.ing).slice(0, 50);
+  }, [ingredients, search, ocrName]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -67,13 +98,12 @@ const SearchableIngredientDropdown: React.FC<{
           <input 
             autoFocus
             type="text"
-            placeholder="FILTER_REGISTRY..."
+            placeholder={ocrName ? `FILTER: ${ocrName}...` : "FILTER_REGISTRY..."}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full bg-[#151921] border-b border-[#c8a96e]/30 p-2 text-[10px] text-white outline-none placeholder:text-[#444]"
           />
           
-          {/* Quick Create Button moved to the TOP of the dropdown list */}
           {!selectedIngredient && (
             <div className="p-2 bg-black border-b border-[#c8a96e]/30">
               <button 
@@ -87,16 +117,19 @@ const SearchableIngredientDropdown: React.FC<{
           )}
 
           <div className="max-h-64 overflow-y-auto divide-y divide-[#1c222b]">
-            {filtered.length > 0 ? filtered.map(ing => (
-              <div 
-                key={ing.id}
-                onClick={() => { onSelect(ing.id); setIsOpen(false); }}
-                className="p-2 hover:bg-[#c8a96e]/10 cursor-pointer group"
-              >
-                <div className="text-[10px] text-white group-hover:text-[#c8a96e] font-bold uppercase truncate">{ing.name}</div>
-                <div className="text-[8px] text-[#444] uppercase">{ing.category} // {ing.supplier}</div>
-              </div>
-            )) : (
+            {sortedAndFiltered.length > 0 ? sortedAndFiltered.map(ing => {
+              const pref = ing.suppliers.find(s => s.isPreferred) || ing.suppliers[0];
+              return (
+                <div 
+                  key={ing.id}
+                  onClick={() => { onSelect(ing.id); setIsOpen(false); }}
+                  className="p-2 hover:bg-[#c8a96e]/10 cursor-pointer group"
+                >
+                  <div className="text-[10px] text-white group-hover:text-[#c8a96e] font-bold uppercase truncate">{ing.name}</div>
+                  <div className="text-[8px] text-[#444] uppercase">{ing.category} // {pref?.name}</div>
+                </div>
+              );
+            }) : (
               <div className="p-4 text-center text-[8px] text-[#444] uppercase">NO_RECORDS_MATCHED</div>
             )}
           </div>
@@ -250,6 +283,12 @@ export const OCRScanner: React.FC<OCRScannerProps> = ({ onAddItems, onCancel, on
     ));
   };
 
+  const updateQuantity = (id: string, newQty: number) => {
+    setStagedItems(prev => prev.map(item => 
+      item.id === id ? { ...item, quantity: newQty } : item
+    ));
+  };
+
   const updateName = (id: string, newName: string) => {
     setStagedItems(prev => prev.map(item => {
       if (item.id === id) {
@@ -263,16 +302,25 @@ export const OCRScanner: React.FC<OCRScannerProps> = ({ onAddItems, onCancel, on
   const handleInlineQuickCreate = async (stagedId: string, name: string) => {
     setCreatingIds(prev => new Set(prev).add(stagedId));
     try {
+      // UNIFIED INTELLIGENCE ENGINE
+      const autoCategory = detectCategory(name);
+      const autoSupplierName = detectSupplierFromCategory(autoCategory);
+      const autoAllergens = detectAllergens(name);
+      const autoKcal = estimateKcal(name);
+
       const newIng = await addIngredient({
         name: name,
-        category: 'Sub-Recipe',
-        supplier: 'Internal',
-        packCost: 0,
-        packSize: 1000,
-        packUnit: 'g',
+        category: autoCategory,
+        suppliers: [{
+            name: autoSupplierName,
+            packCost: 0,
+            packSize: 1000,
+            packUnit: 'g',
+            isPreferred: true
+        }],
         wastePercent: 0,
-        allergens: [],
-        kcalPer100: 0,
+        allergens: autoAllergens,
+        kcalPer100: autoKcal,
         stockLevel: 0,
         incomplete: true
       });
@@ -309,7 +357,7 @@ export const OCRScanner: React.FC<OCRScannerProps> = ({ onAddItems, onCancel, on
 
     const ok = await confirm(`ARE YOU SURE? This will add ${validItems.length} items and instructions to your recipe build.`);
     if (ok) {
-      onAddItems(validItems, stagedInstructions);
+      onAddItems(validItems, stagedInstructions, documentTitle);
     }
   };
 
@@ -426,8 +474,13 @@ export const OCRScanner: React.FC<OCRScannerProps> = ({ onAddItems, onCancel, on
                                 className="w-full bg-transparent border border-transparent focus:border-[#404040] text-[#FAFAFA] text-[11px] p-1 outline-none font-bold"
                               />
                             </td>
-                            <td className="p-3 text-[11px] text-[#FAFAFA] border-r border-[#404040] text-right font-mono">
-                              {item.quantity}
+                            <td className="p-2 text-[11px] text-[#FAFAFA] border-r border-[#404040] text-right font-mono">
+                               <input 
+                                 type="number"
+                                 value={item.quantity}
+                                 onChange={(e) => updateQuantity(item.id, parseFloat(e.target.value))}
+                                 className="w-16 bg-transparent border border-transparent focus:border-[#404040] text-right text-[#FAFAFA] text-[11px] p-1 outline-none font-mono"
+                               />
                             </td>
                             <td className="p-2 border-r border-[#404040]">
                               <select 
@@ -449,6 +502,7 @@ export const OCRScanner: React.FC<OCRScannerProps> = ({ onAddItems, onCancel, on
                                 onSelect={(id) => updateMatch(item.id, id)}
                                 onCreateNew={() => handleInlineQuickCreate(item.id, item.name)}
                                 isCreating={creatingIds.has(item.id)}
+                                ocrName={item.name}
                               />
                             </td>
                             <td className="p-3 text-center">
@@ -468,7 +522,7 @@ export const OCRScanner: React.FC<OCRScannerProps> = ({ onAddItems, onCancel, on
                   </div>
 
                   <div className="p-4">
-                    <label className="text-[9px] font-bold text-[#888] uppercase block mb-2">PREPARATION METHOD / INSTRUCTIONS</label>
+                    <label className="text-[9px] font-bold text-[#888] uppercase block mb-2">METHOD</label>
                     <textarea 
                       value={stagedInstructions}
                       onChange={(e) => setStagedInstructions(e.target.value)}
@@ -483,7 +537,7 @@ export const OCRScanner: React.FC<OCRScannerProps> = ({ onAddItems, onCancel, on
                     onClick={handleAddToRecipe}
                     className="px-16 py-4 bg-[#FAFAFA] text-[#0E1117] text-[12px] font-bold uppercase tracking-[0.2em] hover:bg-white transition-all shadow-xl !rounded-none"
                   >
-                    PUSH TO RECIPE CARD
+                    ADD TO BUILD
                   </button>
                 </div>
               </div>
@@ -493,7 +547,7 @@ export const OCRScanner: React.FC<OCRScannerProps> = ({ onAddItems, onCancel, on
 
         <div className="p-2 border-t border-[#404040] bg-black flex justify-between items-center">
            <div className="text-[8px] text-[#404040] uppercase tracking-[0.4em]">OCR_STAGING_v11 // KERNEL_G3_FLASH</div>
-           <div className="text-[8px] text-[#404040] uppercase tracking-[0.4em]">STRICT_INSTRUCTIONS_ENABLED</div>
+           <div className="text-[8px] text-[#404040] uppercase tracking-[0.4em]">INTELLIGENCE_ROUTING: ACTIVE</div>
         </div>
       </div>
     </div>

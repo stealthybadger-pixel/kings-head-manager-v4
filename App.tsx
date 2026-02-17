@@ -41,13 +41,28 @@ const App: React.FC = () => {
       const type = view === 'kitchen' ? 'recipe' : 'ingredient';
       setSelectedItemId(targetId);
       setSelectionType(type);
-      setLibraryTab(type === 'recipe' ? 'recipes' : 'ingredients');
-      setAvailableTabs(['ingredients', 'recipes']);
+      
+      if (view === 'kitchen') {
+        setLibraryTab('recipes');
+        setAvailableTabs(['recipes']);
+      } else {
+        setLibraryTab(type === 'recipe' ? 'recipes' : 'ingredients');
+        setAvailableTabs(['ingredients', 'recipes']);
+      }
     } else {
       setSelectedItemId(null);
       setSelectionType('ingredient');
-      setAvailableTabs(view === 'service' ? ['ingredients', 'recipes', 'dishes'] : ['ingredients', 'recipes']);
-      setLibraryTab('ingredients');
+      
+      if (view === 'kitchen') {
+        setLibraryTab('recipes');
+        setAvailableTabs(['recipes']);
+      } else if (view === 'service') {
+        setLibraryTab('dishes');
+        setAvailableTabs(['ingredients', 'recipes', 'dishes']);
+      } else {
+        setLibraryTab('ingredients');
+        setAvailableTabs(['ingredients', 'recipes']);
+      }
     }
   };
 
@@ -55,8 +70,18 @@ const App: React.FC = () => {
     setCurrentView(view);
     setSelectedItemId(null);
     setSelectionType('ingredient');
-    setAvailableTabs(view === 'service' ? ['ingredients', 'recipes', 'dishes'] : ['ingredients', 'recipes']);
-    setLibraryTab('ingredients');
+    
+    // Context-aware default tab selection
+    if (view === 'kitchen') {
+        setLibraryTab('recipes');
+        setAvailableTabs(['recipes']);
+    } else if (view === 'service') {
+        setLibraryTab('dishes');
+        setAvailableTabs(['ingredients', 'recipes', 'dishes']);
+    } else {
+        setLibraryTab('ingredients');
+        setAvailableTabs(['ingredients', 'recipes']);
+    }
   };
 
   const handleRecursiveAddRequest = useCallback((name: string, type: 'ingredient' | 'recipe' | 'dish') => {

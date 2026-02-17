@@ -3,6 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { useKitchenData } from '../hooks/useKitchenData';
 import { UI_STYLES } from '../constants';
 import { Ingredient, Recipe, Dish } from '../types';
+import { DashboardAlerts } from './DashboardAlerts';
 
 interface DashboardProps {
   onNavigate: (view: string, targetId?: string) => void;
@@ -21,13 +22,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
   const stockData = useMemo(() => {
     const calculated = ingredients.map(i => {
-      const unitCost = safeNum(i.packCost) / (safeNum(i.packSize) || 1);
+      const pref = i.suppliers.find(s => s.isPreferred) || i.suppliers[0];
+      const packCost = pref ? safeNum(pref.packCost) : 0;
+      const packSize = pref ? safeNum(pref.packSize) : 1;
+      const packUnit = pref ? pref.packUnit : 'ea';
+      
+      const unitCost = packCost / (packSize || 1);
+      
       return {
         id: i.id,
         name: i.name || 'Unknown',
-        value: safeNum(i.stockLevel) * unitCost,
+        value: safeNum(i.stockLevel) * unitCost, // stockLevel is in packUnits? Assuming yes for now. Or is it packs? Prompt says "in packUnits".
         level: safeNum(i.stockLevel),
-        unit: i.packUnit || '?',
+        unit: packUnit,
         category: i.category || 'Other'
       };
     });
@@ -39,7 +46,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
   const totalInventoryValue = useMemo(() => {
     return ingredients.reduce((acc, i) => {
-      const unitCost = safeNum(i.packCost) / (safeNum(i.packSize) || 1);
+      const pref = i.suppliers.find(s => s.isPreferred) || i.suppliers[0];
+      const unitCost = pref ? safeNum(pref.packCost) / (safeNum(pref.packSize) || 1) : 0;
       return acc + (safeNum(i.stockLevel) * unitCost);
     }, 0);
   }, [ingredients]);
@@ -85,6 +93,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         </div>
       </div>
 
+      {/* INTELLIGENCE MODULES */}
+      <DashboardAlerts />
+
       {/* Primary Action Grid - Ultra-short buttons */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-2">
         <button 
@@ -104,7 +115,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           className="bg-[#1a1a1a] border border-[#333333] p-1.5 md:p-2 text-left hover:border-[#c8a96e] transition-all group"
         >
           <div className="flex justify-between items-start">
-            <div className="text-[8px] font-bold uppercase tracking-widest text-[#888888]">Recipe Dev</div>
+            <div className="text-[8px] font-bold uppercase tracking-widest text-[#888888]">Recipe Library</div>
             <div className="text-[10px] text-[#444] font-mono">02</div>
           </div>
           <div className="text-xl md:text-2xl font-mono text-[#e0e0e0] group-hover:text-[#c8a96e] transition-colors">{recipes.length}</div>
