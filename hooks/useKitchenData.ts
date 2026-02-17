@@ -1,8 +1,10 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, query, orderBy, writeBatch, getDocs, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Ingredient, Recipe, Dish, Allergen, RecipeStatus, RecipeItem } from '../types';
+import { calculateBatchTotal } from '../utils/units';
+import { getProduceYield } from '../utils/yields';
 
 const DEFAULT_INGREDIENTS: Omit<Ingredient, 'id'>[] = [
   { 
@@ -148,6 +150,20 @@ export const useKitchenData = () => {
           suppliers: raw.suppliers || []
         };
       }) as Ingredient[];
+
+      // Auto-populate wastePercent from yield data for Vegetable/Fruit ingredients
+      data.forEach(ing => {
+        if ((ing.category === 'Vegetable' || ing.category === 'Fruit') && (ing.wastePercent === 0 || ing.wastePercent === undefined)) {
+          const yieldPct = getProduceYield(ing.name);
+          if (yieldPct !== null) {
+            const waste = 100 - yieldPct;
+            console.info(`[YIELD_UPDATE] "${ing.name}" → ${yieldPct}% yield (${waste}% waste)`);
+            ing.wastePercent = waste;
+            updateDoc(doc(db, 'ingredients', ing.id), { wastePercent: waste, updatedAt: new Date().toISOString() }).catch(console.error);
+          }
+        }
+      });
+
       setIngredients(data);
       setConnectionStatus('connected');
       setError(null);
@@ -162,10 +178,37 @@ export const useKitchenData = () => {
   useEffect(() => {
     const q = query(collection(db, 'recipes'), orderBy('updatedAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Recipe[];
+      const data = snapshot.docs.map(d => {
+        const raw = d.data();
+        const id = d.id;
+        // Strip self-referential items (recipe containing itself as a sub-recipe)
+        const items = (raw.items || []).filter(
+          (item: any) => !(item.type === 'recipe' && (item.id === id || (item as any).recipeId === id))
+        );
+        const patches: Record<string, any> = {};
+
+        // If corrupted items were found, clean them in Firestore too
+        if (items.length !== (raw.items || []).length) {
+          console.warn(`[SELF_REF_CLEANUP] Recipe "${raw.name}" (${id}) had self-referential items — stripping.`);
+          patches.items = items;
+        }
+
+        // Auto-clear isDirty for recipes that have resolved items and an active/structured status
+        if (raw.isDirty && items.length > 0 && items.every((i: any) => i.id)) {
+          console.info(`[AUTO_CLEAN] Recipe "${raw.name}" (${id}) has resolved items — clearing isDirty.`);
+          patches.isDirty = false;
+          if (!raw.status || raw.status === 'pending_validation' || raw.status === 'needs_resolution') {
+            patches.status = 'active';
+          }
+        }
+
+        if (Object.keys(patches).length > 0) {
+          patches.updatedAt = new Date().toISOString();
+          updateDoc(doc(db, 'recipes', id), patches).catch(console.error);
+        }
+
+        return { id, ...raw, items, ...patches } as Recipe;
+      });
       setRecipes(data);
     }, (err) => {
       console.error("Error fetching recipes:", err);
@@ -188,6 +231,28 @@ export const useKitchenData = () => {
     });
     return () => unsubscribe();
   }, []);
+
+  // Retroactive batch size calculation (runs once when both ingredients and recipes are loaded)
+  const batchCalcRan = useRef(false);
+  useEffect(() => {
+    if (batchCalcRan.current || ingredients.length === 0 || recipes.length === 0) return;
+    batchCalcRan.current = true;
+
+    // Build waste lookup from all ingredients
+    const wasteMap = new Map<string, number>();
+    ingredients.forEach(ing => {
+      if (ing.wastePercent > 0) wasteMap.set(ing.id, ing.wastePercent);
+    });
+
+    recipes.forEach(recipe => {
+      if (!recipe.items || recipe.items.length === 0 || !recipe.batchUnit) return;
+      const calculatedBatch = parseFloat(calculateBatchTotal(recipe.items, recipe.batchUnit, wasteMap).toFixed(4));
+      if (calculatedBatch > 0 && Math.abs(calculatedBatch - (recipe.batchSize || 1)) > 0.001) {
+        console.info(`[BATCH_CALC] Recipe "${recipe.name}": ${recipe.batchSize} → ${calculatedBatch} ${recipe.batchUnit}`);
+        updateDoc(doc(db, 'recipes', recipe.id), { batchSize: calculatedBatch, updatedAt: new Date().toISOString() }).catch(console.error);
+      }
+    });
+  }, [ingredients, recipes]);
 
   const addIngredient = useCallback(async (ingredient: Omit<Ingredient, 'id'>) => {
     try {

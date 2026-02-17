@@ -5,15 +5,7 @@ import { useKitchenData } from '../hooks/useKitchenData';
 import { useConfirmation } from '../hooks/useConfirmation';
 import { UI_STYLES, COLORS } from '../constants';
 import { SourceTag } from './SourceTag';
-
-const getConvertedQuantity = (quantity: number, fromUnit: Unit, toUnit: Unit): number => {
-  if (fromUnit === toUnit) return quantity;
-  if (fromUnit === 'kg' && toUnit === 'g') return quantity * 1000;
-  if (fromUnit === 'g' && toUnit === 'kg') return quantity / 1000;
-  if (fromUnit === 'l' && toUnit === 'ml') return quantity * 1000;
-  if (fromUnit === 'ml' && toUnit === 'l') return quantity / 1000;
-  return quantity; 
-};
+import { getConvertedQuantity } from '../utils/units';
 
 interface SearchOption {
   id: string;
