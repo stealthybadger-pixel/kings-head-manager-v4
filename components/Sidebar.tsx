@@ -166,6 +166,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           filteredItems.map(item => {
             const itemType = isHybrid ? (item as any).__type : (activeTab === 'ingredients' ? 'ingredient' : activeTab === 'recipes' ? 'recipe' : 'dish');
             const isIncomplete = itemType === 'ingredient' && (item as Ingredient).incomplete;
+            const isRecipeDirty = itemType === 'recipe' && (item as Recipe).isDirty;
             const isInspecting = inspectedItem?.id === item.id;
             
             let displayCost = '0.0000';
@@ -183,12 +184,18 @@ const Sidebar: React.FC<SidebarProps> = ({
               <div
                 key={item.id}
                 onClick={() => onSelectItem(item.id, itemType)}
-                className={`px-4 py-3 border-b border-[#333333] hover:bg-[#1c1c1c] cursor-pointer group transition-colors ${isIncomplete ? 'bg-red-950/10' : ''}`}
+                className={`px-4 py-3 cursor-pointer group transition-colors 
+                  ${isIncomplete ? 'bg-red-950/10 border-b border-[#333333]' : ''}
+                  ${isRecipeDirty ? 'border border-dashed border-[#A65D43] bg-[#A65D43]/5 my-1' : 'border-b border-[#333333] hover:bg-[#1c1c1c]'}
+                `}
               >
                 <div className="flex justify-between items-center mb-1">
                   <div className="flex items-center gap-2 overflow-hidden w-full">
                     {isIncomplete && <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse flex-shrink-0" />}
-                    <span className={`text-sm font-sans uppercase tracking-tight truncate ${isIncomplete ? 'text-red-400 group-hover:text-red-200' : 'group-hover:text-white'} transition-colors flex-1`}>
+                    <span className={`text-sm font-sans uppercase tracking-tight truncate flex-1 
+                       ${isIncomplete ? 'text-red-400 group-hover:text-red-200' : ''} 
+                       ${isRecipeDirty ? 'text-[#A65D43] group-hover:text-white' : 'group-hover:text-white'}
+                    `}>
                       {/* Source Tag Logic */}
                       {(isHybrid || itemType !== 'dish') && (
                         <SourceTag 
@@ -200,6 +207,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                         />
                       )}
                       {item.name}
+                      {isRecipeDirty && <span className="ml-2 text-[9px] font-bold text-[#A65D43]">[!]</span>}
                     </span>
                   </div>
                 </div>

@@ -24,6 +24,7 @@ export interface IngredientSupplier {
   packSize: number;
   packUnit: Unit;
   isPreferred: boolean;
+  isCase?: boolean; // Flag for case/multipack vs loose item
   notes?: string;
 }
 
@@ -53,7 +54,10 @@ export interface RecipeItem {
   id: string; // References either Ingredient.id or Recipe.id
   quantity: number;
   unit: Unit;
+  notes?: string; // For preserving details like "Sliced" during swaps
 }
+
+export type RecipeStatus = 'pending_validation' | 'needs_resolution' | 'structured' | 'active';
 
 export interface Recipe {
   id: string;
@@ -63,6 +67,11 @@ export interface Recipe {
   items: RecipeItem[];
   instructions: string;
   sourceType: 'manual' | 'ocr';
+  isDirty?: boolean; // Flag for recipes imported with unmapped/incomplete data
+  status?: RecipeStatus;
+  raw_text?: string;
+  structured_data?: Record<string, any> | null;
+  source_filename?: string; // Original filename for traceability
   createdAt?: string;
   updatedAt?: string;
 }
@@ -72,6 +81,7 @@ export interface DishItem {
   id: string; // References either Ingredient.id or Recipe.id
   quantity: number;
   unit: Unit;
+  notes?: string; // For preserving details like "Sliced" during swaps
 }
 
 export interface Dish {

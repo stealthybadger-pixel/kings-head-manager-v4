@@ -8,6 +8,8 @@ import { IngredientManager } from './components/IngredientManager';
 import { DishBuilder } from './components/DishBuilder';
 import { Dashboard } from './components/Dashboard';
 import { Settings } from './components/Settings';
+import { MassIngester } from './components/MassIngester';
+import { ResolutionDashboard } from './components/ResolutionDashboard';
 import { DataInspector } from './components/DataInspector';
 import { ConfirmationProvider } from './hooks/useConfirmation';
 import { useRecursiveBuilder } from './hooks/useRecursiveBuilder';
@@ -135,6 +137,8 @@ const App: React.FC = () => {
             )}
 
             {currentView === 'dashboard' && <Dashboard onNavigate={handleDashboardNavigate} />}
+            {currentView === 'ingest' && <MassIngester />}
+            {currentView === 'resolution' && <ResolutionDashboard />}
             {(currentView === 'service' || currentView === 'kitchen') && (
               <div className="flex h-full w-full">
                   <div className="w-80 h-full flex-shrink-0 border-r border-[#333333]">

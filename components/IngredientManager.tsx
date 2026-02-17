@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useKitchenData } from '../hooks/useKitchenData';
 import { useConfirmation } from '../hooks/useConfirmation';
 import { Ingredient, Unit, Allergen, IngredientSupplier } from '../types';
@@ -38,7 +38,7 @@ export const IngredientManager: React.FC<IngredientManagerProps> = ({
   initialName = '',
   onComplete
 }) => {
-  const { ingredients, addIngredient, updateIngredient, deleteIngredient } = useKitchenData();
+  const { ingredients, addIngredient, updateIngredient, deleteIngredient, mergeIngredients, recipes, dishes } = useKitchenData();
   const { confirm } = useConfirmation();
 
   // Filters
@@ -65,6 +65,11 @@ export const IngredientManager: React.FC<IngredientManagerProps> = ({
   // Nutrition Lookup State
   const [isKcalLookingUp, setIsKcalLookingUp] = useState(false);
   const [kcalSource, setKcalSource] = useState<'COFID' | 'USDA' | null>(null);
+
+  // Swap State
+  const [swappingId, setSwappingId] = useState<string | null>(null);
+  const [swapTargetId, setSwapTargetId] = useState<string>('');
+  const [swapSearch, setSwapSearch] = useState('');
 
   // Dirty check
   const isDirty = useMemo(() => {
@@ -151,19 +156,21 @@ export const IngredientManager: React.FC<IngredientManagerProps> = ({
   }, [ingredients, search, filterSupplier, filterCategory, filterIncomplete]);
 
   const handleEdit = async (ing: Ingredient) => {
+    if (swappingId) setSwappingId(null); // Close swap if opening edit
+
     if (isDirty) {
       const ok = await confirm("You have unsaved changes in the editor. Discard them?");
       if (!ok) return;
     }
 
     const data: Omit<Ingredient, 'id'> = {
-      name: ing.name,
-      category: ing.category,
-      suppliers: ing.suppliers.map(s => ({ ...s })), // Deep copy suppliers
-      wastePercent: ing.wastePercent,
+      name: ing.name || '',
+      category: ing.category || 'Dry Store',
+      suppliers: ing.suppliers ? ing.suppliers.map(s => ({ ...s })) : [], // Deep copy suppliers
+      wastePercent: ing.wastePercent ?? 0, // Fix undefined
       allergens: ing.allergens || [],
-      kcalPer100: ing.kcalPer100 || 0,
-      stockLevel: ing.stockLevel,
+      kcalPer100: ing.kcalPer100 ?? 0, // Fix undefined
+      stockLevel: ing.stockLevel ?? 0, // Fix undefined
       incomplete: ing.incomplete || false,
       audited: ing.audited || false
     };
@@ -288,6 +295,42 @@ export const IngredientManager: React.FC<IngredientManagerProps> = ({
     }
   };
 
+  // --- SWAP & PURGE LOGIC ---
+  const handleInitiateSwap = (ing: Ingredient, e: React.MouseEvent) => {
+     e.stopPropagation();
+     setSwappingId(ing.id);
+     setSwapSearch('');
+     setSwapTargetId('');
+  };
+
+  const handleExecuteSwap = async (sourceIng: Ingredient) => {
+    if (!swapTargetId) return;
+    const targetIng = ingredients.find(i => i.id === swapTargetId);
+    if (!targetIng) return;
+
+    // Calculate Impact
+    const affectedRecipes = recipes.filter(r => r.items.some(i => i.type === 'ingredient' && i.id === sourceIng.id));
+    const affectedDishes = dishes.filter(d => d.items.some(i => i.type === 'ingredient' && i.id === sourceIng.id));
+    const totalImpact = affectedRecipes.length + affectedDishes.length;
+
+    const ok = await confirm(`SWAP "${sourceIng.name}" WITH "${targetIng.name}"?\nThis will update ${totalImpact} recipes/dishes and delete the original.`);
+    
+    if (ok) {
+       await mergeIngredients(sourceIng.id, targetIng.id, sourceIng.name);
+       setSwappingId(null);
+       if (editingId === sourceIng.id) {
+          handleResetForm();
+       }
+    }
+  };
+
+  const filteredSwapTargets = useMemo(() => {
+     if (!swapSearch) return [];
+     return ingredients
+       .filter(i => i.id !== swappingId && i.name.toLowerCase().includes(swapSearch.toLowerCase()))
+       .slice(0, 10);
+  }, [ingredients, swapSearch, swappingId]);
+
   const showIncompleteWarning = useMemo(() => {
     if (!formData.incomplete) return false;
     // Warning if preferred supplier has 0 cost
@@ -297,7 +340,7 @@ export const IngredientManager: React.FC<IngredientManagerProps> = ({
   }, [formData.incomplete, formData.suppliers]);
 
   return (
-    <div className={`flex h-full bg-[#111111] text-[#e0e0e0] divide-x divide-[#333333] ${isRecursive ? 'overflow-hidden' : ''}`}>
+    <div className={`flex h-full bg-[#111111] text-[#e0e0e0] divide-x divide-[#333333] ${isRecursive ? 'overflow-hidden' : ''} relative`}>
       
       {!isRecursive && (
         <div className="w-80 flex flex-col bg-[#0d0d0d]">
@@ -346,6 +389,52 @@ export const IngredientManager: React.FC<IngredientManagerProps> = ({
               <div className="divide-y divide-[#1a1a1a]">
                 {filteredIngredients.map((ing) => {
                   const pref = ing.suppliers.find(s => s.isPreferred) || ing.suppliers[0];
+                  const isSwapping = swappingId === ing.id;
+                  
+                  if (isSwapping) {
+                     // SWAP INTERFACE ROW
+                     return (
+                        <div key={ing.id} className="p-3 bg-[#111] border-l-4 border-l-[#005f73] flex flex-col gap-2">
+                           <div className="flex justify-between items-center">
+                              <span className="text-[10px] font-bold uppercase text-[#005f73] truncate w-32">{ing.name}</span>
+                              <button onClick={(e) => { e.stopPropagation(); setSwappingId(null); }} className="text-[8px] text-[#666] hover:text-white uppercase">Cancel</button>
+                           </div>
+                           <div className="relative">
+                              <input 
+                                autoFocus
+                                type="text"
+                                placeholder="SEARCH REPLACEMENT..."
+                                value={swapSearch}
+                                onChange={(e) => setSwapSearch(e.target.value)}
+                                className="w-full bg-[#1c1c1c] border border-[#333] text-[9px] text-white px-2 py-1 outline-none focus:border-[#005f73]"
+                              />
+                              {swapSearch && !swapTargetId && (
+                                 <div className="absolute top-full left-0 w-full bg-[#1c1c1c] border border-[#333] z-50 max-h-32 overflow-y-auto shadow-xl">
+                                    {filteredSwapTargets.map(target => (
+                                       <div 
+                                         key={target.id}
+                                         onClick={() => { setSwapTargetId(target.id); setSwapSearch(target.name); }}
+                                         className="p-1.5 hover:bg-[#005f73] hover:text-white cursor-pointer text-[9px] uppercase truncate"
+                                       >
+                                         {target.name}
+                                       </div>
+                                    ))}
+                                    {filteredSwapTargets.length === 0 && <div className="p-1.5 text-[8px] text-[#666]">NO MATCHES</div>}
+                                 </div>
+                              )}
+                           </div>
+                           <button 
+                             disabled={!swapTargetId}
+                             onClick={() => handleExecuteSwap(ing)}
+                             className="w-full bg-[#005f73] text-white text-[9px] font-bold uppercase py-1.5 hover:bg-[#004a5d] disabled:opacity-50"
+                           >
+                             SWAP ALL
+                           </button>
+                        </div>
+                     );
+                  }
+
+                  // NORMAL ROW
                   return (
                     <div 
                       key={ing.id} 
@@ -362,7 +451,15 @@ export const IngredientManager: React.FC<IngredientManagerProps> = ({
                         </div>
                         <div className="text-[8px] font-mono text-[#444] mt-0.5">{ing.category} // {pref?.name}</div>
                       </div>
-                      {ing.incomplete && <span className="text-[7px] font-mono text-red-500 uppercase border border-red-900 px-1">STUB</span>}
+                      <div className="flex flex-col gap-1 items-end">
+                        {ing.incomplete && <span className="text-[7px] font-mono text-red-500 uppercase border border-red-900 px-1">STUB</span>}
+                        <button 
+                          onClick={(e) => handleInitiateSwap(ing, e)}
+                          className="opacity-0 group-hover:opacity-100 text-[8px] font-bold uppercase text-[#005f73] hover:bg-[#005f73] hover:text-white px-1 transition-all"
+                        >
+                          SWAP
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -500,8 +597,8 @@ export const IngredientManager: React.FC<IngredientManagerProps> = ({
             <div className="space-y-4">
               <label className={UI_STYLES.label}>Yield Profile (%)</label>
               <div className="flex items-center gap-4">
-                <input type="range" min="0" max="100" value={100 - formData.wastePercent} onChange={e => setFormData({...formData, wastePercent: 100 - (parseFloat(e.target.value) || 0)})} className="flex-1 accent-[#c8a96e]" />
-                <span className="text-sm font-mono w-12 text-[#c8a96e]">{100 - formData.wastePercent}%</span>
+                <input type="range" min="0" max="100" value={100 - (formData.wastePercent || 0)} onChange={e => setFormData({...formData, wastePercent: 100 - (parseFloat(e.target.value) || 0)})} className="flex-1 accent-[#c8a96e]" />
+                <span className="text-sm font-mono w-12 text-[#c8a96e]">{100 - (formData.wastePercent || 0)}%</span>
               </div>
             </div>
             <div>

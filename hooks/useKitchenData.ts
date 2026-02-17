@@ -1,8 +1,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, query, orderBy, writeBatch, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, query, orderBy, writeBatch, getDocs, where } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Ingredient, Recipe, Dish, Allergen } from '../types';
+import { Ingredient, Recipe, Dish, Allergen, RecipeStatus, RecipeItem } from '../types';
 
 const DEFAULT_INGREDIENTS: Omit<Ingredient, 'id'>[] = [
   { 
@@ -77,6 +77,21 @@ const DEFAULT_INGREDIENTS: Omit<Ingredient, 'id'>[] = [
   }
 ];
 
+// Utility to recursively strip undefined values which cause Firestore updateDoc to fail
+const cleanObject = (obj: any): any => {
+  if (Array.isArray(obj)) {
+    return obj.map(v => cleanObject(v));
+  } else if (obj !== null && typeof obj === 'object') {
+    return Object.entries(obj).reduce((acc, [k, v]) => {
+      if (v !== undefined) {
+        acc[k] = cleanObject(v);
+      }
+      return acc;
+    }, {} as any);
+  }
+  return obj;
+};
+
 export const useKitchenData = () => {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
@@ -90,11 +105,13 @@ export const useKitchenData = () => {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => {
         const raw = doc.data();
-        // In-memory migration for legacy data model
         if (!raw.suppliers && raw.supplier) {
           return {
             id: doc.id,
             ...raw,
+            wastePercent: raw.wastePercent ?? 0,
+            stockLevel: raw.stockLevel ?? 0,
+            kcalPer100: raw.kcalPer100 ?? 0,
             suppliers: [{
               name: raw.supplier,
               packCost: raw.packCost,
@@ -107,7 +124,9 @@ export const useKitchenData = () => {
         return {
           id: doc.id,
           ...raw,
-          // Ensure suppliers array exists if completely missing
+          wastePercent: raw.wastePercent ?? 0,
+          stockLevel: raw.stockLevel ?? 0,
+          kcalPer100: raw.kcalPer100 ?? 0,
           suppliers: raw.suppliers || []
         };
       }) as Ingredient[];
@@ -156,16 +175,18 @@ export const useKitchenData = () => {
     try {
       const newIng = {
         ...ingredient,
+        wastePercent: ingredient.wastePercent ?? 0,
+        stockLevel: ingredient.stockLevel ?? 0,
+        kcalPer100: ingredient.kcalPer100 ?? 0,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
-      // Clean up legacy fields if they accidentally crept in
       if ('supplier' in newIng) delete (newIng as any).supplier;
       if ('packCost' in newIng) delete (newIng as any).packCost;
       if ('packSize' in newIng) delete (newIng as any).packSize;
       if ('packUnit' in newIng) delete (newIng as any).packUnit;
 
-      const docRef = await addDoc(collection(db, 'ingredients'), newIng);
+      const docRef = await addDoc(collection(db, 'ingredients'), cleanObject(newIng));
       return { id: docRef.id, ...newIng } as Ingredient;
     } catch (err) {
       console.error("Error adding ingredient:", err);
@@ -180,18 +201,14 @@ export const useKitchenData = () => {
         ...ingredient,
         updatedAt: new Date().toISOString()
       };
-      // Ensure we don't write legacy fields back if we are updating to new model
       if (ingredient.suppliers) {
-        // We are updating the structured data, so let's try to remove legacy fields from the update payload
-        // Note: Firestore update only updates specified fields. To delete legacy fields, we'd need FieldValue.delete()
-        // For now, we just don't include them in the new data payload.
         delete (updateData as any).supplier;
         delete (updateData as any).packCost;
         delete (updateData as any).packSize;
         delete (updateData as any).packUnit;
       }
 
-      await updateDoc(docRef, updateData);
+      await updateDoc(docRef, cleanObject(updateData));
     } catch (err) {
       console.error("Error updating ingredient:", err);
       throw err;
@@ -214,7 +231,7 @@ export const useKitchenData = () => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
-      const docRef = await addDoc(collection(db, 'recipes'), newRecipeData);
+      const docRef = await addDoc(collection(db, 'recipes'), cleanObject(newRecipeData));
       return { id: docRef.id, ...newRecipeData } as Recipe;
     } catch (err) {
       console.error("Error saving recipe:", err);
@@ -225,12 +242,14 @@ export const useKitchenData = () => {
   const updateRecipe = useCallback(async (id: string, recipe: Partial<Recipe>) => {
     try {
       const recipeRef = doc(db, 'recipes', id);
-      await updateDoc(recipeRef, {
+      const payload = {
         ...recipe,
         updatedAt: new Date().toISOString()
-      });
+      };
+      await updateDoc(recipeRef, cleanObject(payload));
     } catch (err) {
       console.error("Error updating recipe:", err);
+      console.dir(recipe); // Log the partial payload for debugging
       throw err;
     }
   }, []);
@@ -244,6 +263,101 @@ export const useKitchenData = () => {
     }
   }, []);
 
+  const ingestRawRecipe = useCallback(async (rawText: string, title?: string, filename?: string) => {
+    try {
+      const timestamp = new Date().toISOString();
+      const recipeData: Omit<Recipe, 'id'> = {
+        name: title || `Raw Import ${new Date().toLocaleTimeString()}`,
+        batchSize: 1,
+        batchUnit: 'ea',
+        items: [],
+        instructions: '',
+        sourceType: 'manual', 
+        isDirty: true,
+        status: 'pending_validation',
+        raw_text: rawText,
+        structured_data: null,
+        source_filename: filename,
+        createdAt: timestamp,
+        updatedAt: timestamp
+      };
+      const docRef = await addDoc(collection(db, 'recipes'), cleanObject(recipeData));
+      return { id: docRef.id, ...recipeData } as Recipe;
+    } catch (err) {
+      console.error("Error ingesting raw recipe:", err);
+      throw err;
+    }
+  }, []);
+
+  const batchIngestFiles = useCallback(async (
+    files: { name: string, content: string }[],
+    onProgress: (progress: number, logs: string[]) => void
+  ) => {
+    try {
+      // 1. Map existing filenames to IDs for Upsert Logic
+      const existingMap = new Map<string, string>();
+      recipes.forEach(r => {
+        if (r.source_filename) existingMap.set(r.source_filename, r.id);
+      });
+
+      const total = files.length;
+      let processed = 0;
+      const CHUNK_SIZE = 50;
+
+      for (let i = 0; i < total; i += CHUNK_SIZE) {
+        const chunk = files.slice(i, i + CHUNK_SIZE);
+        const batch = writeBatch(db);
+        const chunkLogs: string[] = [];
+
+        chunk.forEach(file => {
+          const cleanTitle = file.name.replace(/\.[^/.]+$/, ""); // Strip extension
+          const existingId = existingMap.get(file.name);
+          const timestamp = new Date().toISOString();
+
+          if (existingId) {
+            // Update existing
+            const ref = doc(db, 'recipes', existingId);
+            batch.update(ref, cleanObject({
+              name: cleanTitle,
+              raw_text: file.content,
+              status: 'pending_validation',
+              updatedAt: timestamp
+            }));
+            chunkLogs.push(`[COMMIT] ${cleanTitle} ... SUCCESS (UPDATED)`);
+          } else {
+            // Create new
+            const newRef = doc(collection(db, 'recipes'));
+            const newRecipe = {
+              name: cleanTitle,
+              batchSize: 1,
+              batchUnit: 'ea',
+              items: [],
+              instructions: '',
+              sourceType: 'manual',
+              isDirty: true,
+              status: 'pending_validation',
+              raw_text: file.content,
+              structured_data: null,
+              source_filename: file.name,
+              createdAt: timestamp,
+              updatedAt: timestamp
+            };
+            batch.set(newRef, cleanObject(newRecipe));
+            existingMap.set(file.name, newRef.id); // Add to map to prevent duplicates within same batch/session
+            chunkLogs.push(`[COMMIT] ${cleanTitle} ... SUCCESS`);
+          }
+        });
+
+        await batch.commit();
+        processed += chunk.length;
+        onProgress(Math.round((processed / total) * 100), chunkLogs);
+      }
+    } catch (err) {
+      console.error("Batch ingest error", err);
+      throw err;
+    }
+  }, [recipes]);
+
   const saveDish = useCallback(async (dish: Partial<Dish>) => {
     try {
       const newDishData = {
@@ -251,7 +365,7 @@ export const useKitchenData = () => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
-      const docRef = await addDoc(collection(db, 'dishes'), newDishData);
+      const docRef = await addDoc(collection(db, 'dishes'), cleanObject(newDishData));
       return { id: docRef.id, ...newDishData } as Dish;
     } catch (err) {
       console.error("Error saving dish:", err);
@@ -262,10 +376,10 @@ export const useKitchenData = () => {
   const updateDish = useCallback(async (id: string, dish: Partial<Dish>) => {
     try {
       const dishRef = doc(db, 'dishes', id);
-      await updateDoc(dishRef, {
+      await updateDoc(dishRef, cleanObject({
         ...dish,
         updatedAt: new Date().toISOString()
-      });
+      }));
     } catch (err) {
       console.error("Error updating dish:", err);
       throw err;
@@ -281,6 +395,98 @@ export const useKitchenData = () => {
     }
   }, []);
 
+  const mergeIngredients = useCallback(async (sourceId: string, targetId: string, sourceName: string) => {
+    try {
+      const batch = writeBatch(db);
+      
+      // Find affected recipes
+      const affectedRecipes = recipes.filter(r => r.items.some(i => i.type === 'ingredient' && i.id === sourceId));
+      affectedRecipes.forEach(r => {
+        const newItems = r.items.map(i => {
+           if (i.type === 'ingredient' && i.id === sourceId) {
+             return { 
+               ...i, 
+               id: targetId, 
+               notes: sourceName 
+             };
+           }
+           return i;
+        });
+        const ref = doc(db, 'recipes', r.id);
+        batch.update(ref, cleanObject({ items: newItems, updatedAt: new Date().toISOString() }));
+      });
+
+      // Find affected dishes
+      const affectedDishes = dishes.filter(d => d.items.some(i => i.type === 'ingredient' && i.id === sourceId));
+      affectedDishes.forEach(d => {
+        const newItems = d.items.map(i => {
+           if (i.type === 'ingredient' && i.id === sourceId) {
+             return { 
+               ...i, 
+               id: targetId, 
+               notes: sourceName 
+             };
+           }
+           return i;
+        });
+        const ref = doc(db, 'dishes', d.id);
+        batch.update(ref, cleanObject({ items: newItems, updatedAt: new Date().toISOString() }));
+      });
+
+      // Delete source ingredient
+      const sourceRef = doc(db, 'ingredients', sourceId);
+      batch.delete(sourceRef);
+
+      await batch.commit();
+      return { recipeCount: affectedRecipes.length, dishCount: affectedDishes.length };
+    } catch (err) {
+      console.error("Merge failed:", err);
+      throw err;
+    }
+  }, [recipes, dishes]);
+
+  const purgeStagingData = useCallback(async () => {
+    try {
+      const batch = writeBatch(db);
+      let recipeCount = 0;
+      let ingredientCount = 0;
+
+      const allRecipesQuery = query(collection(db, 'recipes'));
+      const recipeSnap = await getDocs(allRecipesQuery);
+      
+      recipeSnap.docs.forEach(doc => {
+        const data = doc.data() as Recipe;
+        if (data.isDirty || !data.items || data.items.length === 0) {
+          batch.delete(doc.ref);
+          recipeCount++;
+        }
+      });
+
+      const allIngredientsQuery = query(collection(db, 'ingredients'));
+      const ingSnap = await getDocs(allIngredientsQuery);
+
+      ingSnap.docs.forEach(doc => {
+        const data = doc.data() as Ingredient;
+        const isUnsorted = data.category === 'Unsorted';
+        const hasNoPrice = !data.suppliers || data.suppliers.length === 0 || data.suppliers[0].packCost === 0;
+        
+        if (data.incomplete || (isUnsorted && hasNoPrice)) {
+           batch.delete(doc.ref);
+           ingredientCount++;
+        }
+      });
+
+      if (recipeCount > 0 || ingredientCount > 0) {
+        await batch.commit();
+      }
+      
+      return { recipeCount, ingredientCount };
+    } catch (err) {
+      console.error("Purge failed:", err);
+      throw err;
+    }
+  }, []);
+
   const bulkImport = useCallback(async (data: { ingredients: Ingredient[], recipes: Recipe[], dishes?: Dish[] }) => {
     setLoading(true);
     try {
@@ -288,18 +494,25 @@ export const useKitchenData = () => {
       data.ingredients.forEach(ing => {
         const { id, ...cleanIng } = ing;
         const ref = doc(collection(db, 'ingredients'));
-        batch.set(ref, { ...cleanIng, audited: true, updatedAt: new Date().toISOString() });
+        batch.set(ref, cleanObject({ 
+          ...cleanIng, 
+          wastePercent: cleanIng.wastePercent ?? 0,
+          stockLevel: cleanIng.stockLevel ?? 0,
+          kcalPer100: cleanIng.kcalPer100 ?? 0,
+          audited: true, 
+          updatedAt: new Date().toISOString() 
+        }));
       });
       data.recipes.forEach(rec => {
         const { id, ...cleanRec } = rec;
         const ref = doc(collection(db, 'recipes'));
-        batch.set(ref, { ...cleanRec, updatedAt: new Date().toISOString() });
+        batch.set(ref, cleanObject({ ...cleanRec, updatedAt: new Date().toISOString() }));
       });
       if (data.dishes) {
         data.dishes.forEach(dish => {
           const { id, ...cleanDish } = dish;
           const ref = doc(collection(db, 'dishes'));
-          batch.set(ref, { ...cleanDish, updatedAt: new Date().toISOString() });
+          batch.set(ref, cleanObject({ ...cleanDish, updatedAt: new Date().toISOString() }));
         });
       }
       await batch.commit();
@@ -319,7 +532,7 @@ export const useKitchenData = () => {
       const collectionRef = collection(db, 'ingredients');
       DEFAULT_INGREDIENTS.forEach(ing => {
         const docRef = doc(collectionRef);
-        batch.set(docRef, { ...ing, createdAt: new Date().toISOString() });
+        batch.set(docRef, cleanObject({ ...ing, createdAt: new Date().toISOString() }));
       });
       await batch.commit();
     } catch (err: any) {
@@ -329,6 +542,42 @@ export const useKitchenData = () => {
       setLoading(false);
     }
   }, [ingredients.length]);
+
+  const logUnresolvedIngredient = useCallback(async (name: string, recipeId: string) => {
+     try {
+       const collectionRef = collection(db, 'unresolved_ingredients');
+       await addDoc(collectionRef, cleanObject({
+         name,
+         recipeId,
+         detectedAt: new Date().toISOString(),
+         status: 'open'
+       }));
+     } catch (err) {
+       console.error("Error logging unresolved ingredient:", err);
+     }
+  }, []);
+
+  const updateRecipeStatus = useCallback(async (id: string, status: RecipeStatus, items?: RecipeItem[], instructions?: string) => {
+    try {
+      const ref = doc(db, 'recipes', id);
+      
+      const payload = { 
+        status: status || 'pending_validation', 
+        updatedAt: new Date().toISOString(),
+        items: items || [],
+        instructions: instructions || "" 
+      };
+      
+      const updateData = cleanObject(payload);
+      
+      await updateDoc(ref, updateData);
+    } catch (err) {
+      console.error("Error updating recipe status. Payload:", { id, status, items, instructions });
+      // Dir log for deep inspection of object structure
+      console.dir({ id, status, items, instructions }, { depth: null });
+      throw err;
+    }
+  }, []);
 
   return {
     ingredients,
@@ -343,10 +592,16 @@ export const useKitchenData = () => {
     saveRecipe,
     updateRecipe,
     deleteRecipe,
+    ingestRawRecipe,
+    batchIngestFiles,
     saveDish,
     updateDish,
     deleteDish,
+    mergeIngredients,
+    purgeStagingData,
     seedDatabase,
-    bulkImport
+    bulkImport,
+    logUnresolvedIngredient,
+    updateRecipeStatus
   };
 };

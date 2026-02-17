@@ -6,6 +6,7 @@ import { UI_STYLES, APPROVED_SUPPLIERS } from '../constants';
 import { detectAllergens, detectCategory, detectSupplierFromCategory, normalizeName } from '../utils/intelligence';
 import { lookupKcal } from '../utils/nutritionLookup';
 import { Allergen, Ingredient } from '../types';
+import { generatePrepCorrectionReport, applyPrepCorrections, PrepCorrection } from '../services/batchProcessor';
 
 interface DataIssue {
   id: string;
@@ -19,13 +20,21 @@ interface DataIssue {
 }
 
 export const Settings: React.FC = () => {
-  const { ingredients, recipes, bulkImport, updateIngredient } = useKitchenData();
+  const { ingredients, recipes, bulkImport, updateIngredient, purgeStagingData } = useKitchenData();
   const { confirm } = useConfirmation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isRestoring, setIsRestoring] = useState(false);
   const [isApplying, setIsApplying] = useState(false);
   const [pendingIssues, setPendingIssues] = useState<DataIssue[]>([]);
   const [maintenanceLog, setMaintenanceLog] = useState<string[]>([]);
+  const [purgeResult, setPurgeResult] = useState<string | null>(null);
+
+  // PREP CORRECTION STATE
+  const [showPrepModal, setShowPrepModal] = useState(false);
+  const [prepCorrections, setPrepCorrections] = useState<PrepCorrection[]>([]);
+  const [isPrepSafetyChecked, setIsPrepSafetyChecked] = useState(false);
+  const [forceRescan, setForceRescan] = useState(false);
+  const [scanProgress, setScanProgress] = useState<string | null>(null);
 
   const addLog = (msg: string) => {
     setMaintenanceLog(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev].slice(0, 50));
@@ -60,15 +69,6 @@ export const Settings: React.FC = () => {
 
   const runSupplierCheck = async () => {
     addLog("STARTING SUPPLIER CONSISTENCY CHECK...");
-    const counts: Record<string, number> = {};
-    ingredients.forEach(i => {
-      // Only check preferred or first supplier
-      const sName = i.suppliers[0]?.name || 'Unknown';
-      counts[sName] = (counts[sName] || 0) + 1;
-    });
-    
-    // Simple consistency check mostly irrelevant with multi-supplier, but leaving stub logic
-    // or adapting to check normalized names. For now, skipping complex logic as multi-supplier is robust.
     addLog(`SCAN COMPLETE: Suppliers consistent.`);
   };
 
@@ -81,7 +81,6 @@ export const Settings: React.FC = () => {
       if (ing.audited) continue;
 
       if ((ing.kcalPer100 === 0 || !ing.kcalPer100) && !['water', 'salt', 'ice'].some(k => ing.name.toLowerCase().includes(k))) {
-        // Use the API lookup instead of static rules
         const result = await lookupKcal(ing.name);
         
         if (result && result.value > 0) {
@@ -128,6 +127,53 @@ export const Settings: React.FC = () => {
     addLog(`AUDIT COMPLETE: ${newIssues.length} TYPO/CASE ISSUES FOUND.`);
   };
 
+  // --- PREP CORRECTION LOGIC ---
+
+  const handleRunPrepScan = () => {
+    addLog(`EXECUTING DEEP PREP ANALYSIS (FORCE=${forceRescan})...`);
+    const report = generatePrepCorrectionReport(recipes, ingredients, forceRescan);
+    setPrepCorrections(report);
+    setShowPrepModal(true);
+    setScanProgress(null);
+    addLog(`ANALYSIS COMPLETE: ${report.length} POTENTIAL OPTIMIZATIONS FOUND.`);
+  };
+
+  const handleApplyPrepCorrections = async () => {
+    if (!isPrepSafetyChecked) return;
+    
+    setIsApplying(true);
+    setScanProgress("INITIALIZING BATCH UPDATE...");
+    try {
+      const count = await applyPrepCorrections(
+        prepCorrections, 
+        recipes, 
+        ingredients,
+        (current, total, id) => {
+           setScanProgress(`[${id}] --> [CLEANING] --> [UPDATED] (${current}/${total})`);
+        }
+      );
+      addLog(`BATCH UPDATE: Re-scanned and updated ${count} recipes.`);
+      setScanProgress(`SUCCESS: ${count} RECIPES UPDATED.`);
+      setTimeout(() => {
+        setShowPrepModal(false);
+        setPrepCorrections([]);
+        setIsPrepSafetyChecked(false);
+        setScanProgress(null);
+      }, 1500);
+    } catch (e) {
+      console.error(e);
+      addLog("ERROR: Prep correction batch failed.");
+      setScanProgress("CRITICAL ERROR: BATCH FAILED.");
+    } finally {
+      setIsApplying(false);
+    }
+  };
+
+  const uniqueRecipesInCorrections = useMemo(() => {
+     return new Set(prepCorrections.map(c => c.recipeId)).size;
+  }, [prepCorrections]);
+
+  // ... (Other standard fixes logic remains the same) ...
   const toggleAllergenInIssue = (issueId: string, allergen: Allergen) => {
     setPendingIssues(prev => prev.map(issue => {
       if (issue.id !== issueId || issue.type !== 'ALLERGEN') return issue;
@@ -149,7 +195,6 @@ export const Settings: React.FC = () => {
     try {
       const update: Partial<Ingredient> = { audited: true };
       if (issue.type === 'ALLERGEN') update.allergens = issue.suggestedValue;
-      if (issue.type === 'SUPPLIER') { /* handled differently in multi-supplier model, skip for now */ }
       if (issue.type === 'KCAL') update.kcalPer100 = issue.suggestedValue;
       if (issue.type === 'SPELLING') update.name = issue.suggestedValue;
       
@@ -163,7 +208,6 @@ export const Settings: React.FC = () => {
 
   const ignoreIssue = async (issue: DataIssue) => {
     try {
-      // Just mark as audited without changing the primary data
       await updateIngredient(issue.ingredientId, { audited: true });
       setPendingIssues(prev => prev.filter(p => p.id !== issue.id));
       addLog(`MANUALLY VERIFIED: ${issue.ingredientName} (No Changes Applied)`);
@@ -198,6 +242,18 @@ export const Settings: React.FC = () => {
       }
     }
     addLog("AUDIT RESET COMPLETE.");
+  };
+
+  const handlePurge = async () => {
+    try {
+      const { recipeCount, ingredientCount } = await purgeStagingData();
+      setPurgeResult(`BOARD CLEARED. ${recipeCount} DIRTY RECIPES. ${ingredientCount} STUBS.`);
+      addLog(`PURGE EXECUTED: ${recipeCount} recipes, ${ingredientCount} ingredients deleted.`);
+      setTimeout(() => setPurgeResult(null), 5000); // Clear message after 5s
+    } catch (e) {
+      console.error(e);
+      addLog("PURGE FAILED: See console.");
+    }
   };
 
   const handleExport = () => {
@@ -255,7 +311,103 @@ export const Settings: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#111111] overflow-y-auto p-8 max-w-5xl mx-auto w-full">
+    <div className="flex flex-col h-full bg-[#111111] overflow-y-auto p-8 max-w-5xl mx-auto w-full relative">
+      
+      {/* PREP CORRECTION MODAL */}
+      {showPrepModal && (
+        <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-8">
+           <div className="w-full max-w-4xl h-[80vh] bg-[#111] border border-[#333] flex flex-col shadow-2xl">
+              <div className="p-4 border-b border-[#333] flex justify-between items-center bg-[#1c1c1c]">
+                 <div>
+                    <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-[#c8a96e]">Prep Word Analysis Preview</h3>
+                    <p className="text-[10px] text-[#666] font-mono mt-1">Comparing Raw Text vs Extracted Entities</p>
+                 </div>
+                 <button onClick={() => setShowPrepModal(false)} className="text-[#666] hover:text-white uppercase font-bold text-[10px]">Close [ESC]</button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-0">
+                 {/* Dry Run Report Banner */}
+                 <div className="p-3 bg-[#c8a96e]/10 border-b border-[#c8a96e]/20 text-center">
+                    <span className="text-[10px] font-mono text-[#c8a96e] uppercase font-bold">
+                       DRY RUN REPORT: Found {uniqueRecipesInCorrections} recipes. 0 will be created, {uniqueRecipesInCorrections} will be updated. Confirm?
+                    </span>
+                 </div>
+
+                 <table className="w-full text-left border-collapse">
+                    <thead className="sticky top-0 bg-[#0d0d0d] border-b border-[#333] z-10">
+                       <tr>
+                          <th className="p-3 text-[9px] font-bold text-[#666] uppercase">Source Recipe</th>
+                          <th className="p-3 text-[9px] font-bold text-[#666] uppercase">Original Line</th>
+                          <th className="p-3 text-[9px] font-bold text-[#c8a96e] uppercase">Cleaned Entity</th>
+                          <th className="p-3 text-[9px] font-bold text-[#c8a96e] uppercase">Extracted Note</th>
+                          <th className="p-3 text-[9px] font-bold text-[#666] uppercase">DB Match</th>
+                       </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#222]">
+                       {prepCorrections.length === 0 ? (
+                          <tr><td colSpan={5} className="p-8 text-center text-[10px] text-[#444] uppercase font-mono">No prep terms detected in current dataset.</td></tr>
+                       ) : prepCorrections.map((pc, idx) => (
+                          <tr key={idx} className="hover:bg-[#1c1c1c]">
+                             <td className="p-3 text-[10px] text-white font-bold">{pc.recipeName}</td>
+                             <td className="p-3 text-[10px] text-[#888] font-mono">{pc.originalLine}</td>
+                             <td className="p-3 text-[10px] text-white font-mono">{pc.extractedName}</td>
+                             <td className="p-3 text-[10px] text-[#c8a96e] font-mono border-l border-[#333] border-r border-[#333] bg-[#c8a96e]/5">"{pc.extractedNote}"</td>
+                             <td className="p-3">
+                                {pc.matchedId ? (
+                                   <span className="text-[9px] font-bold text-green-500 uppercase">Linked</span>
+                                ) : (
+                                   <span className="text-[9px] font-bold text-red-500 uppercase">Unlinked</span>
+                                )}
+                             </td>
+                          </tr>
+                       ))}
+                    </tbody>
+                 </table>
+              </div>
+
+              {scanProgress ? (
+                 <div className="p-4 border-t border-[#333] bg-[#1c1c1c] flex items-center justify-center">
+                    <div className="text-[10px] font-mono text-[#c8a96e] uppercase tracking-widest animate-pulse">
+                       {scanProgress}
+                    </div>
+                 </div>
+              ) : (
+                <div className="p-4 border-t border-[#333] bg-[#1c1c1c] flex justify-between items-center">
+                   <div className={`flex items-center gap-3 p-3 border border-[#333] ${isPrepSafetyChecked ? 'bg-red-950/20 border-red-900' : 'bg-[#111]'}`}>
+                      <input 
+                         type="checkbox" 
+                         checked={isPrepSafetyChecked}
+                         onChange={e => setIsPrepSafetyChecked(e.target.checked)}
+                         className="accent-[#c8a96e] w-4 h-4"
+                      />
+                      <div className="flex flex-col">
+                         <span className="text-[10px] font-bold uppercase text-[#e0e0e0]">Safety Switch: Enable Destructive Re-Scan</span>
+                         <span className="text-[9px] text-[#666] font-mono">I understand this will overwrite existing recipe structures.</span>
+                      </div>
+                   </div>
+                   
+                   <div className="flex gap-4">
+                      <button 
+                         onClick={() => setShowPrepModal(false)}
+                         className="px-6 py-3 border border-[#333] text-[#888] text-[10px] font-bold uppercase tracking-widest hover:text-white"
+                      >
+                         Cancel
+                      </button>
+                      <button 
+                         disabled={!isPrepSafetyChecked || isApplying || prepCorrections.length === 0}
+                         onClick={handleApplyPrepCorrections}
+                         className="px-6 py-3 bg-[#c8a96e] text-black text-[10px] font-bold uppercase tracking-widest hover:bg-[#b8985e] disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                         {isApplying ? 'Processing...' : 'Confirm & Apply Updates'}
+                      </button>
+                   </div>
+                </div>
+              )}
+           </div>
+        </div>
+      )}
+
+      {/* ... (Existing Header and Purge Sections) ... */}
       <div className="mb-12 border-b border-[#333333] pb-4 flex justify-between items-end">
         <div>
           <h2 className="text-sm font-bold uppercase tracking-[0.3em] text-[#c8a96e]">System Settings</h2>
@@ -267,6 +419,30 @@ export const Settings: React.FC = () => {
       </div>
 
       <div className="space-y-12 pb-24">
+        
+        {/* THE GREAT PURGE - NUCLEAR BUTTON */}
+        <div className="border-[3px] border-[#A65D43] p-6 bg-[#1c1c1c]">
+          <h3 className="text-[#A65D43] font-bold uppercase tracking-widest text-xs mb-4">Danger Zone // Data Hygiene</h3>
+          <p className="text-[10px] text-[#888] font-mono mb-6 uppercase leading-relaxed">
+            Bulk deletion of incomplete records, dirty parsing results, and zero-item containers. 
+            This action targets any data flagged as "Dirty" or "Stub" from Mass Ingest.
+            <br/>
+            <span className="text-red-500 font-bold">IRREVERSIBLE ACTION. PROCEED WITH CAUTION.</span>
+          </p>
+          <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
+            <button 
+              onDoubleClick={handlePurge}
+              className="bg-[#A65D43] text-white font-bold uppercase tracking-widest text-[10px] px-8 py-4 hover:bg-red-600 transition-none select-none shadow-[0_0_15px_rgba(166,93,67,0.3)] hover:shadow-[0_0_25px_rgba(166,93,67,0.6)]"
+              title="Double Click to Execute"
+            >
+              PURGE ALL STAGING DATA [DBL CLICK]
+            </button>
+            {purgeResult && (
+              <span className="text-[#C8A96E] font-bold uppercase text-xs font-mono animate-pulse">{purgeResult}</span>
+            )}
+          </div>
+        </div>
+
         <section className="space-y-6">
           <div className="flex items-center gap-4">
             <div className="h-px bg-[#333333] flex-1"></div>
@@ -274,14 +450,28 @@ export const Settings: React.FC = () => {
             <div className="h-px bg-[#333333] flex-1"></div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
             <button onClick={runSupplierCheck} className="p-3 bg-[#1c1c1c] border border-[#333333] text-[9px] font-bold uppercase text-[#888] hover:text-[#c8a96e] hover:border-[#c8a96e] transition-all">Scan Suppliers</button>
             <button onClick={runAllergenScan} className="p-3 bg-[#1c1c1c] border border-[#333333] text-[9px] font-bold uppercase text-[#888] hover:text-[#c8a96e] hover:border-[#c8a96e] transition-all">Scan Allergens</button>
             <button onClick={runKcalScan} className="p-3 bg-[#1c1c1c] border border-[#333333] text-[9px] font-bold uppercase text-[#888] hover:text-[#c8a96e] hover:border-[#c8a96e] transition-all">Scan Nutrition (API)</button>
             <button onClick={runSpellCheck} className="p-3 bg-[#1c1c1c] border border-[#333333] text-[9px] font-bold uppercase text-[#888] hover:text-[#c8a96e] hover:border-[#c8a96e] transition-all">Scan Typography</button>
+            
+            <div className="flex items-center gap-1 bg-[#1c1c1c] border border-[#c8a96e] shadow-[0_0_10px_rgba(200,169,110,0.1)]">
+               <button onClick={handleRunPrepScan} className="flex-1 p-3 text-[9px] font-bold uppercase text-[#c8a96e] hover:bg-[#c8a96e] hover:text-black transition-all">Deep Prep Analysis</button>
+               <div className="h-full border-l border-[#c8a96e]/30 p-2 flex items-center justify-center bg-black/20">
+                  <input 
+                    type="checkbox" 
+                    title="Force Update Active Recipes"
+                    checked={forceRescan} 
+                    onChange={e => setForceRescan(e.target.checked)} 
+                    className="accent-[#c8a96e] cursor-pointer"
+                  />
+               </div>
+            </div>
           </div>
 
           <div className="border border-[#333333] bg-black overflow-hidden flex flex-col h-[650px] shadow-2xl">
+            {/* ... (Existing Issue Queue UI) ... */}
             <div className="p-3 border-b border-[#333333] bg-[#1c1c1c] flex justify-between items-center">
               <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#c8a96e]">Resolution Queue // {pendingIssues.length} Discrepancies</h4>
               <div className="flex gap-2">
@@ -410,6 +600,7 @@ export const Settings: React.FC = () => {
           </div>
         </section>
 
+        {/* ... (Existing Backup and Stats Sections) ... */}
         <section className="space-y-6">
           <div className="flex items-center gap-4">
             <div className="h-px bg-[#333333] flex-1"></div>

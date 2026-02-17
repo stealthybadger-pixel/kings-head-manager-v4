@@ -28,9 +28,10 @@ const GridItemSelect: React.FC<{
   type: 'ingredient' | 'recipe';
   options: SearchOption[];
   onSelect: (option: SearchOption) => void;
+  onCreate?: (name: string) => void;
   isEditing: boolean;
   placeholder?: string;
-}> = ({ value, type, options, onSelect, isEditing, placeholder }) => {
+}> = ({ value, type, options, onSelect, onCreate, isEditing, placeholder }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -42,6 +43,8 @@ const GridItemSelect: React.FC<{
       setSearch(selectedItem.name);
     } else if (!selectedItem && !isOpen && value) {
        setSearch('UNKNOWN ITEM');
+    } else if (!value && !isOpen) {
+       setSearch('');
     }
   }, [selectedItem, isOpen, value]);
 
@@ -50,6 +53,7 @@ const GridItemSelect: React.FC<{
       if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
         setIsOpen(false);
         if (selectedItem) setSearch(selectedItem.name);
+        else setSearch('');
       }
     };
     document.addEventListener('mousedown', handleClick);
@@ -68,7 +72,7 @@ const GridItemSelect: React.FC<{
          if (!aStarts && bStarts) return 1;
          return a.name.localeCompare(b.name);
       })
-      .slice(0, 20);
+      .slice(0, 50);
   }, [options, search, isOpen]);
 
   if (!isEditing) {
@@ -88,10 +92,13 @@ const GridItemSelect: React.FC<{
         onFocus={() => setIsOpen(true)}
         onChange={(e) => { setSearch(e.target.value); setIsOpen(true); }}
         placeholder={placeholder}
-        className={`w-full bg-transparent text-xs font-bold uppercase outline-none px-2 py-1 transition-colors ${isOpen ? 'border border-[#005f73] bg-[#111]' : 'border border-transparent'}`}
+        className={`w-full bg-transparent text-xs font-bold uppercase outline-none px-2 py-1 transition-colors 
+          ${isOpen ? 'border border-[#c8a96e] bg-[#111111] text-[#c8a96e]' : 'border border-transparent text-[#e0e0e0] hover:text-[#c8a96e]'}
+          placeholder:text-[#444]
+        `}
       />
       {isOpen && (
-        <div className="absolute top-full left-0 w-full z-[999] bg-[#111] border border-[#333] max-h-48 overflow-y-auto shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
+        <div className="absolute top-full left-0 w-full z-[999] bg-[#111111] border border-[#333333] max-h-48 overflow-y-auto shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
            {filtered.length > 0 ? filtered.map(opt => (
              <div 
                key={`${opt.type}-${opt.id}`}
@@ -104,8 +111,7 @@ const GridItemSelect: React.FC<{
                className="px-2 py-2 hover:bg-[#005f73] hover:text-white cursor-pointer flex justify-between items-center group border-b border-[#222] last:border-0"
              >
                 <div className="flex flex-col">
-                  <span className="text-[10px] font-bold uppercase text-[#e0e0e0] group-hover:text-white">
-                    <SourceTag type={opt.type} className="mr-2" />
+                  <span className="text-[10px] font-bold uppercase text-[#c8a96e] group-hover:text-white">
                     {opt.name}
                   </span>
                   <span className="text-[8px] font-mono text-[#666] group-hover:text-[#ccc]">{opt.sub}</span>
@@ -113,6 +119,20 @@ const GridItemSelect: React.FC<{
              </div>
            )) : (
              <div className="p-2 text-[9px] text-[#666] uppercase">No matches found</div>
+           )}
+           
+           {/* CREATE NEW OPTION */}
+           {onCreate && search.length > 2 && !filtered.some(f => f.name.toLowerCase() === search.toLowerCase()) && (
+              <div 
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onCreate(search);
+                  setIsOpen(false);
+                }}
+                className="px-2 py-2 bg-[#1c1c1c] hover:bg-[#c8a96e] hover:text-black cursor-pointer border-t border-[#333] text-[#c8a96e] font-bold text-[10px] uppercase"
+              >
+                + CREATE NEW: "{search}"
+              </div>
            )}
         </div>
       )}
@@ -343,7 +363,8 @@ export const DishBuilder: React.FC<DishBuilderProps> = ({
       type: item.type,
       id: item.id || (item as any).ingredientId || (item as any).recipeId,
       quantity: item.quantity,
-      unit: item.unit
+      unit: item.unit,
+      notes: item.notes // Preserve notes
     }));
 
     const dishData = { name: dishName, items: normalizedItems, instructions, targetGP, sellPrice: dishFinancials.sellPrice, sourceType: 'manual' as const };
@@ -445,10 +466,14 @@ export const DishBuilder: React.FC<DishBuilderProps> = ({
                             type={item.type}
                             options={searchOptions}
                             onSelect={(opt) => swapItem(idx, opt)}
+                            onCreate={(name) => onPushIngredient && onPushIngredient(name)}
                             isEditing={isEditing}
                             placeholder={component?.name || "SELECT_ITEM"}
                           />
-                          <span className="text-[8px] font-mono text-[#666] uppercase mt-1 block">{item.type}</span>
+                          <div className="flex items-center gap-2">
+                             <span className="text-[8px] font-mono text-[#666] uppercase mt-1 block">{item.type}</span>
+                             {item.notes && <span className="text-[8px] font-mono text-[#888] italic mt-1 border-l border-[#333] pl-2">{item.notes}</span>}
+                          </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-8">

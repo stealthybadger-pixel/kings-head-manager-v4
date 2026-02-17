@@ -29,9 +29,11 @@ const GridItemSelect: React.FC<{
   type: 'ingredient' | 'recipe';
   options: SearchOption[];
   onSelect: (option: SearchOption) => void;
+  onCreate?: (name: string) => void;
   isEditing: boolean;
   placeholder?: string;
-}> = ({ value, type, options, onSelect, isEditing, placeholder }) => {
+  placeholderClassName?: string;
+}> = ({ value, type, options, onSelect, onCreate, isEditing, placeholder, placeholderClassName }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -43,6 +45,8 @@ const GridItemSelect: React.FC<{
       setSearch(selectedItem.name);
     } else if (!selectedItem && !isOpen && value) {
        setSearch('UNKNOWN ITEM');
+    } else if (!value && !isOpen) {
+       setSearch('');
     }
   }, [selectedItem, isOpen, value]);
 
@@ -51,6 +55,7 @@ const GridItemSelect: React.FC<{
       if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
         setIsOpen(false);
         if (selectedItem) setSearch(selectedItem.name);
+        else setSearch('');
       }
     };
     document.addEventListener('mousedown', handleClick);
@@ -69,12 +74,12 @@ const GridItemSelect: React.FC<{
          if (!aStarts && bStarts) return 1;
          return a.name.localeCompare(b.name);
       })
-      .slice(0, 20);
+      .slice(0, 50);
   }, [options, search, isOpen]);
 
   if (!isEditing) {
      return (
-       <div className={`text-xs font-bold uppercase ${!selectedItem && value ? 'text-red-500' : 'text-white'}`}>
+       <div className={`text-xs font-bold uppercase ${placeholderClassName || (!selectedItem && value ? 'text-red-500' : 'text-white')}`}>
          {selectedItem ? selectedItem.name : (placeholder || (value ? 'UNKNOWN ITEM' : 'INVALID'))}
          {!selectedItem && value && <span className="ml-2 text-[8px] bg-red-900/30 text-red-500 px-1 border border-red-900">DELETED</span>}
        </div>
@@ -89,10 +94,13 @@ const GridItemSelect: React.FC<{
         onFocus={() => setIsOpen(true)}
         onChange={(e) => { setSearch(e.target.value); setIsOpen(true); }}
         placeholder={placeholder}
-        className={`w-full bg-transparent text-xs font-bold uppercase outline-none px-2 py-1 transition-colors ${isOpen ? 'border border-[#005f73] bg-[#111]' : 'border border-transparent'}`}
+        className={`w-full bg-transparent text-xs font-bold uppercase outline-none px-2 py-1 transition-colors 
+          ${isOpen ? 'border border-[#c8a96e] bg-[#111111] text-[#c8a96e]' : 'border border-transparent hover:text-[#c8a96e]'}
+          ${placeholderClassName || 'text-[#e0e0e0] placeholder:text-[#444]'}
+        `}
       />
       {isOpen && (
-        <div className="absolute top-full left-0 w-full z-[999] bg-[#111] border border-[#333] max-h-48 overflow-y-auto shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
+        <div className="absolute top-full left-0 w-full z-[999] bg-[#111111] border border-[#333333] max-h-48 overflow-y-auto shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
            {filtered.length > 0 ? filtered.map(opt => (
              <div 
                key={`${opt.type}-${opt.id}`}
@@ -105,18 +113,36 @@ const GridItemSelect: React.FC<{
                className="px-2 py-2 hover:bg-[#005f73] hover:text-white cursor-pointer flex justify-between items-center group border-b border-[#222] last:border-0"
              >
                 <div className="flex flex-col">
-                  <span className="text-[10px] font-bold uppercase text-[#e0e0e0] group-hover:text-white">{opt.name}</span>
+                  <span className="text-[10px] font-bold uppercase text-[#c8a96e] group-hover:text-white">
+                    {opt.name}
+                  </span>
                   <span className="text-[8px] font-mono text-[#666] group-hover:text-[#ccc]">{opt.sub}</span>
                 </div>
              </div>
            )) : (
              <div className="p-2 text-[9px] text-[#666] uppercase">No matches found</div>
            )}
+           
+           {/* CREATE NEW OPTION */}
+           {onCreate && search.length > 2 && !filtered.some(f => f.name.toLowerCase() === search.toLowerCase()) && (
+              <div 
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onCreate(search);
+                  setIsOpen(false);
+                }}
+                className="px-2 py-2 bg-[#1c1c1c] hover:bg-[#c8a96e] hover:text-black cursor-pointer border-t border-[#333] text-[#c8a96e] font-bold text-[10px] uppercase"
+              >
+                + CREATE NEW: "{search}"
+              </div>
+           )}
         </div>
       )}
     </div>
   );
 };
+
+// ... (Rest of component Props and implementation same as before until grid loop) ...
 
 interface RecipeBuilderProps {
   stagedItemId: string | null;
@@ -310,7 +336,8 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
       type: item.type,
       id: item.id || (item as any).ingredientId || (item as any).recipeId, // Recovery for legacy/OCR props
       quantity: item.quantity,
-      unit: item.unit
+      unit: item.unit,
+      notes: item.notes // Preserve notes
     }));
 
     const recipeData: Partial<Recipe> = {
@@ -490,7 +517,7 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
               <div className="border border-[#333333] divide-y divide-[#333333] bg-[#0d0d0d]">
                 {gridItems.map((item, idx) => {
                   // Robust ID resolution (handles legacy data)
-                  const rawId = item.id || (item as any).ingredientId || (item as any).recipeId;
+                  const rawId = item.id || (item as any).ingredientId || (item as any).recipeId || '';
                   const component = item.type === 'ingredient' 
                     ? ingredients.find(i => i.id === rawId) 
                     : recipes.find(r => r.id === rawId);
@@ -509,7 +536,19 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
                   cost = cost * scaleFactor;
                   const isInspecting = inspectedItem?.id === rawId;
 
-                  const isMissing = !component && !!rawId;
+                  // MISSING DATA LOGIC
+                  // If no ID is present, we check if there's a note indicating an unresolved item
+                  const isUnresolved = !rawId && item.notes?.startsWith('UNRESOLVED:');
+                  let unresolvedName = '';
+                  if (isUnresolved) {
+                     // Parse "UNRESOLVED: Tomato | Diced" -> "Tomato"
+                     const parts = item.notes?.split('|') || [];
+                     unresolvedName = parts[0].replace('UNRESOLVED:', '').trim();
+                  }
+
+                  const displayPlaceholder = component?.name || (isUnresolved ? `[MISSING DATA: ${unresolvedName}]` : "SELECT_ITEM");
+                  // Requested: #333333 text. Used literally, though it's low contrast on black. 
+                  const placeholderClass = isUnresolved ? 'text-[#333333]' : '';
                   
                   return (
                     <div key={idx} className="flex items-center p-3 group hover:bg-[#1c1c1c] transition-colors relative z-0">
@@ -530,10 +569,15 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
                             type={item.type}
                             options={searchOptions}
                             onSelect={(opt) => swapGridItem(idx, opt)}
+                            onCreate={(name) => onPushIngredient && onPushIngredient(name)}
                             isEditing={isEditing}
-                            placeholder={component?.name || "SELECT_ITEM"}
+                            placeholder={displayPlaceholder}
+                            placeholderClassName={placeholderClass}
                           />
-                          <div className="text-[8px] font-mono text-[#666] uppercase mt-1">{item.type}</div>
+                          <div className="flex items-center gap-2">
+                             <div className="text-[8px] font-mono text-[#666] uppercase mt-1">{item.type}</div>
+                             {item.notes && <div className="text-[8px] font-mono text-[#888] italic mt-1 border-l border-[#333] pl-2">{item.notes}</div>}
+                          </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">

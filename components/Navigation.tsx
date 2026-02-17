@@ -11,6 +11,8 @@ export const Navigation: React.FC<NavigationProps> = ({ activeView, onViewChange
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard' },
+    { id: 'ingest', label: 'Mass Ingest Terminal' },
+    { id: 'resolution', label: 'Resolution Desk' },
     { id: 'service', label: 'DISH LIBRARY' },
     { id: 'kitchen', label: 'Recipe Library' },
     { id: 'ingredients', label: 'Master Ingredient List' },
