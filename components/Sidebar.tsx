@@ -166,7 +166,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           filteredItems.map(item => {
             const itemType = isHybrid ? (item as any).__type : (activeTab === 'ingredients' ? 'ingredient' : activeTab === 'recipes' ? 'recipe' : 'dish');
             const isIncomplete = itemType === 'ingredient' && (item as Ingredient).incomplete;
-            const isRecipeDirty = itemType === 'recipe' && !!(item as Recipe).isDirty;
+            const isRecipeDirty = itemType === 'recipe' && (item as Recipe).isDirty;
             const isInspecting = inspectedItem?.id === item.id;
             
             let displayCost = '0.0000';

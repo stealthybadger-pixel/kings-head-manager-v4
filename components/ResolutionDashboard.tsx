@@ -9,7 +9,7 @@ import { detectCategory, detectSupplierFromCategory, normalizeName } from '../ut
 import { splitDocument, analyzeBulkCommit, executeBulkCommit, BulkCommitAnalysis } from '../services/batchProcessor';
 
 export const ResolutionDashboard: React.FC = () => {
-  const { recipes, ingredients, updateRecipeStatus, logUnresolvedIngredient, addIngredient, deleteRecipe, ingestRawRecipe } = useKitchenData();
+  const { recipes, ingredients, logUnresolvedIngredient, addIngredient, deleteRecipe, deletePendingRecipes, ingestRawRecipe, updateRecipe } = useKitchenData();
   const { confirm } = useConfirmation();
   
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
@@ -26,10 +26,6 @@ export const ResolutionDashboard: React.FC = () => {
   // OPTIMISTIC EVICTION STATE
   // Tracks IDs that have been processed locally but might not have updated in Firestore snapshot yet
   const [processedIds, setProcessedIds] = useState<Set<string>>(new Set());
-
-  // SESSION RESOLUTION DICTIONARY
-  // Maps normalized raw ingredient names to resolved ingredient IDs, so linking once propagates to all future parses
-  const [resolvedMappings, setResolvedMappings] = useState<Map<string, string>>(new Map());
 
   // ... (Existing Creation/Mapping/Splitter State) ...
   const [creationData, setCreationData] = useState<{
@@ -112,7 +108,7 @@ export const ResolutionDashboard: React.FC = () => {
     
     item.name = newName;
     
-    // Live Match Check
+    // Live Match Check - INGREDIENTS ONLY
     const normalized = normalizeName(newName).toLowerCase();
     const match = ingredients.find(i => normalizeName(i.name).toLowerCase() === normalized);
     
@@ -154,7 +150,7 @@ export const ResolutionDashboard: React.FC = () => {
     const item = { ...updatedIngredients[index] };
     item.name = item.originalName; // Revert to raw
     
-    // Live Match Check for raw name
+    // Live Match Check for raw name - INGREDIENTS ONLY
     const normalized = normalizeName(item.name).toLowerCase();
     const match = ingredients.find(i => normalizeName(i.name).toLowerCase() === normalized);
     
@@ -210,36 +206,40 @@ export const ResolutionDashboard: React.FC = () => {
     }
   };
 
-  // ... (Existing Handlers: handleTestParse, handleOpenSplitter, handleSplitPreview, handleSplitCommit, getPreviewSnippet, handleOpenCreate, handleCreateSave, handleOpenMap, handleMapConfirm, handleCommit) ...
+  const handlePurgeAllPending = async () => {
+    if (pendingRecipes.length === 0) return;
+    const ok = await confirm(`WARNING: This will permanently delete all ${pendingRecipes.length} pending recipes. This action is irreversible. Proceed?`);
+    if (!ok) return;
+    
+    setIsProcessing(true);
+    try {
+        const count = await deletePendingRecipes();
+        // Optimistic clear
+        setProcessedIds(prev => {
+            const next = new Set(prev);
+            pendingRecipes.forEach(r => next.add(r.id));
+            return next;
+        });
+        setSelectedRecipeId(null);
+        setParseResult(null);
+    } catch (e) {
+        console.error("Purge failed", e);
+        setCommitError("PURGE FAILED");
+    } finally {
+        setIsProcessing(false);
+    }
+  };
 
   const handleTestParse = () => {
     if (!selectedRecipe?.raw_text) return;
     // Guard: Pass recipe name to parser to exclude self-reference
+    // CRITICAL: We only pass `ingredients` for matching. Never `recipes`.
     const result = parseRecipeContent(selectedRecipe.raw_text, ingredients, selectedRecipe.name);
-
-    // Apply session resolution dictionary to fill in previously mapped names
-    if (resolvedMappings.size > 0) {
-      result.ingredients = result.ingredients.map(ing => {
-        if (ing.matchedId) return ing; // Already matched by parser
-        const key = normalizeName(ing.name).toLowerCase();
-        const mappedId = resolvedMappings.get(key);
-        if (mappedId) {
-          // Verify the ingredient still exists
-          const target = ingredients.find(i => i.id === mappedId);
-          if (target) {
-            return { ...ing, matchedId: mappedId, mappedNote: ing.name };
-          }
-        }
-        return ing;
-      });
-      const matchedCount = result.ingredients.filter(i => i.matchedId).length;
-      result.matchRate = matchedCount / result.ingredients.length;
-    }
-
     setParseResult(result);
     setCommitError(null);
   };
 
+  // ... (Splitter, Create, Map handlers omitted for brevity but remain unchanged) ...
   const handleOpenSplitter = (e: React.MouseEvent, recipe: Recipe) => {
     e.stopPropagation();
     setSplitterData({
@@ -341,18 +341,8 @@ export const ResolutionDashboard: React.FC = () => {
         incomplete: true,
         audited: true
       });
-      // Record mapping for propagation to future parses
-      setResolvedMappings(prev => {
-        const next = new Map(prev);
-        next.set(normalizeName(creationData.originalName).toLowerCase(), newIng.id);
-        if (normalizedName.toLowerCase() !== normalizeName(creationData.originalName).toLowerCase()) {
-          next.set(normalizeName(normalizedName).toLowerCase(), newIng.id);
-        }
-        return next;
-      });
       if (parseResult) {
         const updatedIngredients = parseResult.ingredients.map(ing => {
-          // Check against both originalName (for unmodified items) and current name (for edited items)
           if (ing.name === creationData.originalName || ing.name === normalizedName) {
             return { ...ing, matchedId: newIng.id, name: normalizedName, normalizedName: normalizedName.toLowerCase() };
           }
@@ -388,19 +378,13 @@ export const ResolutionDashboard: React.FC = () => {
     });
     const matchedCount = updatedIngredients.filter(i => i.matchedId).length;
     setParseResult({ ...parseResult, ingredients: updatedIngredients, matchRate: matchedCount / updatedIngredients.length });
-    // Record mapping for propagation to future parses
-    setResolvedMappings(prev => {
-      const next = new Map(prev);
-      next.set(normalizeName(mappingData.originalName).toLowerCase(), mappingData.targetId);
-      return next;
-    });
     setMappingData(prev => ({ ...prev, isOpen: false }));
   };
 
   const handleCommit = async () => {
     if (!selectedRecipe || !parseResult) return;
-    // ... Single commit logic is now mostly superseded by bulk or smart check, but keeping for granular control
-    // Adding Smart Check for Single Commit (Optional but good for consistency)
+    
+    // Check if target recipe exists
     const normalizedName = selectedRecipe.name.trim().toLowerCase();
     const existingActive = recipes.find(r => r.status === 'active' && r.name.toLowerCase() === normalizedName && r.id !== selectedRecipe.id);
     
@@ -433,7 +417,7 @@ export const ResolutionDashboard: React.FC = () => {
             note = note ? `${missingLabel} | ${note}` : missingLabel;
          }
          return {
-           type: 'ingredient',
+           type: 'ingredient', // FORCE INGREDIENT TYPE. SCORCHED EARTH POLICY.
            id: p.matchedId || '',
            quantity: p.qty,
            unit: p.unit,
@@ -449,7 +433,14 @@ export const ResolutionDashboard: React.FC = () => {
       const newStatus = unresolved.length > 0 ? 'needs_resolution' : 'active';
       const instructions = parseResult.method.join('\n\n');
       
-      await updateRecipeStatus(targetId, newStatus, items, instructions);
+      await updateRecipe(targetId, {
+        status: newStatus,
+        items,
+        instructions,
+        batchSize: parseResult.suggestedBatchSize || 1,
+        batchUnit: parseResult.suggestedBatchUnit || 'ea',
+        updatedAt: new Date().toISOString()
+      });
       
       if (isMerge) {
          await deleteRecipe(selectedRecipe.id);
@@ -615,9 +606,21 @@ export const ResolutionDashboard: React.FC = () => {
 
       {/* Sidebar List */}
       <div className="w-80 border-r border-[#333333] flex flex-col bg-[#0d0d0d]">
-        <div className="p-4 border-b border-[#333333]">
-          <h2 className="text-xs font-bold uppercase tracking-widest text-[#c8a96e]">Pending Resolution</h2>
-          <div className="text-[10px] text-[#666] font-mono mt-1">{pendingRecipes.length} FILES QUEUED</div>
+        <div className="p-4 border-b border-[#333333] flex flex-col gap-2">
+          <div className="flex justify-between items-end">
+            <div>
+                <h2 className="text-xs font-bold uppercase tracking-widest text-[#c8a96e]">Pending Resolution</h2>
+                <div className="text-[10px] text-[#666] font-mono mt-1">{pendingRecipes.length} FILES QUEUED</div>
+            </div>
+            {pendingRecipes.length > 0 && (
+                <button 
+                  onClick={handlePurgeAllPending}
+                  className="text-[9px] font-bold text-red-500 hover:text-red-400 uppercase border border-red-900 bg-red-950/20 px-2 py-1"
+                >
+                  PURGE ALL
+                </button>
+            )}
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto">
           {pendingRecipes.length === 0 ? (
@@ -727,8 +730,12 @@ export const ResolutionDashboard: React.FC = () => {
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y divide-[#222]">
-                                    {parseResult.ingredients.map((ing, idx) => (
-                                      <tr key={idx} className={`hover:bg-[#1a1a1a] ${!ing.matchedId ? 'bg-red-950/10' : ''}`}>
+                                    {parseResult.ingredients.map((ing, idx) => {
+                                      // Loop Warning Logic
+                                      const isLoopRisk = selectedRecipe && normalizeName(ing.name).toLowerCase() === normalizeName(selectedRecipe.name).toLowerCase();
+                                      
+                                      return (
+                                      <tr key={idx} className={`hover:bg-[#1a1a1a] ${!ing.matchedId ? 'bg-red-950/10' : ''} ${isLoopRisk ? 'outline outline-1 outline-dashed outline-red-500' : ''}`}>
                                         <td className="p-2 text-[10px] font-mono text-white border-r border-[#333] text-right">
                                             <input 
                                                 type="number"
@@ -771,6 +778,7 @@ export const ResolutionDashboard: React.FC = () => {
                                             )}
                                           </div>
                                           {ing.mappedNote && <div className="text-[8px] text-[#c8a96e] mt-0.5 font-bold">NOTE: "{ing.mappedNote}"</div>}
+                                          {isLoopRisk && <div className="text-[8px] text-red-500 mt-0.5 font-bold animate-pulse">! RECURSION LOOP RISK</div>}
                                         </td>
                                         <td className="p-2">
                                           {ing.matchedId ? <span className="text-[9px] font-bold text-[#c8a96e] uppercase tracking-wider">VERIFIED</span> : (
@@ -784,7 +792,8 @@ export const ResolutionDashboard: React.FC = () => {
                                           )}
                                         </td>
                                       </tr>
-                                    ))}
+                                    );
+                                    })}
                                   </tbody>
                                 </table>
                                 {parseResult.method.length > 0 && (

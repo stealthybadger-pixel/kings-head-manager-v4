@@ -5,7 +5,15 @@ import { useKitchenData } from '../hooks/useKitchenData';
 import { useConfirmation } from '../hooks/useConfirmation';
 import { UI_STYLES, COLORS } from '../constants';
 import { SourceTag } from './SourceTag';
-import { getConvertedQuantity } from '../utils/units';
+
+const getConvertedQuantity = (quantity: number, fromUnit: Unit, toUnit: Unit): number => {
+  if (fromUnit === toUnit) return quantity;
+  if (fromUnit === 'kg' && toUnit === 'g') return quantity * 1000;
+  if (fromUnit === 'g' && toUnit === 'kg') return quantity / 1000;
+  if (fromUnit === 'l' && toUnit === 'ml') return quantity * 1000;
+  if (fromUnit === 'ml' && toUnit === 'l') return quantity / 1000;
+  return quantity; 
+};
 
 interface SearchOption {
   id: string;
@@ -485,47 +493,4 @@ export const DishBuilder: React.FC<DishBuilderProps> = ({
                         <div className="flex gap-1">
                           {onPushRecipe && item.type === 'recipe' && component && (
                             <button onClick={() => onPushRecipe(component.name)} className="p-2 text-[#4a5568] hover:text-white transition-colors">
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                            </button>
-                          )}
-                          <button onClick={() => setItems(prev => prev.filter((_, i) => i !== idx))} className="text-[#444] hover:text-red-500 p-2"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              }
-              </div>
-              <div ref={scrollBottomRef}></div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-4">
-                     <label className={UI_STYLES.label}>Allergen Risk Profile</label>
-                     <div className="flex flex-wrap gap-2">
-                        {aggregatedAllergens.length === 0 ? <span className="text-[10px] text-[#444] font-mono uppercase">NO_RISKS</span> : aggregatedAllergens.map(a => <span key={a} className="px-3 py-1.5 border border-[#333] bg-[#1c1c1c] text-[#888] text-[9px] font-bold uppercase">{a}</span>)}
-                     </div>
-                  </div>
-                  <div className="space-y-4">
-                     <label className={UI_STYLES.label}>The Build</label>
-                     <textarea 
-                        value={instructions} 
-                        onChange={e => setInstructions(e.target.value)} 
-                        className={`w-full h-32 bg-transparent outline-none resize-none font-sans text-sm text-[#e0e0e0] placeholder-[#444]`} 
-                        placeholder="Plating instructions..." 
-                     />
-                  </div>
-              </div>
-            </>
-          )}
-        </div>
-
-        <div className={`p-6 border-t border-[#333333] bg-[#1c1c1c] flex justify-between items-center gap-8 ${!isEditing ? 'opacity-100' : ''}`}>
-           <div className="flex gap-16">
-              <div><label className={UI_STYLES.label}>Plate Cost</label><div className="text-3xl font-mono text-white">£{dishFinancials.totalCost.toFixed(4)}</div></div>
-              <div><label className={UI_STYLES.label}>Retail (@{targetGP}%)</label><div className="text-3xl font-mono text-[#c8a96e]">£{dishFinancials.sellPrice.toFixed(2)}</div></div>
-           </div>
-           <div className="text-right text-[10px] font-mono text-[#666] uppercase">Telemetry: {isEditing ? 'ACTIVE' : 'IDLE'}</div>
-        </div>
-      </div>
-    </div>
-  );
-};
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.57

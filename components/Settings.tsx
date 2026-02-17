@@ -20,7 +20,7 @@ interface DataIssue {
 }
 
 export const Settings: React.FC = () => {
-  const { ingredients, recipes, bulkImport, updateIngredient, purgeStagingData } = useKitchenData();
+  const { ingredients, recipes, bulkImport, updateIngredient, purgeStagingData, deletePendingRecipes } = useKitchenData();
   const { confirm } = useConfirmation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isRestoring, setIsRestoring] = useState(false);
@@ -28,6 +28,7 @@ export const Settings: React.FC = () => {
   const [pendingIssues, setPendingIssues] = useState<DataIssue[]>([]);
   const [maintenanceLog, setMaintenanceLog] = useState<string[]>([]);
   const [purgeResult, setPurgeResult] = useState<string | null>(null);
+  const [pendingDeleteResult, setPendingDeleteResult] = useState<string | null>(null);
 
   // PREP CORRECTION STATE
   const [showPrepModal, setShowPrepModal] = useState(false);
@@ -256,6 +257,28 @@ export const Settings: React.FC = () => {
     }
   };
 
+  const handleClearPending = async () => {
+    const pendingCount = recipes.filter(r => r.status === 'pending_validation').length;
+    if (pendingCount === 0) {
+        setPendingDeleteResult("NO PENDING RECIPES FOUND.");
+        setTimeout(() => setPendingDeleteResult(null), 3000);
+        return;
+    }
+
+    const ok = await confirm(`Delete ${pendingCount} recipes waiting for validation? This cannot be undone.`);
+    if (!ok) return;
+
+    try {
+      const count = await deletePendingRecipes();
+      setPendingDeleteResult(`DELETED ${count} RECIPES.`);
+      addLog(`BULK ACTION: Deleted ${count} pending_validation recipes.`);
+      setTimeout(() => setPendingDeleteResult(null), 5000);
+    } catch (e) {
+      console.error(e);
+      addLog("DELETE FAILED.");
+    }
+  };
+
   const handleExport = () => {
     const data = {
       ingredients,
@@ -429,17 +452,34 @@ export const Settings: React.FC = () => {
             <br/>
             <span className="text-red-500 font-bold">IRREVERSIBLE ACTION. PROCEED WITH CAUTION.</span>
           </p>
-          <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-            <button 
-              onDoubleClick={handlePurge}
-              className="bg-[#A65D43] text-white font-bold uppercase tracking-widest text-[10px] px-8 py-4 hover:bg-red-600 transition-none select-none shadow-[0_0_15px_rgba(166,93,67,0.3)] hover:shadow-[0_0_25px_rgba(166,93,67,0.6)]"
-              title="Double Click to Execute"
-            >
-              PURGE ALL STAGING DATA [DBL CLICK]
-            </button>
-            {purgeResult && (
-              <span className="text-[#C8A96E] font-bold uppercase text-xs font-mono animate-pulse">{purgeResult}</span>
-            )}
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
+                <button 
+                onDoubleClick={handlePurge}
+                className="bg-[#A65D43] text-white font-bold uppercase tracking-widest text-[10px] px-8 py-4 hover:bg-red-600 transition-none select-none shadow-[0_0_15px_rgba(166,93,67,0.3)] hover:shadow-[0_0_25px_rgba(166,93,67,0.6)]"
+                title="Double Click to Execute"
+                >
+                PURGE ALL STAGING DATA [DBL CLICK]
+                </button>
+                {purgeResult && (
+                <span className="text-[#C8A96E] font-bold uppercase text-xs font-mono animate-pulse">{purgeResult}</span>
+                )}
+            </div>
+
+            <div className="h-px bg-[#333] w-full my-2"></div>
+
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+               <span className="text-[10px] text-[#888] font-mono uppercase">Specific Cleanup Operations:</span>
+               <div className="flex gap-4 items-center">
+                   {pendingDeleteResult && <span className="text-[#C8A96E] font-bold uppercase text-[9px] font-mono animate-pulse">{pendingDeleteResult}</span>}
+                   <button 
+                     onClick={handleClearPending}
+                     className="border border-[#A65D43] text-[#A65D43] font-bold uppercase tracking-widest text-[10px] px-4 py-2 hover:bg-[#A65D43] hover:text-white transition-all"
+                   >
+                     Delete 'Pending Validation' ({recipes.filter(r => r.status === 'pending_validation').length})
+                   </button>
+               </div>
+            </div>
           </div>
         </div>
 

@@ -6,7 +6,15 @@ import { useConfirmation } from '../hooks/useConfirmation';
 import { UI_STYLES, COLORS } from '../constants';
 import { OCRScanner } from './OCRScanner';
 import { SourceTag } from './SourceTag';
-import { getConvertedQuantity, calculateBatchTotal } from '../utils/units';
+
+const getConvertedQuantity = (quantity: number, fromUnit: Unit, toUnit: Unit): number => {
+  if (fromUnit === toUnit) return quantity;
+  if (fromUnit === 'kg' && toUnit === 'g') return quantity * 1000;
+  if (fromUnit === 'g' && toUnit === 'kg') return quantity / 1000;
+  if (fromUnit === 'l' && toUnit === 'ml') return quantity * 1000;
+  if (fromUnit === 'ml' && toUnit === 'l') return quantity / 1000;
+  return quantity; 
+};
 
 interface SearchOption {
   id: string;
@@ -170,6 +178,9 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
   const quantityRefs = useRef<(HTMLInputElement | null)[]>([]);
   const scrollBottomRef = useRef<HTMLDivElement>(null);
   const [focusTarget, setFocusTarget] = useState<number | null>(null);
+  
+  // NUCLEAR OPTION: Injection Ref Lock
+  const injectionLock = useRef(false);
 
   // Mode State
   const [isEditing, setIsEditing] = useState(isRecursive); // Default to editing if recursive
@@ -180,8 +191,6 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
   const [batchSize, setBatchSize] = useState<number>(1);
   const [batchUnit, setBatchUnit] = useState<Unit>('kg');
   const [scaleFactor, setScaleFactor] = useState<number>(1);
-  const [constraintIdx, setConstraintIdx] = useState<number | null>(null); // Which item is "pinned" for inverse scaling
-  const [constraintValue, setConstraintValue] = useState<string>(''); // The entered available quantity
   const [gridItems, setGridItems] = useState<RecipeItem[]>([]);
   const [instructions, setInstructions] = useState('');
   const [activeRecipeId, setActiveRecipeId] = useState<string | null>(null); // For updates
@@ -193,38 +202,54 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
     ? ingredients.find(i => i.id === stagedItemId) 
     : recipes.find(r => r.id === stagedItemId);
 
-  // Direct Injection Logic
+  // Direct Injection Logic - NUCLEAR OPTION: Ref Lock + History Clear
   useEffect(() => {
-    if (isEditing && stagedItemId && stagedObject) {
-       // Guard: Never add a recipe to itself
-       if (stagedItemType === 'recipe' && stagedItemId === activeRecipeId) {
-         clearStaged();
-         return;
-       }
-
-       let defaultUnit: Unit = 'g';
-       if ('packUnit' in stagedObject) {
-          defaultUnit = stagedObject.packUnit;
-       } else if ('batchUnit' in stagedObject) {
-          defaultUnit = (stagedObject as Recipe).batchUnit || 'ea';
-       }
-
-       const newItem: RecipeItem = {
-         type: stagedItemType,
-         id: stagedItemId,
-         quantity: 0,
-         unit: defaultUnit
-       };
-
-       setGridItems(prev => {
-         const next = [...prev, newItem];
-         setFocusTarget(next.length - 1);
-         return next;
-       });
-
-       clearStaged();
+    // Safety reset: If no staged item, unlock for next interaction
+    if (!stagedItemId) {
+      injectionLock.current = false;
+      return;
     }
-  }, [stagedItemId, isEditing, stagedObject, stagedItemType, clearStaged, activeRecipeId]);
+
+    if (isEditing && stagedItemId && stagedObject && stagedItemType !== 'dish') {
+      // BLOCKING GUARD: If lock is active, abort immediately
+      if (injectionLock.current) return;
+
+      // ENGAGE LOCK
+      injectionLock.current = true;
+
+      setGridItems(prev => {
+        // DUPLICATION GUARD: Check if item already exists
+        const alreadyExists = prev.some(item => item.id === stagedItemId);
+        if (alreadyExists) return prev;
+
+        // Determine default unit
+        let defaultUnit: Unit = 'ea';
+        if ('packUnit' in stagedObject) {
+           defaultUnit = stagedObject.packUnit;
+        } else if ('batchUnit' in stagedObject) {
+           defaultUnit = (stagedObject as Recipe).batchUnit || 'ea';
+        }
+
+        const newItem: RecipeItem = {
+          type: stagedItemType as 'ingredient' | 'recipe',
+          id: stagedItemId,
+          quantity: 0,
+          unit: defaultUnit
+        };
+
+        const next = [...prev, newItem];
+        setFocusTarget(next.length - 1);
+        return next;
+      });
+      
+      // CRITICAL: Prevent "Refresh Zombies" by clearing history state
+      window.history.replaceState({}, document.title);
+      
+      // Clear app level staged state
+      clearStaged();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stagedItemId, isEditing, stagedItemType]); // stagedObject intentionally omitted to avoid reference thrashing
 
   // Handle Focus & Scroll after injection
   useEffect(() => {
@@ -266,10 +291,6 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
         setGridItems(r.items || []);
         setInstructions(r.instructions || '');
         setActiveRecipeId(r.id);
-        // Reset any temporary scaling when switching recipes
-        setScaleFactor(1);
-        setConstraintIdx(null);
-        setConstraintValue('');
       }
     } else if (!stagedItemId && !isEditing && !isManualNew) {
       // Reset if nothing selected and not editing
@@ -283,28 +304,7 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
     }
   }, [stagedObject, stagedItemId, stagedItemType, isEditing, isManualNew, activeRecipeId]);
 
-  // Auto-calculate batch size from item quantities (accounting for waste/yield)
-  useEffect(() => {
-    if (gridItems.length > 0) {
-      // Build waste lookup from ingredient data
-      const wasteMap = new Map<string, number>();
-      gridItems.forEach(item => {
-        if (item.type === 'ingredient' && item.id) {
-          const ing = ingredients.find(i => i.id === item.id);
-          if (ing && ing.wastePercent > 0) {
-            wasteMap.set(item.id, ing.wastePercent);
-          }
-        }
-      });
-      const total = calculateBatchTotal(gridItems, batchUnit, wasteMap);
-      if (total > 0 && Math.abs(total - batchSize) > 0.001) {
-        setBatchSize(parseFloat(total.toFixed(4)));
-      }
-    }
-  }, [gridItems, batchUnit, ingredients]);
-
   const enterEditMode = () => {
-    clearStaged(); // Clear staged recipe ID so Direct Injection doesn't re-add it to itself
     setIsEditing(true);
     // Pivot to Ingredients
     onSetAvailableTabs(['ingredients']);
@@ -355,24 +355,23 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
     }
   };
 
-  // Constraint-based inverse scaling: pin one ingredient and enter available qty
-  const handleConstraintInput = (idx: number, rawValue: string) => {
-    setConstraintValue(rawValue);
-    const available = parseFloat(rawValue);
-    const original = gridItems[idx]?.quantity;
-    if (available > 0 && original > 0) {
-      setScaleFactor(parseFloat((available / original).toFixed(6)));
-    }
-  };
-
-  const resetScale = () => {
-    setScaleFactor(1);
-    setConstraintIdx(null);
-    setConstraintValue('');
-  };
-
   const updateGridItem = (idx: number, updates: Partial<RecipeItem>) => {
     setGridItems(prev => prev.map((item, i) => i === idx ? { ...item, ...updates } : item));
+  };
+
+  const removeGridItem = async (idx: number) => {
+    const updatedItems = gridItems.filter((_, i) => i !== idx);
+    setGridItems(updatedItems); // Optimistic Update
+    
+    // IMMEDIATE PERSISTENCE
+    if (activeRecipeId && (isEditing || isManualNew)) {
+       try {
+         await updateRecipe(activeRecipeId, { items: updatedItems });
+       } catch (e) {
+         console.error("Failed to persist deletion:", e);
+         // Brutalist design: Errors are fatal, UI might desync, but data integrity is attempted.
+       }
+    }
   };
 
   const swapGridItem = (idx: number, option: SearchOption) => {
@@ -394,8 +393,7 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
     }));
 
     const recipeData: Partial<Recipe> = {
-      name: recipeName, batchSize, batchUnit, items: normalizedItems, instructions, sourceType: 'manual',
-      isDirty: false, status: 'active'
+      name: recipeName, batchSize, batchUnit, items: normalizedItems, instructions, sourceType: 'manual'
     };
     try {
       if (activeRecipeId && !isManualNew) {
@@ -448,7 +446,7 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
     // 1. Guard: Check if we've been here before
     if (visited.has(rid)) {
       console.warn(`[CIRCULAR_REF_DETECTED] Recipe ${rid} references itself.`);
-      return 0;
+      return 0; // Break loop
     }
     
     // 2. Track: Add current ID to visited set
@@ -522,11 +520,11 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
                 placeholder="Recipe Name" 
               />
             </div>
-            <div className={`flex items-center gap-6 border-l border-[#333333] pl-4 ${!isSessionActive && scaleFactor === 1 ? 'opacity-30' : !isSessionActive ? 'opacity-70' : ''}`}>
+            <div className={`flex items-center gap-6 border-l border-[#333333] pl-4 ${!isSessionActive ? 'opacity-30' : ''}`}>
               <div className="flex flex-col">
-                <label className="text-[10px] font-bold uppercase text-[#888888]">Batch Size <span className="text-[#444]">(auto)</span></label>
+                <label className="text-[10px] font-bold uppercase text-[#888888]">Batch Size</label>
                 <div className="flex items-center gap-2">
-                  <span className="font-mono font-bold w-16 text-[#c8a96e]">{batchSize > 0 ? batchSize.toFixed(batchSize < 10 ? 2 : 0) : '—'}</span>
+                  <input type="number" disabled={!isSessionActive} value={batchSize} onChange={(e) => setBatchSize(parseFloat(e.target.value) || 0)} className="bg-transparent border-b border-[#333333] font-mono font-bold w-16 outline-none" />
                   <select disabled={!isSessionActive} value={batchUnit} onChange={(e) => setBatchUnit(e.target.value as Unit)} className="bg-transparent text-xs font-mono font-bold uppercase outline-none text-[#c8a96e]">
                     <option value="kg">kg</option><option value="l">l</option><option value="ea">ea</option><option value="g">g</option><option value="ml">ml</option>
                   </select>
@@ -536,17 +534,14 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
                 <label className="text-[10px] font-bold uppercase text-[#888888]">Scale Factor</label>
                 <div className="flex items-center gap-2">
                    <span className="text-[#666] text-xs font-mono">x</span>
-                   <input
-                     type="number"
-                     readOnly={!isEditing}
-                     value={scaleFactor}
-                     onChange={(e) => isEditing && setScaleFactor(Math.max(0.1, parseFloat(e.target.value) || 1))}
+                   <input 
+                     type="number" 
+                     disabled={!isSessionActive} 
+                     value={scaleFactor} 
+                     onChange={(e) => setScaleFactor(Math.max(0.1, parseFloat(e.target.value) || 1))} 
                      step="0.1"
-                     className={`bg-transparent border-b border-[#333333] font-mono font-bold w-12 outline-none ${scaleFactor !== 1 ? 'text-yellow-400' : 'text-[#c8a96e]'}`}
+                     className="bg-transparent border-b border-[#333333] font-mono font-bold w-12 outline-none text-[#c8a96e]" 
                    />
-                   {scaleFactor !== 1 && !isEditing && (
-                     <button onClick={resetScale} className="text-[8px] text-yellow-500 hover:text-yellow-300 font-bold uppercase">Reset</button>
-                   )}
                 </div>
               </div>
             </div>
@@ -580,35 +575,7 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
           </div>
         </div>
 
-        <div className={`flex-1 overflow-y-auto p-4 transition-opacity ${!isSessionActive ? 'opacity-80' : ''}`}>
-          {/* SCALE BANNER */}
-          {scaleFactor !== 1 && !isEditing && (
-            <div className="flex items-center justify-between bg-yellow-900/30 border border-yellow-700/50 px-4 py-2 mb-2">
-              <div className="flex items-center gap-3">
-                <span className="text-yellow-400 text-xs font-mono font-bold uppercase tracking-wider">
-                  Scaled: x{scaleFactor.toFixed(3)}
-                </span>
-                {constraintIdx !== null && gridItems[constraintIdx] && (
-                  <span className="text-yellow-600 text-[10px] font-mono">
-                    ({(() => {
-                      const rawId = gridItems[constraintIdx].id;
-                      const comp = gridItems[constraintIdx].type === 'ingredient'
-                        ? ingredients.find(i => i.id === rawId)
-                        : recipes.find(r => r.id === rawId);
-                      return comp?.name || 'item';
-                    })()} pinned to {constraintValue}{gridItems[constraintIdx].unit})
-                  </span>
-                )}
-              </div>
-              <button
-                onClick={resetScale}
-                className="text-[10px] font-bold uppercase tracking-wider bg-yellow-700/40 hover:bg-yellow-600/60 text-yellow-300 px-3 py-1 border border-yellow-600/50 transition-colors"
-              >
-                Reset
-              </button>
-            </div>
-          )}
-
+        <div className={`flex-1 overflow-y-auto p-4 transition-opacity ${!isSessionActive ? 'opacity-80 pointer-events-none' : ''}`}>
           {/* ONLY RENDER GRID IF ITEMS EXIST */}
           {gridItems.length > 0 && (
             <>
@@ -681,37 +648,14 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {/* Constraint pin mode: show editable input for pinned item in view mode */}
-                        {!isEditing && constraintIdx === idx ? (
-                          <input
-                            autoFocus
-                            type="number"
-                            value={constraintValue}
-                            onChange={(e) => handleConstraintInput(idx, e.target.value)}
-                            onBlur={() => { if (!constraintValue) resetScale(); }}
-                            onKeyDown={(e) => { if (e.key === 'Escape') resetScale(); }}
-                            className="bg-[#1a1a00] border border-yellow-600 text-right font-mono text-xs w-20 outline-none text-yellow-400 px-1"
-                            placeholder={String(item.quantity)}
-                          />
-                        ) : (
-                          <input
-                            ref={el => (quantityRefs.current[idx] = el)}
-                            type="number"
-                            value={parseFloat((item.quantity * scaleFactor).toFixed(4))}
-                            readOnly={!isEditing}
-                            onChange={(e) => isEditing && updateGridItem(idx, { quantity: (parseFloat(e.target.value) || 0) / scaleFactor })}
-                            onClick={() => {
-                              if (!isEditing && isViewMode) {
-                                setConstraintIdx(idx);
-                                setConstraintValue('');
-                              }
-                            }}
-                            className={`bg-transparent text-right font-mono text-xs w-16 outline-none ${
-                              !isEditing && isViewMode ? 'cursor-pointer hover:text-yellow-300 hover:underline' : ''
-                            } ${scaleFactor !== 1 ? 'text-yellow-500' : 'text-[#c8a96e]'}`}
-                          />
-                        )}
-                        <select disabled={!isEditing} value={item.unit} onChange={(e) => updateGridItem(idx, { unit: e.target.value as Unit })} className="bg-transparent text-[10px] font-mono text-[#888] outline-none">
+                        <input 
+                          ref={el => (quantityRefs.current[idx] = el)}
+                          type="number" 
+                          value={item.quantity * scaleFactor} 
+                          onChange={(e) => updateGridItem(idx, { quantity: (parseFloat(e.target.value) || 0) / scaleFactor })} 
+                          className={`bg-transparent text-right font-mono text-xs w-16 outline-none ${scaleFactor !== 1 ? 'text-yellow-500' : 'text-[#c8a96e]'}`} 
+                        />
+                        <select value={item.unit} onChange={(e) => updateGridItem(idx, { unit: e.target.value as Unit })} className="bg-transparent text-[10px] font-mono text-[#888] outline-none">
                           <option value="g">g</option><option value="ml">ml</option><option value="kg">kg</option><option value="l">l</option><option value="ea">ea</option>
                         </select>
                       </div>
@@ -722,13 +666,13 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
                            <div className="h-px bg-red-500 w-full mt-0.5 opacity-50" title="Cost Error: Circular Reference or Missing Data"></div>
                         )}
                       </div>
-                      <div className={`flex gap-1 ml-2 ${!isEditing ? 'pointer-events-none opacity-0' : ''}`}>
+                      <div className="flex gap-1 ml-2">
                         {onPushRecipe && item.type === 'recipe' && component && (
                           <button onClick={() => onPushRecipe(component.name)} className="p-2 text-[#4a5568] hover:text-white transition-colors">
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                           </button>
                         )}
-                        <button onClick={() => setGridItems(prev => prev.filter((_, i) => i !== idx))} className="p-2 text-[#444] hover:text-red-500"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+                        <button onClick={() => removeGridItem(idx)} className="p-2 text-[#444] hover:text-red-500"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
                       </div>
                     </div>
                   );

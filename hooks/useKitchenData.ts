@@ -1,10 +1,9 @@
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, query, orderBy, writeBatch, getDocs, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Ingredient, Recipe, Dish, Allergen, RecipeStatus, RecipeItem } from '../types';
-import { calculateBatchTotal } from '../utils/units';
-import { getProduceYield } from '../utils/yields';
+import { normalizeName } from '../utils/intelligence';
 
 const DEFAULT_INGREDIENTS: Omit<Ingredient, 'id'>[] = [
   { 
@@ -79,8 +78,8 @@ const DEFAULT_INGREDIENTS: Omit<Ingredient, 'id'>[] = [
   }
 ];
 
-// Utility to recursively strip undefined values which cause Firestore updateDoc to fail
-// HARDENED: Prevents "Maximum call stack size exceeded" by ignoring non-plain objects
+// Utility to recursively strip undefined values and dangerous circular objects
+// HARDENED: Prevents "Converting circular structure to JSON" by stripping complex types (like Events)
 const cleanObject = (obj: any): any => {
   // Primitives and null
   if (obj === null || typeof obj !== 'object') {
@@ -97,16 +96,25 @@ const cleanObject = (obj: any): any => {
     return obj.map(v => cleanObject(v));
   }
 
-  // Guard against complex objects (Firestore References, Class Instances, etc.)
-  // Only recurse into Plain Objects (POJOs)
+  // Allow specific Firebase/Firestore types based on constructor name
+  // This avoids serializing React Events or other circular structures
+  const ctorName = obj.constructor?.name;
+  if (['Timestamp', 'GeoPoint', 'DocumentReference', 'CollectionReference'].includes(ctorName)) {
+    return obj;
+  }
+
+  // Guard against other complex objects (Class Instances, SyntheticEvents, DOM Nodes, etc.)
+  // Only recurse into Plain Objects (POJOs) or objects with no constructor
   if (obj.constructor !== Object && obj.constructor !== undefined) {
-    return obj; 
+    console.warn(`[Data Safety] Stripping complex object of type '${ctorName}' from DB payload to prevent circular reference errors.`);
+    return undefined; 
   }
 
   // Plain Objects: Recurse entries
   return Object.entries(obj).reduce((acc, [k, v]) => {
-    if (v !== undefined) {
-      acc[k] = cleanObject(v);
+    const cleaned = cleanObject(v);
+    if (cleaned !== undefined) {
+      acc[k] = cleaned;
     }
     return acc;
   }, {} as any);
@@ -150,20 +158,6 @@ export const useKitchenData = () => {
           suppliers: raw.suppliers || []
         };
       }) as Ingredient[];
-
-      // Auto-populate wastePercent from yield data for Vegetable/Fruit ingredients
-      data.forEach(ing => {
-        if ((ing.category === 'Vegetable' || ing.category === 'Fruit') && (ing.wastePercent === 0 || ing.wastePercent === undefined)) {
-          const yieldPct = getProduceYield(ing.name);
-          if (yieldPct !== null) {
-            const waste = 100 - yieldPct;
-            console.info(`[YIELD_UPDATE] "${ing.name}" → ${yieldPct}% yield (${waste}% waste)`);
-            ing.wastePercent = waste;
-            updateDoc(doc(db, 'ingredients', ing.id), { wastePercent: waste, updatedAt: new Date().toISOString() }).catch(console.error);
-          }
-        }
-      });
-
       setIngredients(data);
       setConnectionStatus('connected');
       setError(null);
@@ -178,37 +172,10 @@ export const useKitchenData = () => {
   useEffect(() => {
     const q = query(collection(db, 'recipes'), orderBy('updatedAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(d => {
-        const raw = d.data();
-        const id = d.id;
-        // Strip self-referential items (recipe containing itself as a sub-recipe)
-        const items = (raw.items || []).filter(
-          (item: any) => !(item.type === 'recipe' && (item.id === id || (item as any).recipeId === id))
-        );
-        const patches: Record<string, any> = {};
-
-        // If corrupted items were found, clean them in Firestore too
-        if (items.length !== (raw.items || []).length) {
-          console.warn(`[SELF_REF_CLEANUP] Recipe "${raw.name}" (${id}) had self-referential items — stripping.`);
-          patches.items = items;
-        }
-
-        // Auto-clear isDirty for recipes that have resolved items and an active/structured status
-        if (raw.isDirty && items.length > 0 && items.every((i: any) => i.id)) {
-          console.info(`[AUTO_CLEAN] Recipe "${raw.name}" (${id}) has resolved items — clearing isDirty.`);
-          patches.isDirty = false;
-          if (!raw.status || raw.status === 'pending_validation' || raw.status === 'needs_resolution') {
-            patches.status = 'active';
-          }
-        }
-
-        if (Object.keys(patches).length > 0) {
-          patches.updatedAt = new Date().toISOString();
-          updateDoc(doc(db, 'recipes', id), patches).catch(console.error);
-        }
-
-        return { id, ...raw, items, ...patches } as Recipe;
-      });
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Recipe[];
       setRecipes(data);
     }, (err) => {
       console.error("Error fetching recipes:", err);
@@ -231,28 +198,6 @@ export const useKitchenData = () => {
     });
     return () => unsubscribe();
   }, []);
-
-  // Retroactive batch size calculation (runs once when both ingredients and recipes are loaded)
-  const batchCalcRan = useRef(false);
-  useEffect(() => {
-    if (batchCalcRan.current || ingredients.length === 0 || recipes.length === 0) return;
-    batchCalcRan.current = true;
-
-    // Build waste lookup from all ingredients
-    const wasteMap = new Map<string, number>();
-    ingredients.forEach(ing => {
-      if (ing.wastePercent > 0) wasteMap.set(ing.id, ing.wastePercent);
-    });
-
-    recipes.forEach(recipe => {
-      if (!recipe.items || recipe.items.length === 0 || !recipe.batchUnit) return;
-      const calculatedBatch = parseFloat(calculateBatchTotal(recipe.items, recipe.batchUnit, wasteMap).toFixed(4));
-      if (calculatedBatch > 0 && Math.abs(calculatedBatch - (recipe.batchSize || 1)) > 0.001) {
-        console.info(`[BATCH_CALC] Recipe "${recipe.name}": ${recipe.batchSize} → ${calculatedBatch} ${recipe.batchUnit}`);
-        updateDoc(doc(db, 'recipes', recipe.id), { batchSize: calculatedBatch, updatedAt: new Date().toISOString() }).catch(console.error);
-      }
-    });
-  }, [ingredients, recipes]);
 
   const addIngredient = useCallback(async (ingredient: Omit<Ingredient, 'id'>) => {
     try {
@@ -348,6 +293,26 @@ export const useKitchenData = () => {
 
   const ingestRawRecipe = useCallback(async (rawText: string, title?: string, filename?: string) => {
     try {
+      // De-Duplication Check: Update if name matches an existing recipe
+      let existingId: string | undefined;
+      
+      if (title) {
+         const normTitle = normalizeName(title).toLowerCase();
+         const match = recipes.find(r => normalizeName(r.name).toLowerCase() === normTitle);
+         if (match) existingId = match.id;
+      }
+
+      if (existingId) {
+           await updateDoc(doc(db, 'recipes', existingId), cleanObject({
+              raw_text: rawText,
+              status: 'pending_validation',
+              updatedAt: new Date().toISOString()
+           }));
+           // Return existing recipe object
+           return recipes.find(r => r.id === existingId) as Recipe;
+      }
+
+      // If no match, Create New
       const timestamp = new Date().toISOString();
       const recipeData: Omit<Recipe, 'id'> = {
         name: title || `Raw Import ${new Date().toLocaleTimeString()}`,
@@ -370,17 +335,20 @@ export const useKitchenData = () => {
       console.error("Error ingesting raw recipe:", err);
       throw err;
     }
-  }, []);
+  }, [recipes]);
 
   const batchIngestFiles = useCallback(async (
     files: { name: string, content: string }[],
     onProgress: (progress: number, logs: string[]) => void
   ) => {
     try {
-      // 1. Map existing filenames to IDs for Upsert Logic
-      const existingMap = new Map<string, string>();
+      // 1. Map existing filenames AND normalized names to IDs for Upsert Logic
+      const existingFileMap = new Map<string, string>();
+      const existingNameMap = new Map<string, string>();
+      
       recipes.forEach(r => {
-        if (r.source_filename) existingMap.set(r.source_filename, r.id);
+        if (r.source_filename) existingFileMap.set(r.source_filename, r.id);
+        if (r.name) existingNameMap.set(normalizeName(r.name).toLowerCase(), r.id);
       });
 
       const total = files.length;
@@ -394,7 +362,10 @@ export const useKitchenData = () => {
 
         chunk.forEach(file => {
           const cleanTitle = file.name.replace(/\.[^/.]+$/, ""); // Strip extension
-          const existingId = existingMap.get(file.name);
+          const normName = normalizeName(cleanTitle).toLowerCase();
+          
+          // Check both maps
+          const existingId = existingFileMap.get(file.name) || existingNameMap.get(normName);
           const timestamp = new Date().toISOString();
 
           if (existingId) {
@@ -426,7 +397,11 @@ export const useKitchenData = () => {
               updatedAt: timestamp
             };
             batch.set(newRef, cleanObject(newRecipe));
-            existingMap.set(file.name, newRef.id); // Add to map to prevent duplicates within same batch/session
+            
+            // Add to maps to prevent duplicates within same batch/session
+            existingNameMap.set(normName, newRef.id);
+            existingFileMap.set(file.name, newRef.id);
+            
             chunkLogs.push(`[COMMIT] ${cleanTitle} ... SUCCESS`);
           }
         });
@@ -550,10 +525,17 @@ export const useKitchenData = () => {
 
       ingSnap.docs.forEach(doc => {
         const data = doc.data() as Ingredient;
-        const isUnsorted = data.category === 'Unsorted';
-        const hasNoPrice = !data.suppliers || data.suppliers.length === 0 || data.suppliers[0].packCost === 0;
         
-        if (data.incomplete || (isUnsorted && hasNoPrice)) {
+        // Relaxed Stub Logic
+        // An ingredient is only "Incomplete" (stub) if it has no supplier, or if packCost / packSize is 0.
+        // We do NOT check stockLevel or kcalPer100.
+        const hasSupplier = data.suppliers && data.suppliers.length > 0;
+        const pref = hasSupplier ? (data.suppliers.find(s => s.isPreferred) || data.suppliers[0]) : null;
+        const hasValidPrice = pref && pref.packCost > 0 && pref.packSize > 0;
+        
+        const isStub = !hasSupplier || !hasValidPrice;
+        
+        if (data.incomplete && isStub) {
            batch.delete(doc.ref);
            ingredientCount++;
         }
@@ -566,6 +548,28 @@ export const useKitchenData = () => {
       return { recipeCount, ingredientCount };
     } catch (err) {
       console.error("Purge failed:", err);
+      throw err;
+    }
+  }, []);
+
+  const deletePendingRecipes = useCallback(async () => {
+    try {
+      const q = query(collection(db, 'recipes'), where('status', '==', 'pending_validation'));
+      const snapshot = await getDocs(q);
+      const batch = writeBatch(db);
+      let count = 0;
+      
+      snapshot.docs.forEach((doc) => {
+        batch.delete(doc.ref);
+        count++;
+      });
+
+      if (count > 0) {
+        await batch.commit();
+      }
+      return count;
+    } catch (err) {
+      console.error("Error deleting pending recipes:", err);
       throw err;
     }
   }, []);
@@ -656,8 +660,6 @@ export const useKitchenData = () => {
       await updateDoc(ref, updateData);
     } catch (err) {
       console.error("Error updating recipe status. Payload:", { id, status, items, instructions });
-      // Dir log for deep inspection of object structure
-      console.dir({ id, status, items, instructions }, { depth: null });
       throw err;
     }
   }, []);
@@ -682,6 +684,7 @@ export const useKitchenData = () => {
     deleteDish,
     mergeIngredients,
     purgeStagingData,
+    deletePendingRecipes,
     seedDatabase,
     bulkImport,
     logUnresolvedIngredient,

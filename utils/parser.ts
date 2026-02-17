@@ -1,5 +1,6 @@
 
 import { Ingredient, Unit } from '../types';
+import { normalizeName as intelligentNormalize } from './intelligence';
 
 export interface ParsedIngredient {
   originalText: string;
@@ -16,6 +17,8 @@ export interface ParsedRecipe {
   ingredients: ParsedIngredient[];
   method: string[];
   matchRate: number; // 0-1
+  suggestedBatchSize?: number;
+  suggestedBatchUnit?: Unit;
 }
 
 const NORMALIZE_UNITS: Record<string, Unit> = {
@@ -112,25 +115,30 @@ const extractPrepNotes = (rawName: string): { cleanName: string, notes: string |
 const isMethodLine = (line: string): boolean => {
   const lower = line.toLowerCase();
   if (lower === 'method' || lower === 'instructions' || lower === 'preparation') return true;
-  if (lower.endsWith(':')) return true; // e.g. "For the sauce:"
   return false;
 };
 
+// SCORCHED EARTH: Force Ingredient Matching Only. 
+// This function must NEVER accept a Recipe list for matching.
 export const parseRecipeContent = (text: string, ingredientsDB: Ingredient[], recipeTitle?: string): ParsedRecipe => {
   if (!text) return { ingredients: [], method: [], matchRate: 0 };
 
   const lines = text.split('\n').map(l => l.trim()).filter(l => l);
   
-  const parsedIngredients: ParsedIngredient[] = [];
+  let parsedIngredients: ParsedIngredient[] = [];
   const methodLines: string[] = [];
   
   let parsingMethodSection = false;
   
-  // Guard: Normalize title for comparison
-  const normalizedTitle = recipeTitle ? normalizeName(recipeTitle) : null;
+  // Guard: Normalize title for comparison using intelligence utils for consistent comparison
+  const normalizedTitle = recipeTitle ? intelligentNormalize(recipeTitle).toLowerCase() : null;
+
+  // Batch Size Guessing Accumulators
+  let totalWeight = 0; // grams
+  let totalVolume = 0; // ml
 
   for (const line of lines) {
-    // Check for Section Headers that force a switch
+    // Check for Section Headers that force a strict switch
     if (isMethodLine(line)) {
       parsingMethodSection = true;
       continue;
@@ -158,16 +166,23 @@ export const parseRecipeContent = (text: string, ingredientsDB: Ingredient[], re
       
       // Name Normalization
       const normalized = normalizeName(cleanName);
+      const comparisonName = intelligentNormalize(cleanName).toLowerCase();
 
       // TITLE GUARD: Prevent parsing the recipe title as an ingredient of itself
-      // e.g. "Pork Cheek" inside "Pork Cheek" recipe
-      if (normalizedTitle && (normalized === normalizedTitle || cleanName.toLowerCase() === recipeTitle?.toLowerCase().trim())) {
+      if (normalizedTitle && (comparisonName === normalizedTitle)) {
          console.debug(`[GUARD] REMOVED TITLE "${recipeTitle}" FROM INGREDIENTS`);
          continue; 
       }
 
-      // Strict Matching (No Auto-Correct)
-      // We check if any ingredient in DB has a normalized name that strictly matches
+      // Batch Accumulation
+      if (unit === 'kg') totalWeight += qty * 1000;
+      else if (unit === 'g') totalWeight += qty;
+      else if (unit === 'l') totalVolume += qty * 1000;
+      else if (unit === 'ml') totalVolume += qty;
+
+      // STRICT MATCHING: ONLY INGREDIENTS.
+      // We explicitly search the ingredientsDB.
+      // We do NOT search any recipe collection.
       const matchedIng = ingredientsDB.find(i => normalizeName(i.name) === normalized);
 
       parsedIngredients.push({
@@ -182,19 +197,47 @@ export const parseRecipeContent = (text: string, ingredientsDB: Ingredient[], re
       });
 
     } else {
-      // If line doesn't match Qty Regex, treat as Method (or title, but we assume raw_text is body)
+      // If line doesn't match Qty Regex, treat as Method (or title)
       methodLines.push(line);
     }
   }
+
+  // METHOD SANITATION FILTER
+  const fullMethodText = methodLines.join('\n');
+  parsedIngredients = parsedIngredients.filter(ing => !fullMethodText.includes(ing.originalText));
 
   // Calculate Match Rate
   const total = parsedIngredients.length;
   const matched = parsedIngredients.filter(p => !!p.matchedId).length;
   const matchRate = total > 0 ? matched / total : 0;
 
+  // Calculate Batch Suggestion
+  let suggestedBatchSize = 1;
+  let suggestedBatchUnit: Unit = 'ea';
+  
+  if (totalWeight > 0 && totalWeight > totalVolume) {
+     if (totalWeight >= 1000) {
+        suggestedBatchSize = Number((totalWeight / 1000).toFixed(2));
+        suggestedBatchUnit = 'kg';
+     } else {
+        suggestedBatchSize = Number(totalWeight.toFixed(0));
+        suggestedBatchUnit = 'g';
+     }
+  } else if (totalVolume > 0) {
+      if (totalVolume >= 1000) {
+        suggestedBatchSize = Number((totalVolume / 1000).toFixed(2));
+        suggestedBatchUnit = 'l';
+     } else {
+        suggestedBatchSize = Number(totalVolume.toFixed(0));
+        suggestedBatchUnit = 'ml';
+     }
+  }
+
   return {
     ingredients: parsedIngredients,
     method: methodLines,
-    matchRate
+    matchRate,
+    suggestedBatchSize,
+    suggestedBatchUnit
   };
 };

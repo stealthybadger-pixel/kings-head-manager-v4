@@ -333,10 +333,13 @@ export const IngredientManager: React.FC<IngredientManagerProps> = ({
 
   const showIncompleteWarning = useMemo(() => {
     if (!formData.incomplete) return false;
-    // Warning if preferred supplier has 0 cost
     const pref = formData.suppliers.find(s => s.isPreferred) || formData.suppliers[0];
-    if (pref.name === 'Internal') return false;
-    return pref.packCost === 0;
+    if (pref.name === 'Internal') return true; 
+    
+    // An ingredient is only "Incomplete" (stub) if it has no supplier, or if packCost / packSize is 0.
+    // We do NOT check stockLevel or kcalPer100.
+    if (!pref) return true;
+    return pref.packCost === 0 || pref.packSize === 0;
   }, [formData.incomplete, formData.suppliers]);
 
   return (
