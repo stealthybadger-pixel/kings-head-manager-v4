@@ -183,7 +183,16 @@ export const parseRecipeContent = (text: string, ingredientsDB: Ingredient[], re
       // STRICT MATCHING: ONLY INGREDIENTS.
       // We explicitly search the ingredientsDB.
       // We do NOT search any recipe collection.
-      const matchedIng = ingredientsDB.find(i => normalizeName(i.name) === normalized);
+      let matchedIng = ingredientsDB.find(i => normalizeName(i.name) === normalized);
+
+      // FUZZY FALLBACK: if no exact match, try unambiguous substring match.
+      // e.g. "black pepper" → "Cracked Black Pepper" (1 candidate → auto-resolve)
+      // e.g. "anise"        → "Star Anise"           (1 candidate → auto-resolve)
+      // e.g. "pepper"       → multiple hits          → left unresolved (correct)
+      if (!matchedIng && normalized.length > 3) {
+        const candidates = ingredientsDB.filter(i => normalizeName(i.name).includes(normalized));
+        if (candidates.length === 1) matchedIng = candidates[0];
+      }
 
       parsedIngredients.push({
         originalText: line,
