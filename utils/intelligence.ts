@@ -36,45 +36,61 @@ const EXACT_MATCH_KEYWORDS = new Set(['gin', 'rum', 'port', 'rye', 'nut', 'soy',
  */
 const CATEGORY_KEYWORDS: Record<string, string[]> = {
   'Vegetable': [
-    'potato', 'onion', 'garlic', 'carrot', 'broccoli', 'cauliflower', 'cabbage', 'savoy', 'lettuce', 'spinach',
-    'kale', 'cavolo nero', 'spring green', 'chard', 'pepper', 'chilli', 'scotch bonnet', 'jalapeno', 'habanero',
-    'tomato', 'cherry tom', 'cucumber', 'courgette', 'zucchini', 'mushroom', 'leek', 'celery', 'celeriac',
-    'asparagus', 'beetroot', 'parsnip', 'radish', 'mooli', 'pea', 'petit pois', 'sweetcorn', 'corn on',
+    'potato', 'potatoes', 'onion', 'onions', 'garlic', 'carrot', 'carrots', 'broccoli', 'cauliflower',
+    'cabbage', 'savoy', 'lettuce', 'spinach', 'sprout', 'sprouts', 'brussels',
+    'kale', 'cavolo nero', 'spring green', 'chard', 'pepper', 'peppers', 'chilli', 'chillies',
+    'scotch bonnet', 'jalapeno', 'habanero',
+    'tomato', 'tomatoes', 'cherry tom', 'cucumber', 'courgette', 'courgettes', 'zucchini',
+    'mushroom', 'mushrooms', 'leek', 'leeks', 'celery', 'celeriac',
+    'asparagus', 'beetroot', 'parsnip', 'parsnips', 'radish', 'radishes', 'mooli',
+    'pea', 'peas', 'petit pois', 'sweetcorn', 'corn on',
     'ginger', 'lemongrass', 'galangal', 'coriander', 'basil', 'mint', 'parsley', 'rosemary', 'thyme',
-    'chive', 'dill', 'tarragon', 'sage', 'oregano', 'marjoram', 'bay leaf', 'curry leaf',
-    'shallot', 'spring onion', 'squash', 'butternut', 'pumpkin', 'aubergine', 'fennel',
+    'chive', 'chives', 'dill', 'tarragon', 'sage', 'oregano', 'marjoram', 'bay leaf', 'curry leaf',
+    'shallot', 'shallots', 'spring onion', 'squash', 'butternut', 'pumpkin', 'aubergine', 'fennel',
     'pak choi', 'bok choi', 'mange tout', 'sugar snap', 'tenderstem', 'purple sprouting', 'broccolini',
     'micro', 'leaf', 'rocket', 'watercress', 'samphire', 'sea beet',
     'endive', 'radicchio', 'chicory', 'artichoke', 'turnip', 'swede', 'kohlrabi', 'yam', 'okra',
     'sweet potato', 'edamame', 'beansprout', 'bamboo shoot', 'water chestnut', 'daikon',
     'broad bean', 'runner bean', 'green bean', 'french bean', 'borlotti',
-    'gem lettuce', 'little gem', 'romaine', 'iceberg', 'lollo', 'frisee',
+    'baby gem', 'gem lettuce', 'little gem', 'romaine', 'iceberg', 'lollo', 'frisee',
     'sorrel', 'nettle', 'wild garlic', 'ramp', 'truffle'
   ],
   'Fruit': [
-    'apple', 'banana', 'orange', 'lemon', 'lime', 'strawberry', 'raspberry', 'blueberry', 'blackberry', 
-    'cherry', 'grape', 'melon', 'pineapple', 'mango', 'kiwi', 'peach', 'nectarine', 'plum', 'apricot', 
-    'fig', 'date', 'avocado', 'passion fruit', 'pomegranate', 'rhubarb', 'pear', 'grapefruit', 'clementine', 
-    'satsuma', 'blood orange', 'kumquat', 'dragon fruit', 'lychee', 'papaya', 'guava', 'star fruit'
+    'apple', 'apples', 'banana', 'bananas', 'orange', 'oranges', 'lemon', 'lemons', 'lime', 'limes',
+    'strawberry', 'strawberries', 'raspberry', 'raspberries', 'blueberry', 'blueberries',
+    'blackberry', 'blackberries', 'cherry', 'cherries', 'grape', 'grapes',
+    'melon', 'pineapple', 'mango', 'mangoes', 'kiwi', 'peach', 'peaches', 'nectarine', 'nectarines',
+    'plum', 'plums', 'apricot', 'apricots', 'fig', 'figs', 'date', 'avocado',
+    'passion fruit', 'pomegranate', 'rhubarb', 'pear', 'pears', 'grapefruit', 'clementine', 'clementines',
+    'satsuma', 'blood orange', 'kumquat', 'dragon fruit', 'lychee', 'papaya', 'guava', 'star fruit',
+    'redcurrant', 'blackcurrant', 'gooseberry', 'gooseberries', 'cranberry', 'cranberries'
   ],
   'Meat': [
-    'beef', 'chicken', 'pork', 'lamb', 'steak', 'mince', 'sausage', 'bacon', 'ham', 'gammon', 'turkey', 'duck', 
-    'goose', 'venison', 'veal', 'rabbit', 'chorizo', 'salami', 'pepperoni', 'pancetta', 'brisket', 'shoulder', 
-    'loin', 'breast', 'thigh', 'wing', 'drumstick', 'rib', 'fillet', 'black pudding', 'haggis', 'offal', 
-    'liver', 'kidney', 'cheek', 'tail', 'bone', 'suet', 'quail', 'pigeon', 'pheasant', 'grouse', 'marrow'
+    'beef', 'chicken', 'pork', 'lamb', 'steak', 'mince', 'sausage', 'sausages', 'bacon', 'ham', 'gammon',
+    'turkey', 'duck', 'goose', 'venison', 'veal', 'rabbit', 'chorizo', 'salami', 'pepperoni', 'pancetta',
+    'brisket', 'shoulder', 'loin', 'breast', 'thigh', 'wing', 'drumstick', 'rib', 'fillet',
+    'black pudding', 'haggis', 'offal', 'liver', 'kidney', 'cheek', 'tail', 'bone', 'suet',
+    'quail', 'pigeon', 'pheasant', 'grouse', 'marrow',
+    'tomahawk', 'ribeye', 'sirloin', 'rump', 'bavette', 'onglet', 'nduja', 'bresaola', 'prosciutto',
+    'coppa', 'guanciale', 'speck', 'oxtail', 'shin', 'shank'
   ],
   'Fish': [
-    'salmon', 'cod', 'tuna', 'haddock', 'bass', 'bream', 'trout', 'mackerel', 'sardine', 'prawn', 'shrimp', 
-    'lobster', 'crab', 'mussel', 'clam', 'oyster', 'scallop', 'squid', 'octopus', 'anchovy', 'snapper', 
-    'swordfish', 'halibut', 'turbot', 'monkfish', 'kipper', 'hake', 'sole', 'plaice', 'brill', 'skate', 
-    'john dory', 'mullet', 'eel', 'roach', 'perch', 'pike', 'caviar', 'roe'
+    'salmon', 'cod', 'tuna', 'haddock', 'bass', 'sea bass', 'bream', 'trout', 'mackerel', 'sardine', 'sardines',
+    'prawn', 'prawns', 'shrimp', 'lobster', 'crab', 'mussel', 'mussels', 'clam', 'clams',
+    'oyster', 'oysters', 'scallop', 'scallops', 'squid', 'octopus', 'anchovy', 'anchovies', 'snapper',
+    'swordfish', 'halibut', 'turbot', 'monkfish', 'kipper', 'hake', 'sole', 'plaice', 'brill', 'skate',
+    'john dory', 'mullet', 'eel', 'roach', 'perch', 'pike', 'caviar', 'roe',
+    'langoustine', 'crayfish', 'calamari', 'whitebait', 'whelk', 'cockle', 'cockles',
+    'smoked salmon', 'smoked haddock', 'smoked mackerel', 'fish cake', 'fish pie',
+    'ceviche', 'gravlax', 'sashimi', 'seabream', 'sea trout', 'lemon sole', 'dover sole'
   ],
   'Dry Store': [
-    'flour', 'sugar', 'salt', 'pepper', 'oil', 'vinegar', 'rice', 'pasta', 'couscous', 'quinoa', 'lentil', 
-    'chickpea', 'bean', 'nut', 'seed', 'spice', 'herb', 'chocolate', 'cocoa', 'honey', 'syrup', 'jam', 
-    'pickle', 'sauce', 'stock', 'broth', 'coffee', 'tea', 'biscuit', 'cracker', 'cereal', 'oats', 'yeast', 
-    'baking powder', 'vanilla', 'coconut milk', 'curry paste', 'mustard', 'mayo', 'ketchup', 'soy', 'miso', 
-    'tahini', 'gelatine', 'pectin', 'xanthan', 'lecithin', 'cornflour', 'bulgur', 'polenta', 'semolina'
+    'flour', 'sugar', 'salt', 'oil', 'vinegar', 'rice', 'pasta', 'couscous', 'quinoa', 'lentil', 'lentils',
+    'chickpea', 'chickpeas', 'nut', 'seed', 'spice', 'herb', 'chocolate', 'cocoa', 'honey', 'syrup', 'jam',
+    'pickle', 'stock', 'broth', 'coffee', 'tea', 'biscuit', 'cracker', 'cereal', 'oats', 'yeast',
+    'baking powder', 'vanilla', 'coconut milk', 'curry paste', 'mustard', 'mayo', 'ketchup', 'soy', 'miso',
+    'tahini', 'gelatine', 'pectin', 'xanthan', 'lecithin', 'cornflour', 'bulgur', 'polenta', 'semolina',
+    'kidney bean', 'cannellini', 'haricot', 'pinto', 'black bean'
   ],
   'Frozen': [
     'frozen', 'ice', 'gelato', 'sorbet', 'chips', 'frozen peas', 'frozen berries', 'par-baked', 'ice cream'
