@@ -36,12 +36,20 @@ const EXACT_MATCH_KEYWORDS = new Set(['gin', 'rum', 'port', 'rye', 'nut', 'soy',
  */
 const CATEGORY_KEYWORDS: Record<string, string[]> = {
   'Vegetable': [
-    'potato', 'onion', 'garlic', 'carrot', 'broccoli', 'cauliflower', 'cabbage', 'lettuce', 'spinach', 'kale', 
-    'pepper', 'chilli', 'tomato', 'cucumber', 'courgette', 'mushroom', 'leek', 'celery', 'asparagus', 'beetroot', 
-    'parsnip', 'radish', 'pea', 'bean', 'sweetcorn', 'ginger', 'lemongrass', 'coriander', 'basil', 'mint', 
-    'parsley', 'rosemary', 'thyme', 'chive', 'dill', 'tarragon', 'sage', 'oregano', 'shallot', 'squash', 
-    'pumpkin', 'aubergine', 'fennel', 'pak choi', 'mange tout', 'sugar snap', 'micro', 'leaf', 'rocket', 
-    'watercress', 'endive', 'radicchio', 'chicory', 'artichoke', 'turnip', 'swede', 'kohlrabi', 'yam', 'okra'
+    'potato', 'onion', 'garlic', 'carrot', 'broccoli', 'cauliflower', 'cabbage', 'savoy', 'lettuce', 'spinach',
+    'kale', 'cavolo nero', 'spring green', 'chard', 'pepper', 'chilli', 'scotch bonnet', 'jalapeno', 'habanero',
+    'tomato', 'cherry tom', 'cucumber', 'courgette', 'zucchini', 'mushroom', 'leek', 'celery', 'celeriac',
+    'asparagus', 'beetroot', 'parsnip', 'radish', 'mooli', 'pea', 'petit pois', 'sweetcorn', 'corn on',
+    'ginger', 'lemongrass', 'galangal', 'coriander', 'basil', 'mint', 'parsley', 'rosemary', 'thyme',
+    'chive', 'dill', 'tarragon', 'sage', 'oregano', 'marjoram', 'bay leaf', 'curry leaf',
+    'shallot', 'spring onion', 'squash', 'butternut', 'pumpkin', 'aubergine', 'fennel',
+    'pak choi', 'bok choi', 'mange tout', 'sugar snap', 'tenderstem', 'purple sprouting', 'broccolini',
+    'micro', 'leaf', 'rocket', 'watercress', 'samphire', 'sea beet',
+    'endive', 'radicchio', 'chicory', 'artichoke', 'turnip', 'swede', 'kohlrabi', 'yam', 'okra',
+    'sweet potato', 'edamame', 'beansprout', 'bamboo shoot', 'water chestnut', 'daikon',
+    'broad bean', 'runner bean', 'green bean', 'french bean', 'borlotti',
+    'gem lettuce', 'little gem', 'romaine', 'iceberg', 'lollo', 'frisee',
+    'sorrel', 'nettle', 'wild garlic', 'ramp', 'truffle'
   ],
   'Fruit': [
     'apple', 'banana', 'orange', 'lemon', 'lime', 'strawberry', 'raspberry', 'blueberry', 'blackberry', 
