@@ -163,12 +163,15 @@ export const useKitchenData = () => {
       }) as Ingredient[];
 
       // Normalize category aliases ("Veg" → "Vegetable", etc.) and re-detect miscategorized items
+      // Skip items with multiple suppliers (user has manually configured them)
       data.forEach(ing => {
         const normalized = normalizeCategory(ing.category);
-        const detected = detectCategory(ing.name);
-        // Fix if: category alias needs normalizing, OR detected category differs from current
         const needsNormalize = normalized !== ing.category;
-        const needsRecat = detected !== normalized;
+
+        // Only re-detect category for single-supplier, non-audited items
+        const canRecat = ing.suppliers.length <= 1 && !ing.audited;
+        const detected = canRecat ? detectCategory(ing.name) : normalized;
+        const needsRecat = canRecat && detected !== normalized;
         const correctedCategory = needsRecat ? detected : normalized;
 
         if (needsNormalize || needsRecat) {
@@ -232,6 +235,19 @@ export const useKitchenData = () => {
               updateDoc(doc(db, 'ingredients', ing.id), { kcalPer100: val, updatedAt: new Date().toISOString() }).catch(console.error);
               break;
             }
+          }
+        }
+      });
+
+      // Auto-clear incomplete flag when pricing data is valid (stockLevel: 0 is NOT a stub indicator)
+      data.forEach(ing => {
+        if (ing.incomplete) {
+          const pref = ing.suppliers.find((s: any) => s.isPreferred) || ing.suppliers[0];
+          const hasValidPrice = pref && pref.packCost > 0 && pref.packSize > 0;
+          if (hasValidPrice) {
+            console.info(`[STUB_CLEAR] "${ing.name}" → incomplete cleared (has valid pricing)`);
+            ing.incomplete = false;
+            updateDoc(doc(db, 'ingredients', ing.id), { incomplete: false, updatedAt: new Date().toISOString() }).catch(console.error);
           }
         }
       });
