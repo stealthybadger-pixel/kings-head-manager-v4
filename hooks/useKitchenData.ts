@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, query, orderBy, writeBatch, getDocs, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Ingredient, Recipe, Dish, Allergen, RecipeStatus, RecipeItem } from '../types';
-import { normalizeName, detectSupplierFromCategory, detectCategory } from '../utils/intelligence';
+import { normalizeName, detectSupplierFromCategory, detectCategory, normalizeCategory } from '../utils/intelligence';
 import { calculateBatchTotal } from '../utils/units';
 import { getProduceYield } from '../utils/yields';
 import { COFID_DATA } from '../utils/nutritionLookup';
@@ -162,27 +162,31 @@ export const useKitchenData = () => {
         };
       }) as Ingredient[];
 
-      // Auto-fix category for ingredients stuck in "Dry Store" that should be Vegetable/Fruit
+      // Normalize category aliases ("Veg" → "Vegetable", etc.) and re-detect miscategorized items
       data.forEach(ing => {
-        if (ing.category === 'Dry Store') {
-          const detected = detectCategory(ing.name);
-          if (detected !== 'Dry Store') {
-            console.info(`[CATEGORY_FIX] "${ing.name}": "Dry Store" → "${detected}"`);
-            ing.category = detected;
-            const correctSupplier = detectSupplierFromCategory(detected);
-            const preferred = ing.suppliers.find(s => s.isPreferred) || ing.suppliers[0];
-            const updates: Record<string, any> = { category: detected, updatedAt: new Date().toISOString() };
-            // Also fix the supplier in the same write if it's wrong
-            if (preferred && (preferred.name === 'Generic' || preferred.name === 'Internal' || preferred.name === 'Urban') && correctSupplier !== 'Urban') {
-              const updatedSuppliers = ing.suppliers.map(s =>
-                s === preferred ? { ...s, name: correctSupplier } : s
-              );
-              ing.suppliers = updatedSuppliers;
-              updates.suppliers = updatedSuppliers;
-              console.info(`[SUPPLIER_FIX] "${ing.name}": "${preferred.name}" → "${correctSupplier}" (via category fix)`);
-            }
-            updateDoc(doc(db, 'ingredients', ing.id), updates).catch(console.error);
+        const normalized = normalizeCategory(ing.category);
+        const detected = detectCategory(ing.name);
+        // Fix if: category alias needs normalizing, OR detected category differs from current
+        const needsNormalize = normalized !== ing.category;
+        const needsRecat = detected !== normalized;
+        const correctedCategory = needsRecat ? detected : normalized;
+
+        if (needsNormalize || needsRecat) {
+          console.info(`[CATEGORY_FIX] "${ing.name}": "${ing.category}" → "${correctedCategory}"`);
+          ing.category = correctedCategory;
+          const correctSupplier = detectSupplierFromCategory(correctedCategory);
+          const preferred = ing.suppliers.find(s => s.isPreferred) || ing.suppliers[0];
+          const updates: Record<string, any> = { category: correctedCategory, updatedAt: new Date().toISOString() };
+          // Also fix the supplier in the same write if it's wrong
+          if (preferred && (preferred.name === 'Generic' || preferred.name === 'Internal' || preferred.name === 'Urban') && correctSupplier !== preferred.name) {
+            const updatedSuppliers = ing.suppliers.map(s =>
+              s === preferred ? { ...s, name: correctSupplier } : s
+            );
+            ing.suppliers = updatedSuppliers;
+            updates.suppliers = updatedSuppliers;
+            console.info(`[SUPPLIER_FIX] "${ing.name}": "${preferred.name}" → "${correctSupplier}" (via category fix)`);
           }
+          updateDoc(doc(db, 'ingredients', ing.id), updates).catch(console.error);
         }
       });
 

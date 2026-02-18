@@ -159,8 +159,34 @@ export const detectAllergens = (name: string): Allergen[] => {
   return detected;
 };
 
+// Override keywords: if the name contains any of these, force Dry Store
+// regardless of other matches (e.g. "Coriander Seeds" → Dry Store, not Vegetable)
+const DRY_STORE_OVERRIDES = ['seed', 'dried', 'ground', 'powder', 'paste', 'extract', 'essence', 'puree', 'concentrate'];
+
+// Category name normalization: map common variants to canonical names
+const CATEGORY_ALIASES: Record<string, string> = {
+  'veg': 'Vegetable', 'vegetables': 'Vegetable', 'vegetable': 'Vegetable',
+  'fruit': 'Fruit', 'fruits': 'Fruit',
+  'meat': 'Meat', 'meats': 'Meat', 'butcher': 'Meat',
+  'fish': 'Fish', 'seafood': 'Fish',
+  'dairy': 'Dairy',
+  'dry store': 'Dry Store', 'dry': 'Dry Store', 'pantry': 'Dry Store', 'store cupboard': 'Dry Store',
+  'frozen': 'Frozen',
+  'alcohol': 'Alcohol', 'drinks': 'Alcohol', 'beverage': 'Alcohol',
+};
+
+export const normalizeCategory = (category: string): string => {
+  return CATEGORY_ALIASES[category.toLowerCase().trim()] || category;
+};
+
 export const detectCategory = (name: string): string => {
   const lowercaseName = name.toLowerCase();
+
+  // Check Dry Store overrides first (seeds, dried, ground, powder, etc.)
+  if (DRY_STORE_OVERRIDES.some(ov => lowercaseName.includes(ov))) {
+    return 'Dry Store';
+  }
+
   for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
     if (keywords.some(keyword => lowercaseName.includes(keyword))) {
       return category;
