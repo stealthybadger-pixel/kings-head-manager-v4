@@ -27,6 +27,10 @@ export const ResolutionDashboard: React.FC = () => {
   // Tracks IDs that have been processed locally but might not have updated in Firestore snapshot yet
   const [processedIds, setProcessedIds] = useState<Set<string>>(new Set());
 
+  // SESSION RESOLUTION DICTIONARY
+  // Maps normalized raw ingredient names to resolved ingredient IDs, so linking once propagates to all future parses
+  const [resolvedMappings, setResolvedMappings] = useState<Map<string, string>>(new Map());
+
   // ... (Existing Creation/Mapping/Splitter State) ...
   const [creationData, setCreationData] = useState<{
     isOpen: boolean;
@@ -235,6 +239,26 @@ export const ResolutionDashboard: React.FC = () => {
     // Guard: Pass recipe name to parser to exclude self-reference
     // CRITICAL: We only pass `ingredients` for matching. Never `recipes`.
     const result = parseRecipeContent(selectedRecipe.raw_text, ingredients, selectedRecipe.name);
+
+    // Apply session resolution dictionary to fill in previously mapped names
+    if (resolvedMappings.size > 0) {
+      result.ingredients = result.ingredients.map(ing => {
+        if (ing.matchedId) return ing; // Already matched by parser
+        const key = normalizeName(ing.name).toLowerCase();
+        const mappedId = resolvedMappings.get(key);
+        if (mappedId) {
+          // Verify the ingredient still exists
+          const target = ingredients.find(i => i.id === mappedId);
+          if (target) {
+            return { ...ing, matchedId: mappedId, mappedNote: ing.name };
+          }
+        }
+        return ing;
+      });
+      const matchedCount = result.ingredients.filter(i => i.matchedId).length;
+      result.matchRate = matchedCount / result.ingredients.length;
+    }
+
     setParseResult(result);
     setCommitError(null);
   };
@@ -341,6 +365,15 @@ export const ResolutionDashboard: React.FC = () => {
         incomplete: true,
         audited: true
       });
+      // Record mapping for propagation to future parses
+      setResolvedMappings(prev => {
+        const next = new Map(prev);
+        next.set(normalizeName(creationData.originalName).toLowerCase(), newIng.id);
+        if (normalizedName.toLowerCase() !== normalizeName(creationData.originalName).toLowerCase()) {
+          next.set(normalizeName(normalizedName).toLowerCase(), newIng.id);
+        }
+        return next;
+      });
       if (parseResult) {
         const updatedIngredients = parseResult.ingredients.map(ing => {
           if (ing.name === creationData.originalName || ing.name === normalizedName) {
@@ -378,6 +411,12 @@ export const ResolutionDashboard: React.FC = () => {
     });
     const matchedCount = updatedIngredients.filter(i => i.matchedId).length;
     setParseResult({ ...parseResult, ingredients: updatedIngredients, matchRate: matchedCount / updatedIngredients.length });
+    // Record mapping for propagation to future parses
+    setResolvedMappings(prev => {
+      const next = new Map(prev);
+      next.set(normalizeName(mappingData.originalName).toLowerCase(), mappingData.targetId);
+      return next;
+    });
     setMappingData(prev => ({ ...prev, isOpen: false }));
   };
 
