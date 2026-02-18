@@ -3,9 +3,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, query, orderBy, writeBatch, getDocs, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Ingredient, Recipe, Dish, Allergen, RecipeStatus, RecipeItem } from '../types';
-import { normalizeName } from '../utils/intelligence';
+import { normalizeName, detectSupplierFromCategory } from '../utils/intelligence';
 import { calculateBatchTotal } from '../utils/units';
 import { getProduceYield } from '../utils/yields';
+import { COFID_DATA } from '../utils/nutritionLookup';
 
 const DEFAULT_INGREDIENTS: Omit<Ingredient, 'id'>[] = [
   { 
@@ -170,6 +171,39 @@ export const useKitchenData = () => {
             console.info(`[YIELD_UPDATE] "${ing.name}" → ${yieldPct}% yield (${waste}% waste)`);
             ing.wastePercent = waste;
             updateDoc(doc(db, 'ingredients', ing.id), { wastePercent: waste, updatedAt: new Date().toISOString() }).catch(console.error);
+          }
+        }
+      });
+
+      // Auto-fix supplier routing for ingredients with "Generic" or "Internal" preferred supplier
+      data.forEach(ing => {
+        const preferred = ing.suppliers.find(s => s.isPreferred) || ing.suppliers[0];
+        if (preferred && (preferred.name === 'Generic' || preferred.name === 'Internal')) {
+          const correctSupplier = detectSupplierFromCategory(ing.category);
+          if (correctSupplier !== 'Internal' && correctSupplier !== preferred.name) {
+            console.info(`[SUPPLIER_FIX] "${ing.name}" (${ing.category}): "${preferred.name}" → "${correctSupplier}"`);
+            const updatedSuppliers = ing.suppliers.map(s =>
+              s === preferred ? { ...s, name: correctSupplier } : s
+            );
+            ing.suppliers = updatedSuppliers;
+            updateDoc(doc(db, 'ingredients', ing.id), { suppliers: updatedSuppliers, updatedAt: new Date().toISOString() }).catch(console.error);
+          }
+        }
+      });
+
+      // Auto-populate kcalPer100 from COFID data for ingredients with kcal = 0
+      const ZERO_KCAL_ITEMS = ['water', 'salt', 'ice', 'bicarbonate'];
+      data.forEach(ing => {
+        if (ing.kcalPer100 === 0 || ing.kcalPer100 === undefined) {
+          if (ZERO_KCAL_ITEMS.some(k => ing.name.toLowerCase().includes(k))) return;
+          const lower = ing.name.toLowerCase();
+          for (const [key, val] of Object.entries(COFID_DATA)) {
+            if (lower.includes(key) && val > 0) {
+              console.info(`[KCAL_FIX] "${ing.name}" → ${val} kcal/100g (matched: "${key}")`);
+              ing.kcalPer100 = val;
+              updateDoc(doc(db, 'ingredients', ing.id), { kcalPer100: val, updatedAt: new Date().toISOString() }).catch(console.error);
+              break;
+            }
           }
         }
       });
