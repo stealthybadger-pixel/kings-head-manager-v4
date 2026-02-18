@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { useKitchenData } from '../hooks/useKitchenData';
+import { useKitchenData, SupplierPriceItem } from '../hooks/useKitchenData';
 import { useConfirmation } from '../hooks/useConfirmation';
 import { Recipe, RecipeItem, Unit, Ingredient } from '../types';
 import { parseRecipeContent, ParsedRecipe, ParsedIngredient } from '../utils/parser';
@@ -9,7 +9,7 @@ import { detectCategory, detectSupplierFromCategory, normalizeName } from '../ut
 import { splitDocument, analyzeBulkCommit, executeBulkCommit, BulkCommitAnalysis } from '../services/batchProcessor';
 
 export const ResolutionDashboard: React.FC = () => {
-  const { recipes, ingredients, logUnresolvedIngredient, addIngredient, deleteRecipe, deletePendingRecipes, ingestRawRecipe, updateRecipe } = useKitchenData();
+  const { recipes, ingredients, logUnresolvedIngredient, addIngredient, deleteRecipe, deletePendingRecipes, ingestRawRecipe, updateRecipe, searchSupplierPriceGuide } = useKitchenData();
   const { confirm } = useConfirmation();
   
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
@@ -26,6 +26,9 @@ export const ResolutionDashboard: React.FC = () => {
   // OPTIMISTIC EVICTION STATE
   // Tracks IDs that have been processed locally but might not have updated in Firestore snapshot yet
   const [processedIds, setProcessedIds] = useState<Set<string>>(new Set());
+
+  // David Catt suggestions for creation modal
+  const [dcSuggestions, setDcSuggestions] = useState<SupplierPriceItem[]>([]);
 
   // SESSION RESOLUTION DICTIONARY
   // Maps normalized raw ingredient names to resolved ingredient IDs, so linking once propagates to all future parses
@@ -234,6 +237,16 @@ export const ResolutionDashboard: React.FC = () => {
     }
   };
 
+  const handleDeleteSingle = async (e: React.MouseEvent, r: Recipe) => {
+    e.stopPropagation();
+    setProcessedIds(prev => new Set(prev).add(r.id));
+    if (selectedRecipeId === r.id) {
+      setSelectedRecipeId(null);
+      setParseResult(null);
+    }
+    await deleteRecipe(r.id);
+  };
+
   const handleTestParse = () => {
     if (!selectedRecipe?.raw_text) return;
     // Guard: Pass recipe name to parser to exclude self-reference
@@ -321,7 +334,7 @@ export const ResolutionDashboard: React.FC = () => {
     return { start, end };
   };
 
-  const handleOpenCreate = (rawName: string) => {
+  const handleOpenCreate = async (rawName: string) => {
     const detectedCat = detectCategory(rawName);
     const detectedSup = detectSupplierFromCategory(detectedCat);
     setCreationData({
@@ -336,6 +349,9 @@ export const ResolutionDashboard: React.FC = () => {
       isCase: false,
       error: null
     });
+    setDcSuggestions([]);
+    const results = await searchSupplierPriceGuide(rawName);
+    setDcSuggestions(results);
   };
 
   const handleCreateSave = async () => {
@@ -633,6 +649,20 @@ export const ResolutionDashboard: React.FC = () => {
           <div className="w-full max-w-md bg-[#111111] border border-[#c8a96e] p-6 shadow-2xl flex flex-col gap-6 relative">
              <div className="flex justify-between items-start border-b border-[#333] pb-2"><div><h3 className="text-sm font-bold uppercase tracking-[0.2em] text-[#c8a96e]">Promote to Registry</h3></div><button onClick={() => setCreationData(prev => ({...prev, isOpen: false}))} className="text-[#666] hover:text-white">X</button></div>
              {creationData.error && <div className="bg-red-950/20 border border-red-900 p-3"><span className="text-[10px] text-red-500 font-bold uppercase">{creationData.error}</span></div>}
+             {dcSuggestions.length > 0 && (
+               <div className="border border-[#3a9db8]/30 bg-[#041824] p-3 space-y-1.5">
+                 <div className="text-[8px] font-bold uppercase text-[#3a9db8] tracking-widest mb-2">David Catt DB Matches</div>
+                 {dcSuggestions.slice(0, 4).map(s => (
+                   <button key={s.id} onClick={() => {
+                     setCreationData(prev => ({ ...prev, name: s.name, supplier: 'David Catt', packCost: s.packCost, packSize: s.packSize, unit: s.packUnit as Unit, error: null }));
+                     setDcSuggestions([]);
+                   }} className="w-full text-left px-3 py-2 bg-[#0d1f2a] border border-[#1a4a5a] hover:border-[#3a9db8] transition-colors">
+                     <div className="text-[10px] font-bold uppercase text-[#c8a96e]">{s.name}</div>
+                     <div className="text-[8px] text-[#666] font-mono">£{s.packCost} / {s.packSize}{s.packUnit}</div>
+                   </button>
+                 ))}
+               </div>
+             )}
              <div className="space-y-4">
                 <div><label className={UI_STYLES.label}>Master Ingredient Name</label><input autoFocus value={creationData.name} onChange={(e) => setCreationData(prev => ({...prev, name: e.target.value, error: null}))} className={`w-full ${UI_STYLES.input}`} /></div>
                 <div><label className={UI_STYLES.label}>Category</label><select value={creationData.category} onChange={(e) => setCreationData(prev => ({...prev, category: e.target.value}))} className={`w-full ${UI_STYLES.input}`}>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
@@ -677,8 +707,13 @@ export const ResolutionDashboard: React.FC = () => {
                 className={`p-4 border-b border-[#333] cursor-pointer hover:bg-[#1c1c1c] transition-colors group ${selectedRecipeId === r.id ? 'bg-[#1c1c1c] border-l-2 border-l-[#c8a96e]' : 'border-l-2 border-l-transparent'}`}
               >
                 <div className="text-xs font-bold text-[#e0e0e0] uppercase truncate mb-1 flex justify-between items-center">
-                  <span>{r.name}</span>
-                  <button onClick={(e) => handleOpenSplitter(e, r)} className="opacity-0 group-hover:opacity-100 p-1 hover:text-[#c8a96e]" title="Split Document"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm0-5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z" /></svg></button>
+                  <span className="truncate">{r.name}</span>
+                  <div className="flex items-center flex-shrink-0 ml-1 opacity-0 group-hover:opacity-100">
+                    <button onClick={(e) => handleOpenSplitter(e, r)} className="p-1 text-[#555] hover:text-[#c8a96e] transition-colors" title="Split Document"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm0-5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z" /></svg></button>
+                    <button onClick={(e) => handleDeleteSingle(e, r)} className="p-1 text-[#555] hover:text-[#ff4d4d] transition-colors" title="Remove from queue">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                  </div>
                 </div>
                 <div className="flex justify-between items-center">
                    <div className="text-[8px] font-mono text-[#666] uppercase">{r.source_filename || 'MANUAL_INPUT'}</div>

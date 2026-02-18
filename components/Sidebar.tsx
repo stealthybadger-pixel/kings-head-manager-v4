@@ -14,22 +14,28 @@ interface SidebarProps {
   onTabChange: (tab: 'ingredients' | 'recipes' | 'dishes') => void;
   onCreateRequest?: (name: string, type: 'ingredient' | 'recipe' | 'dish') => void;
   incompleteOnly?: boolean;
-  isHybrid?: boolean; // New Prop for Production Mode
+  isHybrid?: boolean;
   onInspect?: (id: string, type: 'ingredient' | 'recipe') => void;
   inspectedItem?: {id: string, type: 'ingredient' | 'recipe'} | null;
+  onNewRecipe?: () => void;
+  onNewDish?: () => void;
+  kitchenMode?: boolean;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ 
-  onSelectItem, 
-  activeTab, 
-  availableTabs, 
-  allTabs = availableTabs, 
-  onTabChange, 
-  onCreateRequest, 
+const Sidebar: React.FC<SidebarProps> = ({
+  onSelectItem,
+  activeTab,
+  availableTabs,
+  allTabs = availableTabs,
+  onTabChange,
+  onCreateRequest,
   incompleteOnly = false,
   isHybrid = false,
   onInspect,
-  inspectedItem
+  inspectedItem,
+  onNewRecipe,
+  onNewDish,
+  kitchenMode = false,
 }) => {
   const { ingredients, recipes, dishes, loading } = useKitchenData();
   const [search, setSearch] = useState('');
@@ -147,6 +153,30 @@ const Sidebar: React.FC<SidebarProps> = ({
         )}
       </div>
 
+      {/* Quick-action buttons for recipes tab */}
+      {!isHybrid && kitchenMode && (
+        <div className="flex flex-col border-b border-[#333]">
+          <button onClick={onNewRecipe} className="w-full py-2.5 text-[9px] font-bold uppercase tracking-widest text-[#c8a96e] hover:bg-[#c8a96e] hover:text-black transition-colors border-b border-[#333]">
+            + New Recipe
+          </button>
+          <button onClick={() => onCreateRequest?.('', 'ingredient')} className="w-full py-2.5 text-[9px] font-bold uppercase tracking-widest text-[#888] hover:bg-[#1c1c1c] hover:text-[#c8a96e] transition-colors">
+            + New Ingredient
+          </button>
+        </div>
+      )}
+
+      {/* Quick-action buttons for dishes tab */}
+      {!isHybrid && activeTab === 'dishes' && (
+        <div className="flex flex-col border-b border-[#333]">
+          <button onClick={onNewDish} className="w-full py-2.5 text-[9px] font-bold uppercase tracking-widest text-[#c8a96e] hover:bg-[#c8a96e] hover:text-black transition-colors border-b border-[#333]">
+            + New Dish
+          </button>
+          <button onClick={onNewRecipe} className="w-full py-2.5 text-[9px] font-bold uppercase tracking-widest text-[#888] hover:bg-[#1c1c1c] hover:text-[#c8a96e] transition-colors">
+            + New Recipe
+          </button>
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="p-4 text-xs font-mono text-[#666666]">Loading data...</div>
@@ -184,7 +214,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               <div
                 key={item.id}
                 onClick={() => onSelectItem(item.id, itemType)}
-                className={`px-4 py-3 cursor-pointer group transition-colors 
+                className={`px-4 py-3 cursor-pointer group transition-colors border-r border-[#333333]
                   ${isIncomplete ? 'bg-red-950/10 border-b border-[#333333]' : ''}
                   ${isRecipeDirty ? 'border border-dashed border-[#A65D43] bg-[#A65D43]/5 my-1' : 'border-b border-[#333333] hover:bg-[#1c1c1c]'}
                 `}

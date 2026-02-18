@@ -62,6 +62,7 @@ export type RecipeStatus = 'pending_validation' | 'needs_resolution' | 'structur
 export interface Recipe {
   id: string;
   name: string;
+  category?: string; // Recipe category for organization
   batchSize: number;
   batchUnit: Unit;
   items: RecipeItem[];

@@ -1,660 +1,493 @@
-
-import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { useKitchenData } from '../hooks/useKitchenData';
-import { useConfirmation } from '../hooks/useConfirmation';
-import { Ingredient, Unit, Allergen, IngredientSupplier } from '../types';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useKitchenData, SupplierPriceItem } from '../hooks/useKitchenData';
+import { Ingredient, Unit, Allergen } from '../types';
 import { UI_STYLES, APPROVED_SUPPLIERS } from '../constants';
-import { detectAllergens, detectCategory, detectSupplierFromCategory, normalizeName } from '../utils/intelligence';
-import { lookupKcal } from '../utils/nutritionLookup';
+import { detectCategory, detectAllergens, normalizeName } from '../utils/intelligence';
+import { getProduceYield } from '../utils/yields';
 
-const INITIAL_FORM_STATE: Omit<Ingredient, 'id'> = {
-  name: '',
-  category: 'Dry Store',
-  suppliers: [{
-    name: 'Internal',
-    packCost: 0,
-    packSize: 1000,
-    packUnit: 'g',
-    isPreferred: true
-  }],
-  wastePercent: 0,
-  allergens: [],
-  kcalPer100: 0,
-  stockLevel: 0,
-  incomplete: false,
-  audited: false
-};
-
-interface IngredientManagerProps {
+interface Props {
   initialEditId?: string | null;
   isRecursive?: boolean;
   initialName?: string;
   onComplete?: (id: string) => void;
 }
 
-export const IngredientManager: React.FC<IngredientManagerProps> = ({ 
-  initialEditId, 
-  isRecursive = false,
-  initialName = '',
-  onComplete
-}) => {
-  const { ingredients, addIngredient, updateIngredient, deleteIngredient, mergeIngredients, recipes, dishes } = useKitchenData();
-  const { confirm } = useConfirmation();
+const UNITS: Unit[] = ['g', 'kg', 'ml', 'l', 'ea'];
+const CATEGORIES = ['Vegetable', 'Fruit', 'Meat', 'Fish', 'Dairy', 'Dry Store', 'Frozen', 'Alcohol', 'Uncategorized'];
 
-  // Filters
+const blankForm = (name = '') => ({
+  name,
+  supplier: 'David Catt',
+  packCost: '' as string | number,
+  packSize: '' as string | number,
+  packUnit: 'kg' as Unit,
+  category: name.length > 2 ? detectCategory(name) : 'Dry Store',
+  wastePercent: '' as string | number,
+  kcalPer100: '' as string | number,
+  allergens: name.length > 2 ? detectAllergens(name) : [] as Allergen[],
+});
+
+export const IngredientManager: React.FC<Props> = ({ initialEditId, isRecursive, initialName, onComplete }) => {
+  const { ingredients, addIngredient, updateIngredient, deleteIngredient, searchSupplierPriceGuide } = useKitchenData();
+
+  const [selectedId, setSelectedId] = useState<string | null>(initialEditId || null);
+  const [isNew, setIsNew] = useState(!initialEditId);
   const [search, setSearch] = useState('');
   const [filterSupplier, setFilterSupplier] = useState('ALL');
   const [filterCategory, setFilterCategory] = useState('ALL');
-  const [filterIncomplete, setFilterIncomplete] = useState(false);
+  const [form, setForm] = useState(blankForm(initialName));
+  const [suggestions, setSuggestions] = useState<SupplierPriceItem[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Form State
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState<Omit<Ingredient, 'id'>>({
-    ...INITIAL_FORM_STATE,
-    name: initialName,
-    suppliers: INITIAL_FORM_STATE.suppliers.map(s => ({...s})) // Deep copy
-  });
-  const [originalFormData, setOriginalFormData] = useState<Omit<Ingredient, 'id'>>({
-    ...INITIAL_FORM_STATE,
-    name: initialName,
-    suppliers: INITIAL_FORM_STATE.suppliers.map(s => ({...s})) // Deep copy
-  });
-  const [suggestedAllergens, setSuggestedAllergens] = useState<Allergen[]>([]);
-  const [isAutoDetecting, setIsAutoDetecting] = useState(false);
-  
-  // Nutrition Lookup State
-  const [isKcalLookingUp, setIsKcalLookingUp] = useState(false);
-  const [kcalSource, setKcalSource] = useState<'COFID' | 'USDA' | null>(null);
+  // Stock take mode
+  const [stockTakeMode, setStockTakeMode] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [stockInput, setStockInput] = useState('');
+  const [pendingChanges, setPendingChanges] = useState<Record<string, number>>({});
+  const [isCommitting, setIsCommitting] = useState(false);
+  const stockInputRef = useRef<HTMLInputElement>(null);
 
-  // Swap State
-  const [swappingId, setSwappingId] = useState<string | null>(null);
-  const [swapTargetId, setSwapTargetId] = useState<string>('');
-  const [swapSearch, setSwapSearch] = useState('');
-
-  // Dirty check
-  const isDirty = useMemo(() => {
-    return JSON.stringify(formData) !== JSON.stringify(originalFormData);
-  }, [formData, originalFormData]);
-
-  const uniqueSuppliers = useMemo(() => {
-    const all = new Set<string>();
-    ingredients.forEach(i => i.suppliers.forEach(s => all.add(s.name)));
-    return ['ALL', ...Array.from(all).sort()];
-  }, [ingredients]);
-
-  const categories = useMemo(() => ['ALL', 'Dry Store', 'Sub-Recipe', 'Dairy', 'Meat', 'Fish', 'Vegetable', 'Fruit', 'Frozen', 'Alcohol', 'Non-Food'], []);
-
-  // Intelligence: Name Watcher
+  // Auto-focus stock input when expanded item changes
   useEffect(() => {
-    if (formData.name && !editingId) {
-      setIsAutoDetecting(true);
-      
-      // Synchronous Detection
-      const category = detectCategory(formData.name);
-      const supplierName = detectSupplierFromCategory(category);
-      const allergens = detectAllergens(formData.name);
-      
-      setSuggestedAllergens(allergens);
-      
-      // Only auto-set supplier if user hasn't messed with it much (i.e., it's still default Internal)
-      setFormData(prev => {
-        const isDefaultSupplier = prev.suppliers.length === 1 && prev.suppliers[0].name === 'Internal';
-        const newSuppliers = isDefaultSupplier 
-          ? [{ ...prev.suppliers[0], name: supplierName }]
-          : prev.suppliers;
-
-        return {
-          ...prev,
-          category,
-          suppliers: newSuppliers,
-          allergens: [...new Set([...prev.allergens, ...allergens])]
-        };
-      });
-      
-      setTimeout(() => setIsAutoDetecting(false), 300);
-
-      // Async Kcal Lookup (Debounced)
-      const timer = setTimeout(() => handleManualKcalLookup(formData.name), 800);
-      return () => clearTimeout(timer);
+    if (expandedId && stockInputRef.current) {
+      stockInputRef.current.focus();
+      stockInputRef.current.select();
     }
-  }, [formData.name, editingId]);
+  }, [expandedId]);
 
+  // Load ingredient into form when selected
   useEffect(() => {
-    if (initialEditId && ingredients.length > 0) {
-      const target = ingredients.find(i => i.id === initialEditId);
-      if (target) {
-        handleEdit(target);
-      }
-    }
-  }, [initialEditId, ingredients]);
-
-  const handleManualKcalLookup = async (name: string) => {
-    if (!name) return;
-    setIsKcalLookingUp(true);
-    setKcalSource(null);
-    try {
-      const result = await lookupKcal(name);
-      if (result) {
-        setFormData(prev => ({ ...prev, kcalPer100: result.value }));
-        setKcalSource(result.source);
-      }
-    } catch (e) {
-      console.error("Kcal lookup failed", e);
-    } finally {
-      setIsKcalLookingUp(false);
-    }
-  };
-
-  const filteredIngredients = useMemo(() => {
-    return ingredients.filter(i => {
-      const matchesSearch = i.name.toLowerCase().includes(search.toLowerCase());
-      const matchesSupplier = filterSupplier === 'ALL' || i.suppliers.some(s => s.name === filterSupplier);
-      const matchesCategory = filterCategory === 'ALL' || i.category === filterCategory;
-      const matchesIncomplete = !filterIncomplete || i.incomplete;
-      return matchesSearch && matchesSupplier && matchesCategory && matchesIncomplete;
+    if (!selectedId) return;
+    const ing = ingredients.find(i => i.id === selectedId);
+    if (!ing) return;
+    const pref = ing.suppliers.find(s => s.isPreferred) || ing.suppliers[0];
+    setForm({
+      name: ing.name,
+      supplier: pref?.name || 'David Catt',
+      packCost: pref?.packCost ?? '',
+      packSize: pref?.packSize ?? '',
+      packUnit: pref?.packUnit || 'kg',
+      category: ing.category,
+      wastePercent: ing.wastePercent || '',
+      kcalPer100: ing.kcalPer100 || '',
+      allergens: ing.allergens,
     });
-  }, [ingredients, search, filterSupplier, filterCategory, filterIncomplete]);
+  }, [selectedId, ingredients]);
 
-  const handleEdit = async (ing: Ingredient) => {
-    if (swappingId) setSwappingId(null); // Close swap if opening edit
-
-    if (isDirty) {
-      const ok = await confirm("You have unsaved changes in the editor. Discard them?");
-      if (!ok) return;
+  // David Catt autocomplete (only on new ingredient)
+  useEffect(() => {
+    if (form.supplier !== 'David Catt' || String(form.name).length < 2) {
+      setSuggestions([]);
+      return;
     }
+    const t = setTimeout(async () => {
+      setSuggestions(await searchSupplierPriceGuide(String(form.name)));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [form.name, form.supplier, searchSupplierPriceGuide]);
 
-    const data: Omit<Ingredient, 'id'> = {
-      name: ing.name || '',
-      category: ing.category || 'Dry Store',
-      suppliers: ing.suppliers ? ing.suppliers.map(s => ({ ...s })) : [], // Deep copy suppliers
-      wastePercent: ing.wastePercent ?? 0, // Fix undefined
-      allergens: ing.allergens || [],
-      kcalPer100: ing.kcalPer100 ?? 0, // Fix undefined
-      stockLevel: ing.stockLevel ?? 0, // Fix undefined
-      incomplete: ing.incomplete || false,
-      audited: ing.audited || false
-    };
-    setFormData(data);
-    setOriginalFormData(data);
-    setEditingId(ing.id);
-    setSuggestedAllergens([]); 
-    setKcalSource(null); 
-  };
-
-  const handleResetForm = async () => {
-    if (isDirty) {
-      const ok = await confirm("Discard all unsaved changes?");
-      if (!ok) return;
-    }
-    // Correct deep copy logic to prevent state collisions
-    const resetState = {
-       ...INITIAL_FORM_STATE,
-       name: initialName,
-       suppliers: INITIAL_FORM_STATE.suppliers.map(s => ({ ...s }))
-    };
-    setFormData(resetState);
-    setOriginalFormData(resetState);
-    setEditingId(null);
-    setSuggestedAllergens([]);
-    setKcalSource(null);
-  };
-
-  const handleDelete = async (id: string, name: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const ok = await confirm(`Are you sure you want to delete ${name}? This cannot be undone.`);
-    if (ok) {
-      await deleteIngredient(id);
-      if (editingId === id) {
-        handleResetForm();
-      }
-    }
-  };
-
-  const handleNameBlur = () => {
-    if (formData.name) {
-      const normalized = normalizeName(formData.name);
-      if (normalized !== formData.name) {
-        setFormData(prev => ({ ...prev, name: normalized }));
-      }
-    }
-  };
-
-  const updateSupplier = (index: number, field: keyof IngredientSupplier, value: any) => {
-    setFormData(prev => {
-      const newSuppliers = [...prev.suppliers];
-      newSuppliers[index] = { ...newSuppliers[index], [field]: value };
-      return { ...prev, suppliers: newSuppliers };
-    });
-  };
-
-  const togglePreferredSupplier = (index: number) => {
-    setFormData(prev => {
-      const newSuppliers = prev.suppliers.map((s, i) => ({
-        ...s,
-        isPreferred: i === index
-      }));
-      return { ...prev, suppliers: newSuppliers };
-    });
-  };
-
-  const addSupplier = () => {
-    setFormData(prev => ({
-      ...prev,
-      // Default to first approved supplier
-      suppliers: [...prev.suppliers, { name: APPROVED_SUPPLIERS[0], packCost: 0, packSize: 1, packUnit: 'kg', isPreferred: false }]
+  const handleNameChange = (val: string) => {
+    setForm(f => ({
+      ...f,
+      name: val,
+      ...(val.length > 2 ? { category: detectCategory(val), allergens: detectAllergens(val) } : {}),
     }));
   };
 
-  const removeSupplier = (index: number) => {
-    if (formData.suppliers.length <= 1) return; // Prevent deleting last supplier
-    setFormData(prev => {
-      const newSuppliers = prev.suppliers.filter((_, i) => i !== index);
-      // Ensure one is preferred
-      if (!newSuppliers.some(s => s.isPreferred)) {
-        newSuppliers[0].isPreferred = true;
-      }
-      return { ...prev, suppliers: newSuppliers };
-    });
+  const handleSuggestionSelect = (s: SupplierPriceItem) => {
+    const category = detectCategory(s.name);
+    const yieldPct = getProduceYield(s.name);
+    const allergens = s.allergens && s.allergens.length > 0
+      ? s.allergens.filter(a => Object.values(Allergen).includes(a as Allergen)) as Allergen[]
+      : detectAllergens(s.name);
+    setForm(f => ({
+      ...f,
+      name: s.name,
+      packCost: s.packCost,
+      packSize: s.packSize,
+      packUnit: s.packUnit as Unit,
+      category,
+      allergens,
+      kcalPer100: s.kcalPer100 ?? 0,
+      ...(yieldPct !== null ? { wastePercent: 100 - yieldPct } : {}),
+    }));
+    setSuggestions([]);
+  };
+
+  const handleNew = () => {
+    setSelectedId(null);
+    setIsNew(true);
+    setForm(blankForm());
+  };
+
+  const handleSelect = (id: string) => {
+    setSelectedId(id);
+    setIsNew(false);
+    setSuggestions([]);
   };
 
   const handleSave = async () => {
-    if (!formData.name) return;
-
-    let finalFormData = { 
-      ...formData, 
-      name: normalizeName(formData.name), 
-      audited: true, 
-      incomplete: false 
-    };
-    
+    if (!form.name || !form.packCost || !form.packSize) return;
+    setIsSaving(true);
     try {
-      if (editingId) {
-        await updateIngredient(editingId, finalFormData);
-        setOriginalFormData(finalFormData);
+      const payload: Omit<Ingredient, 'id'> = {
+        name: normalizeName(String(form.name)),
+        category: form.category,
+        suppliers: [{ name: form.supplier, packCost: Number(form.packCost), packSize: Number(form.packSize), packUnit: form.packUnit, isPreferred: true }],
+        wastePercent: Number(form.wastePercent) || 0,
+        allergens: form.allergens,
+        kcalPer100: Number(form.kcalPer100) || 0,
+        stockLevel: 0,
+        audited: true,
+      };
+      if (isNew) {
+        const created = await addIngredient(payload);
+        if (onComplete) { onComplete(created.id); return; }
+        setSelectedId(created.id);
+        setIsNew(false);
+      } else if (selectedId) {
+        await updateIngredient(selectedId, payload);
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedId || !window.confirm('Delete this ingredient?')) return;
+    await deleteIngredient(selectedId);
+    handleNew();
+  };
+
+  const listSuppliers = useMemo(() =>
+    ['ALL', ...Array.from(new Set(ingredients.flatMap(i => i.suppliers.map(s => s.name)))).sort()],
+    [ingredients]);
+
+  const listCategories = useMemo(() =>
+    ['ALL', ...Array.from(new Set(ingredients.map(i => i.category))).sort()],
+    [ingredients]);
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return ingredients.filter(i => {
+      const matchesSearch = i.name.toLowerCase().includes(q) || i.category.toLowerCase().includes(q);
+      const matchesSupplier = filterSupplier === 'ALL' || i.suppliers.some(s => s.name === filterSupplier);
+      const matchesCategory = filterCategory === 'ALL' || i.category === filterCategory;
+      return matchesSearch && matchesSupplier && matchesCategory;
+    });
+  }, [ingredients, search, filterSupplier, filterCategory]);
+
+  // Stock take handlers
+  const handleStockItemClick = useCallback((ing: Ingredient) => {
+    if (expandedId === ing.id) {
+      setExpandedId(null);
+      return;
+    }
+    const currentVal = pendingChanges[ing.id] ?? ing.stockLevel;
+    setExpandedId(ing.id);
+    setStockInput(String(currentVal));
+  }, [expandedId, pendingChanges]);
+
+  const handleStockInputKey = useCallback((e: React.KeyboardEvent, ing: Ingredient) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const newLevel = parseFloat(stockInput);
+      const updated = { ...pendingChanges };
+      if (!isNaN(newLevel)) {
+        updated[ing.id] = newLevel;
+        setPendingChanges(updated);
+      }
+      // Move to next item in filtered list
+      const idx = filtered.findIndex(i => i.id === expandedId);
+      const nextItem = filtered[idx + 1];
+      if (nextItem) {
+        const nextVal = updated[nextItem.id] ?? nextItem.stockLevel;
+        setExpandedId(nextItem.id);
+        setStockInput(String(nextVal));
       } else {
-        const docRef = await addIngredient(finalFormData);
-        if (isRecursive && onComplete) {
-          onComplete(docRef.id);
-        }
+        setExpandedId(null);
       }
-      if (!isRecursive) {
-        // Deep copy reset state
-        const resetState = {
-           ...INITIAL_FORM_STATE,
-           name: initialName,
-           suppliers: INITIAL_FORM_STATE.suppliers.map(s => ({ ...s }))
-        };
-        setFormData(resetState);
-        setOriginalFormData(resetState);
-        setEditingId(null);
-        setSuggestedAllergens([]);
-        setKcalSource(null);
+    } else if (e.key === 'Escape') {
+      setExpandedId(null);
+    }
+  }, [stockInput, pendingChanges, filtered, expandedId]);
+
+  const handleCommitStock = async () => {
+    const entries = Object.entries(pendingChanges);
+    if (entries.length === 0) return;
+    setIsCommitting(true);
+    try {
+      for (const [id, level] of entries) {
+        await updateIngredient(id, { stockLevel: level });
       }
-    } catch (e) {
-      console.error(e);
+      setPendingChanges({});
+      setStockTakeMode(false);
+      setExpandedId(null);
+    } finally {
+      setIsCommitting(false);
     }
   };
 
-  // --- SWAP & PURGE LOGIC ---
-  const handleInitiateSwap = (ing: Ingredient, e: React.MouseEvent) => {
-     e.stopPropagation();
-     setSwappingId(ing.id);
-     setSwapSearch('');
-     setSwapTargetId('');
-  };
+  const pendingCount = Object.keys(pendingChanges).length;
 
-  const handleExecuteSwap = async (sourceIng: Ingredient) => {
-    if (!swapTargetId) return;
-    const targetIng = ingredients.find(i => i.id === swapTargetId);
-    if (!targetIng) return;
+  const inp = UI_STYLES.input + ' w-full text-[#e0e0e0]';
+  const lbl = UI_STYLES.label;
+  const selInp = `${UI_STYLES.input} !py-1 !px-2 !text-[9px] w-full`;
 
-    // Calculate Impact
-    const affectedRecipes = recipes.filter(r => r.items.some(i => i.type === 'ingredient' && i.id === sourceIng.id));
-    const affectedDishes = dishes.filter(d => d.items.some(i => i.type === 'ingredient' && i.id === sourceIng.id));
-    const totalImpact = affectedRecipes.length + affectedDishes.length;
+  const formPanel = (
+    <div className="flex-1 flex flex-col h-full overflow-hidden">
+      <div className="h-12 border-b border-[#333] flex items-center px-6 justify-between flex-shrink-0 bg-[#1c1c1c]">
+        <span className="text-[10px] font-bold text-[#c8a96e] uppercase tracking-[0.2em]">
+          {isNew ? 'New Ingredient' : (String(form.name) || 'Edit Ingredient')}
+        </span>
+      </div>
 
-    const ok = await confirm(`SWAP "${sourceIng.name}" WITH "${targetIng.name}"?\nThis will update ${totalImpact} recipes/dishes and delete the original.`);
-    
-    if (ok) {
-       await mergeIngredients(sourceIng.id, targetIng.id, sourceIng.name);
-       setSwappingId(null);
-       if (editingId === sourceIng.id) {
-          handleResetForm();
-       }
-    }
-  };
+      <div className="flex-1 overflow-y-auto p-6 space-y-5">
+        <div>
+          <label className={lbl}>Supplier</label>
+          <select value={form.supplier} onChange={e => setForm(f => ({ ...f, supplier: e.target.value }))} className={inp}>
+            {APPROVED_SUPPLIERS.filter(s => s !== 'Internal').map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
 
-  const filteredSwapTargets = useMemo(() => {
-     if (!swapSearch) return [];
-     return ingredients
-       .filter(i => i.id !== swappingId && i.name.toLowerCase().includes(swapSearch.toLowerCase()))
-       .slice(0, 10);
-  }, [ingredients, swapSearch, swappingId]);
-
-  const showIncompleteWarning = useMemo(() => {
-    if (!formData.incomplete) return false;
-    const pref = formData.suppliers.find(s => s.isPreferred) || formData.suppliers[0];
-    if (pref.name === 'Internal') return true; 
-    
-    // An ingredient is only "Incomplete" (stub) if it has no supplier, or if packCost / packSize is 0.
-    // We do NOT check stockLevel or kcalPer100.
-    if (!pref) return true;
-    return pref.packCost === 0 || pref.packSize === 0;
-  }, [formData.incomplete, formData.suppliers]);
-
-  return (
-    <div className={`flex h-full bg-[#111111] text-[#e0e0e0] divide-x divide-[#333333] ${isRecursive ? 'overflow-hidden' : ''} relative`}>
-      
-      {!isRecursive && (
-        <div className="w-80 flex flex-col bg-[#0d0d0d]">
-          <div className="p-4 border-b border-[#333333] space-y-3">
-            <h2 className="text-[10px] font-bold uppercase tracking-widest text-[#c8a96e]">Master Registry</h2>
-            <input 
-              type="text" 
-              placeholder="Search items..." 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className={`w-full ${UI_STYLES.input} !text-xs`}
-            />
-            <div className="grid grid-cols-2 gap-2">
-              <div className="flex flex-col">
-                 <label className="text-[8px] font-bold uppercase text-[#666666] mb-1">Supplier</label>
-                 <select 
-                   value={filterSupplier}
-                   onChange={e => setFilterSupplier(e.target.value)}
-                   className={`${UI_STYLES.input} !py-1 !px-2 !text-[10px]`}
-                 >
-                   {uniqueSuppliers.map(s => <option key={s} value={s}>{s}</option>)}
-                 </select>
-              </div>
-              <div className="flex flex-col">
-                 <label className="text-[8px] font-bold uppercase text-[#666666] mb-1">Category</label>
-                 <select 
-                   value={filterCategory}
-                   onChange={e => setFilterCategory(e.target.value)}
-                   className={`${UI_STYLES.input} !py-1 !px-2 !text-[10px]`}
-                 >
-                   {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                 </select>
-              </div>
+        <div className="relative">
+          <label className={lbl}>Name</label>
+          <input
+            type="text"
+            value={String(form.name)}
+            onChange={e => handleNameChange(e.target.value)}
+            placeholder={form.supplier === 'David Catt' && isNew ? 'Type to search price guide…' : 'Ingredient name'}
+            className={inp}
+            autoComplete="off"
+          />
+          {suggestions.length > 0 && (
+            <div className="absolute z-10 w-full mt-0.5 bg-[#111] border border-[#c8a96e] max-h-48 overflow-y-auto shadow-xl">
+              {suggestions.map(s => (
+                <div key={s.id} onMouseDown={() => handleSuggestionSelect(s)}
+                  className="px-3 py-2 cursor-pointer hover:bg-[#005f73] border-b border-[#222] last:border-0">
+                  <div className="text-[10px] font-bold uppercase text-[#c8a96e]">{s.name}</div>
+                  <div className="text-[8px] text-[#666] font-mono">£{s.packCost} / {s.packSize}{s.packUnit}</div>
+                </div>
+              ))}
             </div>
-            <button 
-              onClick={() => setFilterIncomplete(!filterIncomplete)}
-              className={`w-full py-2 text-[8px] font-bold uppercase tracking-widest border transition-all ${filterIncomplete ? 'bg-red-900 border-red-500 text-white' : 'border-[#333333] text-[#666666] hover:text-[#888888]'}`}
-            >
-              {filterIncomplete ? 'Showing Incomplete Only' : 'Filter by Incomplete'}
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            {filteredIngredients.length === 0 ? (
-              <div className="p-12 text-center text-[#666666] font-mono text-[10px] uppercase">No items match filters</div>
-            ) : (
-              <div className="divide-y divide-[#1a1a1a]">
-                {filteredIngredients.map((ing) => {
-                  const pref = ing.suppliers.find(s => s.isPreferred) || ing.suppliers[0];
-                  const isSwapping = swappingId === ing.id;
-                  
-                  if (isSwapping) {
-                     // SWAP INTERFACE ROW
-                     return (
-                        <div key={ing.id} className="p-3 bg-[#111] border-l-4 border-l-[#005f73] flex flex-col gap-2">
-                           <div className="flex justify-between items-center">
-                              <span className="text-[10px] font-bold uppercase text-[#005f73] truncate w-32">{ing.name}</span>
-                              <button onClick={(e) => { e.stopPropagation(); setSwappingId(null); }} className="text-[8px] text-[#666] hover:text-white uppercase">Cancel</button>
-                           </div>
-                           <div className="relative">
-                              <input 
-                                autoFocus
-                                type="text"
-                                placeholder="SEARCH REPLACEMENT..."
-                                value={swapSearch}
-                                onChange={(e) => setSwapSearch(e.target.value)}
-                                className="w-full bg-[#1c1c1c] border border-[#333] text-[9px] text-white px-2 py-1 outline-none focus:border-[#005f73]"
-                              />
-                              {swapSearch && !swapTargetId && (
-                                 <div className="absolute top-full left-0 w-full bg-[#1c1c1c] border border-[#333] z-50 max-h-32 overflow-y-auto shadow-xl">
-                                    {filteredSwapTargets.map(target => (
-                                       <div 
-                                         key={target.id}
-                                         onClick={() => { setSwapTargetId(target.id); setSwapSearch(target.name); }}
-                                         className="p-1.5 hover:bg-[#005f73] hover:text-white cursor-pointer text-[9px] uppercase truncate"
-                                       >
-                                         {target.name}
-                                       </div>
-                                    ))}
-                                    {filteredSwapTargets.length === 0 && <div className="p-1.5 text-[8px] text-[#666]">NO MATCHES</div>}
-                                 </div>
-                              )}
-                           </div>
-                           <button 
-                             disabled={!swapTargetId}
-                             onClick={() => handleExecuteSwap(ing)}
-                             className="w-full bg-[#005f73] text-white text-[9px] font-bold uppercase py-1.5 hover:bg-[#004a5d] disabled:opacity-50"
-                           >
-                             SWAP ALL
-                           </button>
-                        </div>
-                     );
-                  }
+          )}
+        </div>
 
-                  // NORMAL ROW
-                  return (
-                    <div 
-                      key={ing.id} 
-                      onClick={() => handleEdit(ing)}
-                      className={`p-3 cursor-pointer group transition-all flex justify-between items-center ${
-                        editingId === ing.id ? 'bg-[#c8a96e]/10 border-l-2 border-l-[#c8a96e]' : 'hover:bg-[#151515] border-l-2 border-l-transparent'
-                      } ${ing.incomplete ? 'bg-red-950/5' : ''}`}
-                    >
-                      <div className="flex flex-col overflow-hidden">
-                        <div className={`text-xs uppercase tracking-wide font-medium flex items-center gap-2 ${editingId === ing.id ? 'text-[#c8a96e]' : 'text-[#888888] group-hover:text-white'}`}>
-                          {ing.incomplete && <div className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />}
-                          {ing.name}
-                          {ing.audited && <div className="w-1 h-1 rounded-full bg-[#c8a96e] opacity-40 ml-1" title="Verified" />}
-                        </div>
-                        <div className="text-[8px] font-mono text-[#444] mt-0.5">{ing.category} // {pref?.name}</div>
-                      </div>
-                      <div className="flex flex-col gap-1 items-end">
-                        {ing.incomplete && <span className="text-[7px] font-mono text-red-500 uppercase border border-red-900 px-1">STUB</span>}
-                        <button 
-                          onClick={(e) => handleInitiateSwap(ing, e)}
-                          className="opacity-0 group-hover:opacity-100 text-[8px] font-bold uppercase text-[#005f73] hover:bg-[#005f73] hover:text-white px-1 transition-all"
-                        >
-                          SWAP
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className={lbl}>Pack Cost £</label>
+            <input type="number" value={form.packCost as any} onChange={e => setForm(f => ({ ...f, packCost: e.target.value }))} className={inp} min="0" step="0.01" />
           </div>
-          <div className="p-3 border-t border-[#333333] bg-[#111111]">
-             <button onClick={handleResetForm} className="w-full py-2 text-[10px] font-bold uppercase tracking-widest text-[#666666] hover:text-[#c8a96e] border border-dashed border-[#333333] hover:border-[#c8a96e] transition-all">
-               + Add Ingredient
-             </button>
+          <div>
+            <label className={lbl}>Pack Size</label>
+            <input type="number" value={form.packSize as any} onChange={e => setForm(f => ({ ...f, packSize: e.target.value }))} className={inp} min="0" />
+          </div>
+          <div>
+            <label className={lbl}>Unit</label>
+            <select value={form.packUnit} onChange={e => setForm(f => ({ ...f, packUnit: e.target.value as Unit }))} className={inp}>
+              {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+            </select>
           </div>
         </div>
-      )}
 
-      <div className="flex-1 flex flex-col bg-[#111111] overflow-hidden">
-        {showIncompleteWarning && (
-          <div className="bg-red-950/40 border-b border-red-900 p-2 text-center flex items-center justify-center gap-4">
-            <span className="text-[9px] font-bold text-red-500 uppercase tracking-[0.4em] animate-pulse">! DATA_RECONCILIATION_REQUIRED</span>
-            <span className="text-[8px] text-red-400 uppercase font-mono">Stub record detected. Complete pricing and yield data to finalize the registry entry.</span>
+        <div>
+          <label className={lbl}>Category <span className="text-[#555] normal-case font-normal">(auto-detected)</span></label>
+          <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className={inp}>
+            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={lbl}>Yield %</label>
+            <input type="number"
+              value={form.wastePercent === '' ? '' : 100 - Number(form.wastePercent)}
+              onChange={e => setForm(f => ({ ...f, wastePercent: e.target.value === '' ? '' : 100 - Number(e.target.value) }))}
+              className={inp} min="0" max="100" />
+          </div>
+          <div>
+            <label className={lbl}>Kcal / 100g</label>
+            <input type="number" value={form.kcalPer100 as any} onChange={e => setForm(f => ({ ...f, kcalPer100: e.target.value }))} className={inp} min="0" />
+          </div>
+        </div>
+
+        <div>
+          <label className={lbl}>Allergens <span className="text-[#555] normal-case font-normal">(auto-detected, toggle to override)</span></label>
+          <div className="flex flex-wrap gap-1.5 mt-1">
+            {Object.values(Allergen).map(a => {
+              const active = form.allergens.includes(a);
+              return (
+                <button key={a} type="button"
+                  onClick={() => setForm(f => ({ ...f, allergens: active ? f.allergens.filter(x => x !== a) : [...f.allergens, a] }))}
+                  className={`text-[9px] uppercase font-bold px-2 py-1 border transition-colors ${active ? 'bg-[#c8a96e] text-black border-[#c8a96e]' : 'text-[#555] border-[#333] hover:border-[#c8a96e] hover:text-[#c8a96e]'}`}>
+                  {a}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-shrink-0 border-t border-[#333] px-6 py-4 flex gap-3 bg-[#1c1c1c]">
+        <button onClick={handleSave} disabled={isSaving || !form.name}
+          className="flex-1 py-2 bg-[#c8a96e] text-black text-[10px] font-bold uppercase tracking-widest hover:bg-[#e0c080] disabled:opacity-40 transition-colors">
+          {isSaving ? 'Saving…' : 'Save Ingredient'}
+        </button>
+        {!isNew && selectedId && !isRecursive && (
+          <button onClick={handleDelete}
+            className="px-4 py-2 border border-[#ff4d4d] text-[#ff4d4d] text-[10px] font-bold uppercase tracking-widest hover:bg-[#ff4d4d] hover:text-black transition-colors">
+            Delete
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
+  if (isRecursive) return formPanel;
+
+  return (
+    <div className="flex h-full w-full bg-[#111111]">
+      {/* Left: ingredient list */}
+      <div className="w-72 flex-shrink-0 border-r border-[#333] flex flex-col h-full">
+
+        {/* Action buttons row */}
+        {!stockTakeMode ? (
+          <div className="flex flex-col border-b border-[#333]">
+            <button onClick={handleNew} className="w-full py-2.5 text-[9px] font-bold uppercase tracking-widest text-[#c8a96e] hover:bg-[#c8a96e] hover:text-black transition-colors border-b border-[#333]">
+              + New Ingredient
+            </button>
+            <button onClick={() => setStockTakeMode(true)} className="w-full py-2.5 text-[9px] font-bold uppercase tracking-widest text-[#888] hover:bg-[#1c1c1c] hover:text-[#c8a96e] transition-colors">
+              Stock Take
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col border-b border-[#333]">
+            <div className="flex items-center justify-between px-3 py-2 bg-[#005f73]/20 border-b border-[#005f73]/40">
+              <span className="text-[9px] font-bold uppercase tracking-widest text-[#3a9db8]">Stock Take Mode</span>
+              <button
+                onClick={() => { setStockTakeMode(false); setExpandedId(null); setPendingChanges({}); }}
+                className="text-[8px] uppercase tracking-widest text-[#888] hover:text-white border border-[#333] px-2 py-1 hover:border-[#555] transition-colors"
+              >
+                Exit
+              </button>
+            </div>
+            {pendingCount > 0 && (
+              <button
+                onClick={handleCommitStock}
+                disabled={isCommitting}
+                className="w-full py-2.5 text-[9px] font-bold uppercase tracking-widest bg-[#3a9db8] text-black hover:bg-[#2a8fa6] disabled:opacity-50 transition-colors"
+              >
+                {isCommitting ? 'Saving…' : `Commit ${pendingCount} Change${pendingCount !== 1 ? 's' : ''}`}
+              </button>
+            )}
           </div>
         )}
 
-        <div className="p-4 border-b border-[#333333] flex justify-between items-center bg-[#1c1c1c]">
-          <h3 className="text-xs font-bold uppercase tracking-widest text-[#c8a96e]">
-            {editingId ? `Edit: ${formData.name}` : isRecursive ? `Define New: ${initialName}` : 'Ingredient Details'}
-          </h3>
-          <div className="flex items-center gap-4">
-            {isAutoDetecting && <span className="text-[9px] font-mono text-[#c8a96e] animate-pulse uppercase tracking-widest">Running Intelligence...</span>}
-            {isDirty && !isAutoDetecting && <span className="text-[9px] font-mono text-yellow-500 animate-pulse uppercase">Unsaved Changes</span>}
-            {editingId && (
-              <button onClick={(e) => handleDelete(editingId, formData.name, e)} className="text-[9px] font-bold uppercase text-red-800 hover:text-red-500 transition-colors">Delete</button>
-            )}
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-4 md:p-8 w-full space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
-            <div className="md:col-span-1">
-              <label className={UI_STYLES.label}>Ingredient Name</label>
-              <input 
-                value={formData.name} 
-                onChange={e => setFormData({...formData, name: e.target.value})} 
-                onBlur={handleNameBlur}
-                className={`w-full ${UI_STYLES.input} text-base`} 
-                placeholder="e.g. Maldon Sea Salt" 
-              />
+        {/* Search + filters */}
+        <div className="p-3 border-b border-[#333] flex-shrink-0 flex flex-col gap-2">
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search ingredients…"
+            className="w-full bg-[#1c1c1c] border border-[#333] px-3 py-2 text-[11px] text-[#e0e0e0] focus:outline-none focus:border-[#c8a96e] font-mono placeholder:text-[#444]"
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[8px] font-bold uppercase text-[#666] mb-1 block">Supplier</label>
+              <select value={filterSupplier} onChange={e => setFilterSupplier(e.target.value)} className={selInp}>
+                {listSuppliers.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
             </div>
             <div>
-              <label className={UI_STYLES.label}>Category</label>
-              <select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className={`w-full ${UI_STYLES.input}`}>
-                {categories.filter(c => c !== 'ALL').map(c => <option key={c} value={c}>{c}</option>)}
+              <label className="text-[8px] font-bold uppercase text-[#666] mb-1 block">Category</label>
+              <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} className={selInp}>
+                {listCategories.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
           </div>
-
-          {/* Suppliers Panel */}
-          <div className={`bg-[#1c1c1c] border p-4 space-y-4 ${showIncompleteWarning ? 'border-red-900/50' : 'border-[#333333]'}`}>
-            <div className="flex justify-between items-center border-b border-[#333333] pb-2">
-              <h4 className={`text-[10px] font-bold uppercase tracking-widest ${showIncompleteWarning ? 'text-red-400' : 'text-[#888888]'}`}>Supply Chain & Economics</h4>
-              <button onClick={addSupplier} className="text-[9px] uppercase font-bold text-[#c8a96e] hover:text-white">+ Add Supplier</button>
-            </div>
-            
-            <div className="space-y-3">
-              {formData.suppliers.map((supplier, idx) => {
-                const unitCost = supplier.packSize > 0 ? supplier.packCost / supplier.packSize : 0;
-                return (
-                  <div key={idx} className={`grid grid-cols-12 gap-2 items-center p-2 border ${supplier.isPreferred ? 'border-[#c8a96e] bg-[#c8a96e]/5' : 'border-[#333333] bg-[#151515]'}`}>
-                    <div className="col-span-1 flex justify-center">
-                       <input 
-                         type="radio" 
-                         checked={supplier.isPreferred} 
-                         onChange={() => togglePreferredSupplier(idx)}
-                         className="accent-[#c8a96e] cursor-pointer"
-                         title="Set as Preferred Supplier"
-                       />
-                    </div>
-                    <div className="col-span-3">
-                      <label className="text-[7px] font-mono text-[#666] uppercase block mb-1">Supplier Name</label>
-                      <select 
-                        value={supplier.name}
-                        onChange={(e) => updateSupplier(idx, 'name', e.target.value)}
-                        className={`w-full ${UI_STYLES.input} !text-[10px] !py-1 !px-2`}
-                      >
-                         {!APPROVED_SUPPLIERS.includes(supplier.name) && supplier.name && (
-                            <option value={supplier.name} disabled>{supplier.name} (Invalid)</option>
-                         )}
-                         {APPROVED_SUPPLIERS.map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                    </div>
-                    <div className="col-span-2">
-                      <label className="text-[7px] font-mono text-[#666] uppercase block mb-1">Cost (£)</label>
-                      <input 
-                        type="number" step="0.01"
-                        value={supplier.packCost}
-                        onChange={(e) => updateSupplier(idx, 'packCost', parseFloat(e.target.value) || 0)}
-                        className={`w-full ${UI_STYLES.input} !text-[10px] !py-1 !px-2`}
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="text-[7px] font-mono text-[#666] uppercase block mb-1">Pack Size</label>
-                      <input 
-                        type="number"
-                        value={supplier.packSize}
-                        onChange={(e) => updateSupplier(idx, 'packSize', parseFloat(e.target.value) || 0)}
-                        className={`w-full ${UI_STYLES.input} !text-[10px] !py-1 !px-2`}
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="text-[7px] font-mono text-[#666] uppercase block mb-1">Unit</label>
-                      <select 
-                        value={supplier.packUnit}
-                        onChange={(e) => updateSupplier(idx, 'packUnit', e.target.value)}
-                        className={`w-full ${UI_STYLES.input} !text-[10px] !py-1 !px-2`}
-                      >
-                        <option value="g">g</option><option value="ml">ml</option><option value="kg">kg</option><option value="l">l</option><option value="ea">ea</option>
-                      </select>
-                    </div>
-                    <div className="col-span-2 flex flex-col items-end justify-between h-full">
-                       <button onClick={() => removeSupplier(idx)} className="text-[#444] hover:text-red-500 mb-1">
-                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                       </button>
-                       <span className="text-[9px] font-mono text-[#c8a96e]">£{unitCost.toFixed(4)}/{supplier.packUnit}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4 pt-2 border-t border-[#333333]">
-              <div><label className={UI_STYLES.label}>Current Stock ({formData.suppliers.find(s=>s.isPreferred)?.packUnit || 'units'})</label><input type="number" value={formData.stockLevel} onChange={e => setFormData({...formData, stockLevel: parseFloat(e.target.value) || 0})} className={`w-full ${UI_STYLES.input}`} /></div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="space-y-4">
-              <label className={UI_STYLES.label}>Yield Profile (%)</label>
-              <div className="flex items-center gap-4">
-                <input type="range" min="0" max="100" value={100 - (formData.wastePercent || 0)} onChange={e => setFormData({...formData, wastePercent: 100 - (parseFloat(e.target.value) || 0)})} className="flex-1 accent-[#c8a96e]" />
-                <span className="text-sm font-mono w-12 text-[#c8a96e]">{100 - (formData.wastePercent || 0)}%</span>
-              </div>
-            </div>
-            <div>
-               <label className={UI_STYLES.label}>
-                 Energy Density (kcal/100g)
-                 {kcalSource && <span className="ml-2 text-[8px] font-mono text-[#444] uppercase tracking-widest border border-[#333] px-1 bg-[#222] text-[#888]">{kcalSource}</span>}
-               </label>
-               <div className="relative flex gap-2">
-                 <input type="number" value={formData.kcalPer100} onChange={e => { setFormData({...formData, kcalPer100: parseFloat(e.target.value) || 0}); setKcalSource(null); }} className={`flex-1 ${UI_STYLES.input}`} />
-                 <button 
-                  onClick={() => handleManualKcalLookup(formData.name)}
-                  className="px-3 border border-[#333] hover:border-[#c8a96e] text-[#666] hover:text-[#c8a96e] text-[9px] font-bold uppercase"
-                 >
-                   SEARCH
-                 </button>
-                 {isKcalLookingUp && <div className="absolute inset-0 bg-[#1c1c1c]/90 text-[#666] text-[10px] font-mono flex items-center px-3 animate-pulse border border-[#333]">LOOKING_UP...</div>}
-               </div>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <label className={UI_STYLES.label}>Allergen Risk Declaration</label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              {Object.values(Allergen).map((allergen) => {
-                const isSuggested = suggestedAllergens.includes(allergen);
-                return (
-                  <label key={allergen} className={`flex items-center justify-between p-2 border text-[9px] cursor-pointer transition-all ${formData.allergens.includes(allergen) ? 'bg-[#c8a96e]/10 border-[#c8a96e] text-[#c8a96e]' : 'bg-[#1c1c1c] border-[#333333] text-[#666666] hover:border-[#888888]'} ${isSuggested ? 'ring-1 ring-[#c8a96e]/50 ring-inset' : ''}`}>
-                    <input type="checkbox" className="hidden" checked={formData.allergens.includes(allergen)} onChange={() => {
-                      const cur = formData.allergens;
-                      setFormData({...formData, allergens: cur.includes(allergen) ? cur.filter(a => a !== allergen) : [...cur, allergen]});
-                    }} />
-                    <span className="truncate uppercase font-bold">{allergen}</span>
-                    {isSuggested && !formData.allergens.includes(allergen) && <span className="text-[7px] text-[#c8a96e] font-mono tracking-tighter">[AUTO_DETECT]</span>}
-                  </label>
-                );
-              })}
-            </div>
-          </div>
         </div>
 
-        <div className="p-6 border-t border-[#333333] bg-[#1c1c1c] flex justify-end gap-3 flex-shrink-0">
-          <button onClick={handleResetForm} className={`${UI_STYLES.button} border border-[#333333] text-[#888888] hover:bg-[#333333] hover:text-white`}>
-            {isDirty ? 'Discard' : 'Clear'}
-          </button>
-          <button 
-            disabled={!isDirty || !formData.name} 
-            onClick={handleSave} 
-            className={`${UI_STYLES.button} bg-[#c8a96e] text-black hover:bg-[#b8985e] px-8 font-bold border border-black/20 disabled:opacity-20`}
-          >
-            {editingId ? 'Save Changes' : isRecursive ? 'Save & Add' : 'Save Changes'}
-          </button>
+        {/* List */}
+        <div className="flex-1 overflow-y-auto">
+          {filtered.map((ing, idx) => {
+            const pref = ing.suppliers.find(s => s.isPreferred) || ing.suppliers[0];
+            const packUnit = pref?.packUnit || '';
+            const isExpanded = expandedId === ing.id;
+            const hasPending = pendingChanges[ing.id] !== undefined;
+            const displayLevel = pendingChanges[ing.id] ?? ing.stockLevel;
+
+            if (stockTakeMode) {
+              return (
+                <div key={ing.id} className="border-b border-[#1a1a1a] border-r border-[#333]">
+                  {/* Item row */}
+                  <div
+                    onClick={() => handleStockItemClick(ing)}
+                    className={`px-4 py-2.5 cursor-pointer flex items-center justify-between transition-colors
+                      ${isExpanded ? 'bg-[#005f73]/20 border-l-2 border-l-[#3a9db8]' : hasPending ? 'bg-[#c8a96e]/5 border-l-2 border-l-[#c8a96e]' : 'border-l-2 border-l-transparent hover:bg-[#1c1c1c]'}`}
+                  >
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      {hasPending && !isExpanded && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-[#c8a96e] flex-shrink-0" />
+                      )}
+                      <span className={`text-[10px] font-bold uppercase truncate ${hasPending ? 'text-[#c8a96e]' : 'text-[#e0e0e0]'}`}>
+                        {ing.name}
+                      </span>
+                    </div>
+                    <span className="text-[9px] font-mono text-[#666] flex-shrink-0 ml-2">
+                      {displayLevel}{packUnit}
+                    </span>
+                  </div>
+
+                  {/* Accordion */}
+                  {isExpanded && (
+                    <div className="px-4 py-3 bg-[#041824] border-t border-[#005f73]/30">
+                      <label className="text-[8px] font-bold uppercase text-[#3a9db8] mb-1.5 block">
+                        New Stock Level ({packUnit})
+                      </label>
+                      <div className="flex gap-2 items-center">
+                        <input
+                          ref={stockInputRef}
+                          type="number"
+                          value={stockInput}
+                          onChange={e => setStockInput(e.target.value)}
+                          onKeyDown={e => handleStockInputKey(e, ing)}
+                          className="flex-1 bg-[#111] border border-[#3a9db8]/40 focus:border-[#3a9db8] px-2 py-1.5 text-[11px] text-white font-mono focus:outline-none"
+                          min="0"
+                          step="any"
+                        />
+                        <button
+                          onClick={() => handleStockInputKey({ key: 'Enter', preventDefault: () => {} } as any, ing)}
+                          className="px-3 py-1.5 bg-[#3a9db8] text-black text-[9px] font-bold uppercase tracking-widest hover:bg-[#2a8fa6] transition-colors flex-shrink-0"
+                        >
+                          ↵
+                        </button>
+                      </div>
+                      <div className="text-[8px] text-[#446] font-mono mt-1.5">
+                        Enter to save &amp; move next · Esc to close
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            // Normal mode
+            const unitPrice = pref && pref.packSize > 0 ? `£${(pref.packCost / pref.packSize).toFixed(3)}/${pref.packUnit}` : null;
+            const active = selectedId === ing.id;
+            return (
+              <div key={ing.id} onClick={() => handleSelect(ing.id)}
+                className={`px-4 py-3 cursor-pointer border-b border-[#1a1a1a] border-r border-[#333] hover:bg-[#1c1c1c] border-l-2 transition-colors ${active ? 'bg-[#1c1c1c] border-l-[#c8a96e]' : 'border-l-transparent'}`}>
+                <div className={`text-[10px] font-bold uppercase truncate ${active ? 'text-[#c8a96e]' : 'text-[#e0e0e0]'}`}>{ing.name}</div>
+                <div className="text-[8px] text-[#555] mt-0.5 font-mono">{ing.category} · {pref?.name}{unitPrice ? ` · ${unitPrice}` : ''}</div>
+              </div>
+            );
+          })}
         </div>
       </div>
+
+      {/* Right: form */}
+      {formPanel}
     </div>
   );
 };

@@ -28,6 +28,8 @@ const App: React.FC = () => {
 
   // Track Dish Builder Mode for Sidebar Pivot
   const [isDishEditing, setIsDishEditing] = useState(false);
+  const [forceNewDish, setForceNewDish] = useState(false);
+  const [forceNewRecipe, setForceNewRecipe] = useState(false);
 
   const { pushLevel, popLevel, currentLevel, isNested, depth } = useRecursiveBuilder();
 
@@ -96,6 +98,21 @@ const App: React.FC = () => {
     }
   };
 
+  const handleNewRecipe = useCallback(() => {
+    setCurrentView('kitchen');
+    setSelectedItemId(null);
+    setSelectionType('recipe');
+    setForceNewRecipe(true);
+  }, []);
+
+  const handleNewDish = useCallback(() => {
+    setCurrentView('service');
+    setSelectedItemId(null);
+    setSelectionType('dish');
+    setForceNewDish(true);
+    setIsDishEditing(true);
+  }, []);
+
   const handleRecursiveAddRequest = useCallback((name: string, type: 'ingredient' | 'recipe' | 'dish') => {
     // Dish creation not currently recursive-supported in first pass but kept for consistency
     if (type === 'dish') return;
@@ -152,6 +169,9 @@ const App: React.FC = () => {
                       isHybrid={currentView === 'service' && isDishEditing}
                       onInspect={handleInspect}
                       inspectedItem={inspectedItem}
+                      onNewRecipe={handleNewRecipe}
+                      onNewDish={handleNewDish}
+                      kitchenMode={currentView === 'kitchen'}
                     />
                   </div>
                   <div className="flex-1 h-full overflow-hidden">
@@ -167,6 +187,7 @@ const App: React.FC = () => {
                         onModeChange={setIsDishEditing}
                         onInspect={handleInspect}
                         inspectedItem={inspectedItem}
+                        forceNewDish={forceNewDish}
                       />
                     ) : (
                       <RecipeBuilder 
@@ -180,6 +201,8 @@ const App: React.FC = () => {
                         onPushRecipe={(name) => pushLevel('recipe', { name })}
                         onInspect={handleInspect}
                         inspectedItem={inspectedItem}
+                        forceNew={forceNewRecipe}
+                        onForceNewHandled={() => setForceNewRecipe(false)}
                       />
                     )}
                   </div>

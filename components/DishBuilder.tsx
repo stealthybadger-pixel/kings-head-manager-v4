@@ -143,10 +143,11 @@ interface DishBuilderProps {
   onModeChange: (isEditing: boolean) => void;
   onInspect?: (id: string, type: 'ingredient' | 'recipe') => void;
   inspectedItem?: {id: string, type: 'ingredient' | 'recipe'} | null;
+  forceNewDish?: boolean;
 }
 
 export const DishBuilder: React.FC<DishBuilderProps> = ({ 
-  onPushRecipe, onPushIngredient, stagedItemId, stagedItemType, clearStaged, onSetLibraryTab, onSetAvailableTabs, onModeChange, onInspect, inspectedItem
+  onPushRecipe, onPushIngredient, stagedItemId, stagedItemType, clearStaged, onSetLibraryTab, onSetAvailableTabs, onModeChange, onInspect, inspectedItem, forceNewDish
 }) => {
   const { ingredients, recipes, dishes, saveDish, updateDish, deleteDish } = useKitchenData();
   const { confirm } = useConfirmation();
@@ -169,6 +170,18 @@ export const DishBuilder: React.FC<DishBuilderProps> = ({
     : stagedItemType === 'recipe' 
       ? recipes.find(r => r.id === stagedItemId)
       : dishes.find(d => d.id === stagedItemId);
+
+  // Trigger new dish mode when "New Dish" button clicked in sidebar
+  useEffect(() => {
+    if (forceNewDish && !isEditing) {
+      clearStaged();
+      setIsEditing(true);
+      setDishName('New Service Dish');
+      setItems([]);
+      setInstructions('');
+      setActiveDishId(null);
+    }
+  }, [forceNewDish]);
 
   // Sync state with parent App (Sidebar Control)
   // Reverts to DishList in Browse Mode, Switches to Hybrid in Edit Mode
@@ -408,7 +421,6 @@ export const DishBuilder: React.FC<DishBuilderProps> = ({
                 </>
               ) : (
                 <>
-                  <button onClick={handleStartNew} className={`${UI_STYLES.button} border border-[#333333] text-[#e0e0e0] hover:bg-[#c8a96e] hover:text-black`}>New</button>
                   {isViewMode && (
                     <>
                       <button onClick={enterEditMode} className={`${UI_STYLES.button} border border-[#333333] text-[#e0e0e0] hover:bg-[#c8a96e] hover:text-black`}>Edit</button>

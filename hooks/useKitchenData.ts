@@ -8,6 +8,17 @@ import { calculateBatchTotal } from '../utils/units';
 import { getProduceYield } from '../utils/yields';
 import { COFID_DATA } from '../utils/nutritionLookup';
 
+// TODO: Move to types.ts
+export interface SupplierPriceItem {
+  id: string;
+  name: string;
+  packCost: number;
+  packSize: number;
+  packUnit: string;
+  kcalPer100?: number;
+  allergens?: string[];
+}
+
 const DEFAULT_INGREDIENTS: Omit<Ingredient, 'id'>[] = [
   { 
     name: 'Agar-agar', 
@@ -322,6 +333,8 @@ export const useKitchenData = () => {
 
   // Retroactive batch size calculation (runs once when both ingredients and recipes are loaded)
   const batchCalcRan = useRef(false);
+  const davidCattCache = useRef<SupplierPriceItem[]>([]);
+  const davidCattLoaded = useRef(false);
   useEffect(() => {
     if (batchCalcRan.current || ingredients.length === 0 || recipes.length === 0) return;
     batchCalcRan.current = true;
@@ -807,6 +820,85 @@ export const useKitchenData = () => {
     }
   }, []);
 
+  const searchSupplierPriceGuide = useCallback(async (searchTerm: string): Promise<SupplierPriceItem[]> => {
+    if (!searchTerm || searchTerm.trim().length < 2) return [];
+    try {
+      // Load catalogue once, then filter in memory
+      if (!davidCattLoaded.current) {
+        const snapshot = await getDocs(collection(db, 'david_catt_db'));
+        const unitMap: Record<string, string> = { each: 'ea', ea: 'ea', kg: 'kg', g: 'g', ml: 'ml', l: 'l', litre: 'l', ltr: 'l', gram: 'g', kilo: 'kg' };
+        davidCattCache.current = snapshot.docs.map(d => {
+          const data = d.data();
+          const rawUnit = (data.pack_unit || 'ea').toLowerCase();
+          return {
+            id: d.id,
+            name: data.name,
+            packCost: data.cost,
+            packSize: data.pack_size,
+            packUnit: unitMap[rawUnit] || 'ea',
+            kcalPer100: (() => {
+              if (data.kcal_per_100g > 0) return data.kcal_per_100g;
+              const lower = (data.name || '').toLowerCase();
+              for (const [key, val] of Object.entries(COFID_DATA)) {
+                if (lower.includes(key) && val > 0) return val;
+              }
+              return 0;
+            })(),
+            allergens: Array.isArray(data.allergens) ? data.allergens : [],
+          };
+        });
+        davidCattLoaded.current = true;
+      }
+      const lower = searchTerm.toLowerCase().trim();
+      const words = lower.split(/\s+/).filter(w => w.length > 2);
+      return davidCattCache.current
+        .filter(item => {
+          const name = item.name?.toLowerCase() || '';
+          return name.includes(lower) || words.some(w => name.includes(w));
+        })
+        .slice(0, 15);
+    } catch (err) {
+      console.error("Error searching David Catt price guide:", err);
+      return [];
+    }
+  }, []);
+
+  const seedSupplierPriceGuide = useCallback(async () => {
+    setLoading(true);
+    try {
+      const TEST_BATCH = [
+        { name: "Potatoes - Chippers Washed", packCost: 14.50, packSize: 25, packUnit: 'kg' },
+        { name: "Potatoes - Koffmann's Chipping", packCost: 20.25, packSize: 20, packUnit: 'kg' },
+        { name: "Peppers Mixed Loose", packCost: 18.13, packSize: 5, packUnit: 'kg' },
+        { name: "Tomatoes Standard", packCost: 13.75, packSize: 6, packUnit: 'kg' },
+        { name: "Tomatoes On Vine", packCost: 10.63, packSize: 5, packUnit: 'kg' },
+        { name: "Mushrooms Button", packCost: 7.75, packSize: 2.5, packUnit: 'kg' },
+        { name: "Mushrooms Portobello", packCost: 7.00, packSize: 1.5, packUnit: 'kg' }
+      ];
+
+      const batch = writeBatch(db);
+      
+      TEST_BATCH.forEach(item => {
+        const docRef = doc(collection(db, 'supplier_prices'));
+        batch.set(docRef, {
+          ...item,
+          supplier: "David Catt",
+          name_lowercase: item.name.toLowerCase(),
+          unitPrice: Number((item.packCost / item.packSize).toFixed(4)),
+          updatedAt: new Date().toISOString()
+        });
+      });
+
+      await batch.commit();
+      console.info(`[SEED] Successfully added ${TEST_BATCH.length} items to supplier_prices.`);
+    } catch (err: any) {
+      console.error("Error seeding supplier prices:", err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   return {
     ingredients,
     recipes,
@@ -831,6 +923,8 @@ export const useKitchenData = () => {
     seedDatabase,
     bulkImport,
     logUnresolvedIngredient,
-    updateRecipeStatus
+    updateRecipeStatus,
+    searchSupplierPriceGuide,
+    seedSupplierPriceGuide
   };
 };
