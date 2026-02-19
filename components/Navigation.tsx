@@ -13,6 +13,7 @@ export const Navigation: React.FC<NavigationProps> = ({ activeView, onViewChange
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'ingest', label: 'Mass Ingest Terminal' },
     { id: 'resolution', label: 'Resolution Desk' },
+    { id: 'stock', label: 'Stock & Waste' },
     { id: 'service', label: 'DISH LIBRARY' },
     { id: 'kitchen', label: 'Recipe Library' },
     { id: 'ingredients', label: 'Master Ingredient List' },

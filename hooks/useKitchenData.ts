@@ -1,8 +1,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, query, orderBy, writeBatch, getDocs, where } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, query, orderBy, writeBatch, getDocs, where, limit } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Ingredient, Recipe, Dish, Allergen, RecipeStatus, RecipeItem } from '../types';
+import { Ingredient, Recipe, Dish, Allergen, RecipeStatus, RecipeItem, StockMovement, Invoice } from '../types';
 import { normalizeName, detectSupplierFromCategory, detectCategory, normalizeCategory } from '../utils/intelligence';
 import { calculateBatchTotal } from '../utils/units';
 import { getProduceYield } from '../utils/yields';
@@ -138,6 +138,8 @@ export const useKitchenData = () => {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [dishes, setDishes] = useState<Dish[]>([]);
+  const [stockMovements, setStockMovements] = useState<StockMovement[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
@@ -328,6 +330,24 @@ export const useKitchenData = () => {
       console.error("Error fetching dishes:", err);
       setLoading(false);
     });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const q = query(collection(db, 'stock_movements'), orderBy('createdAt', 'desc'), limit(500));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as StockMovement[];
+      setStockMovements(data);
+    }, (err) => console.error("Error fetching stock_movements:", err));
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const q = query(collection(db, 'invoices'), orderBy('date', 'desc'), limit(200));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Invoice[];
+      setInvoices(data);
+    }, (err) => console.error("Error fetching invoices:", err));
     return () => unsubscribe();
   }, []);
 
@@ -863,6 +883,89 @@ export const useKitchenData = () => {
     }
   }, []);
 
+  // ── Stock Management ────────────────────────────────────────────────────────
+
+  const addInvoice = useCallback(async (
+    invoiceData: Omit<Invoice, 'id'>,
+    movements: Omit<StockMovement, 'id'>[]
+  ) => {
+    const now = new Date().toISOString();
+    const batch = writeBatch(db);
+
+    // Create invoice doc
+    const invoiceRef = doc(collection(db, 'invoices'));
+    batch.set(invoiceRef, cleanObject({ ...invoiceData, createdAt: now }));
+
+    // Create movement docs and update ingredient stockLevels
+    movements.forEach(mv => {
+      const mvRef = doc(collection(db, 'stock_movements'));
+      batch.set(mvRef, cleanObject({ ...mv, invoiceId: invoiceRef.id, createdAt: now }));
+      // Increment stockLevel on ingredient
+      const ingRef = doc(db, 'ingredients', mv.ingredientId);
+      batch.update(ingRef, { stockLevel: (ingredients.find((i: Ingredient) => i.id === mv.ingredientId)?.stockLevel ?? 0) + mv.quantity, updatedAt: now });
+    });
+
+    await batch.commit();
+  }, [ingredients]);
+
+  const logWaste = useCallback(async (
+    ingredientId: string,
+    quantity: number,
+    unit: string,
+    notes?: string,
+    date?: string
+  ) => {
+    const now = new Date().toISOString();
+    const today = date || now.slice(0, 10);
+    const ing = ingredients.find((i: Ingredient) => i.id === ingredientId);
+    const currentStock = ing?.stockLevel ?? 0;
+    const batch = writeBatch(db);
+
+    const mvRef = doc(collection(db, 'stock_movements'));
+    batch.set(mvRef, cleanObject({
+      ingredientId,
+      type: 'waste',
+      quantity: -Math.abs(quantity),
+      unit,
+      date: today,
+      notes,
+      createdAt: now,
+    }));
+
+    const ingRef = doc(db, 'ingredients', ingredientId);
+    batch.update(ingRef, { stockLevel: Math.max(0, currentStock - Math.abs(quantity)), updatedAt: now });
+
+    await batch.commit();
+  }, [ingredients]);
+
+  const commitStockTake = useCallback(async (changes: { id: string; newLevel: number }[]) => {
+    const now = new Date().toISOString();
+    const today = now.slice(0, 10);
+    const batch = writeBatch(db);
+
+    changes.forEach(({ id, newLevel }) => {
+      const ing = ingredients.find((i: Ingredient) => i.id === id);
+      const oldLevel = ing?.stockLevel ?? 0;
+      const delta = newLevel - oldLevel;
+
+      const mvRef = doc(collection(db, 'stock_movements'));
+      batch.set(mvRef, cleanObject({
+        ingredientId: id,
+        type: 'stock_take',
+        quantity: delta,
+        unit: ing?.suppliers[0]?.packUnit || 'g',
+        date: today,
+        notes: `Stock take: ${oldLevel} → ${newLevel}`,
+        createdAt: now,
+      }));
+
+      const ingRef = doc(db, 'ingredients', id);
+      batch.update(ingRef, { stockLevel: newLevel, updatedAt: now });
+    });
+
+    await batch.commit();
+  }, [ingredients]);
+
   const seedSupplierPriceGuide = useCallback(async () => {
     setLoading(true);
     try {
@@ -903,9 +1006,14 @@ export const useKitchenData = () => {
     ingredients,
     recipes,
     dishes,
+    stockMovements,
+    invoices,
     loading,
     error,
     connectionStatus,
+    addInvoice,
+    logWaste,
+    commitStockTake,
     addIngredient,
     updateIngredient,
     deleteIngredient,

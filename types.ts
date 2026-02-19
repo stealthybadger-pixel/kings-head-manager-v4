@@ -102,3 +102,36 @@ export interface Financials {
   suggestedSellPrice: number;
   currentGP: number;
 }
+
+export type StockMovementType = 'delivery' | 'waste' | 'adjustment' | 'stock_take';
+
+export interface StockMovement {
+  id: string;
+  ingredientId: string;
+  type: StockMovementType;
+  quantity: number;      // positive = stock in, negative = stock out
+  unit: Unit;
+  date: string;          // ISO date string (YYYY-MM-DD)
+  notes?: string;
+  invoiceId?: string;    // links to Invoice when type='delivery'
+  supplierName?: string;
+  createdAt?: string;
+}
+
+export interface InvoiceItem {
+  ingredientId: string;
+  quantity: number;
+  unit: Unit;
+  unitCost: number;
+}
+
+export interface Invoice {
+  id: string;
+  supplier: string;
+  date: string;
+  reference?: string;    // invoice number / PO ref
+  notes?: string;
+  items: InvoiceItem[];
+  totalCost: number;
+  createdAt?: string;
+}
