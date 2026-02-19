@@ -1,7 +1,17 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:www.chefs-resources.com)"
+      "WebFetch(domain:www.chefs-resources.com)",
+      "Bash(git add:*)",
+      "Bash(git fetch:*)",
+      "Bash(npm run dev)",
+      "Bash(firebase deploy:*)",
+      "Bash(cmd /c \"dir /b /s \"\"C:\\\\Users\\\\paul\\\\kings-head-manager\\\\recipes\"\"\")",
+      "Bash(node -e:*)",
+      "Bash(node scripts/import-docx.mjs:*)",
+      "Bash(npm run build:*)",
+      "Bash(node scripts/outlier-analysis.mjs:*)",
+      "Bash(node scripts/fix-outliers.mjs:*)"
     ]
   }
 }
