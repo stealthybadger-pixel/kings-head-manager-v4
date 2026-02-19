@@ -198,7 +198,13 @@ export const InvoiceScanner: React.FC<InvoiceScannerProps> = ({ onCancel }) => {
     setError(null);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
+      if (!apiKey) {
+        setError("GOOGLE_API_KEY NOT SET IN .env");
+        setIsProcessing(false);
+        return;
+      }
+      const ai = new GoogleGenAI({ apiKey });
       const base64Data = previewUrl.split(',')[1];
 
       // Detect MIME type from data URL
