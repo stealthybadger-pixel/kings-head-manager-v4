@@ -3,6 +3,7 @@ import React, { useState, useMemo, useRef } from 'react';
 import { Ingredient, Unit, StockMovement, Invoice } from '../types';
 import { useKitchenData } from '../hooks/useKitchenData';
 import { UI_STYLES, COLORS, APPROVED_SUPPLIERS } from '../constants';
+import { InvoiceScanner } from './InvoiceScanner';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -82,12 +83,13 @@ const IngredientSearch: React.FC<{
 
 // ── Main Component ───────────────────────────────────────────────────────────
 
-type Tab = 'stock_take' | 'deliveries' | 'waste' | 'history';
+type Tab = 'stock_take' | 'deliveries' | 'waste' | 'history' | 'invoice_scanner';
 type DeliveryMode = 'supplier' | 'adhoc';
 
 export const StockManager: React.FC = () => {
   const { ingredients, stockMovements, invoices, addInvoice, logWaste, commitStockTake } = useKitchenData();
   const [tab, setTab] = useState<Tab>('stock_take');
+  const [showInvoiceScanner, setShowInvoiceScanner] = useState(false);
 
   // ── STOCK TAKE state ──────────────────────────────────────────────────────
   const [stockSearch, setStockSearch] = useState('');
@@ -257,6 +259,7 @@ export const StockManager: React.FC = () => {
   const TABS: { id: Tab; label: string }[] = [
     { id: 'stock_take', label: 'Stock Take' },
     { id: 'deliveries', label: 'Deliveries' },
+    { id: 'invoice_scanner', label: 'Invoice Scanner' },
     { id: 'waste', label: 'Waste Log' },
     { id: 'history', label: 'History' },
   ];
@@ -681,7 +684,27 @@ export const StockManager: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* ── INVOICE SCANNER ────────────────────────────────────────────────── */}
+        {tab === 'invoice_scanner' && (
+          <div className="p-6 text-center text-[#555]">
+            <div className="flex flex-col items-center gap-4 py-16">
+              <div className="text-[12px] font-bold text-[#666] uppercase tracking-[0.4em]">INVOICE_SCANNER</div>
+              <button
+                onClick={() => setShowInvoiceScanner(true)}
+                className="px-8 py-4 bg-[#c8a96e] text-black text-[11px] font-bold uppercase tracking-widest hover:bg-[#d4b896] transition-all"
+              >
+                OPEN SCANNER
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Invoice Scanner Modal */}
+      {showInvoiceScanner && (
+        <InvoiceScanner onCancel={() => setShowInvoiceScanner(false)} />
+      )}
     </div>
   );
 };
