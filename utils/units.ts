@@ -34,6 +34,19 @@ export const getConvertedQuantity = (quantity: number, fromUnit: Unit, toUnit: U
 };
 
 /**
+ * Convert any unit to grams (for kcal calculations).
+ * ml/l treated as g/kg (1ml ≈ 1g water assumption — acceptable for nutrition estimates).
+ * Returns 0 for 'ea' since no weight reference is available without ingredient context.
+ */
+export const toGrams = (qty: number, unit: Unit): number => {
+  if (unit === 'g')  return qty;
+  if (unit === 'kg') return qty * 1000;
+  if (unit === 'ml') return qty;
+  if (unit === 'l')  return qty * 1000;
+  return 0; // ea — caller must handle
+};
+
+/**
  * Calculate total batch size by summing all item quantities converted to the target unit.
  * Skips 'ea' items when target is weight/volume and vice versa.
  */

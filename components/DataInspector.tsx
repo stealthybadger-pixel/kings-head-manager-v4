@@ -2,7 +2,8 @@
 import React, { useMemo } from 'react';
 import { useKitchenData } from '../hooks/useKitchenData';
 import { UI_STYLES } from '../constants';
-import { Ingredient, Recipe } from '../types';
+import { Ingredient, Recipe, Allergen } from '../types';
+import { AllergenMatrix } from './AllergenMatrix';
 
 interface DataInspectorProps {
   id: string;
@@ -73,11 +74,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ id, type, onClose 
 
             <section>
                <label className={UI_STYLES.label}>Allergen Profile</label>
-               <div className="flex flex-wrap gap-2">
-                 {ingredient.allergens.length > 0 ? ingredient.allergens.map(a => (
-                   <span key={a} className="px-2 py-1 bg-[#1c1c1c] border border-red-900 text-red-400 text-[9px] font-bold uppercase">{a}</span>
-                 )) : <span className="text-[10px] text-[#444] font-mono">NO_RISKS_DECLARED</span>}
-               </div>
+               <AllergenMatrix active={ingredient.allergens} className="mt-1" />
             </section>
 
             <section>

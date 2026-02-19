@@ -31,6 +31,9 @@ const App: React.FC = () => {
   const [forceNewDish, setForceNewDish] = useState(false);
   const [forceNewRecipe, setForceNewRecipe] = useState(false);
 
+  // Scale mode request — set when user right-clicks a recipe in the sidebar
+  const [requestScaleMode, setRequestScaleMode] = useState(false);
+
   const { pushLevel, popLevel, currentLevel, isNested, depth } = useRecursiveBuilder();
 
   useEffect(() => {
@@ -98,6 +101,13 @@ const App: React.FC = () => {
     }
   };
 
+  const handleScaleRecipe = useCallback((id: string) => {
+    setCurrentView('kitchen');
+    setSelectedItemId(id);
+    setSelectionType('recipe');
+    setRequestScaleMode(true);
+  }, []);
+
   const handleNewRecipe = useCallback(() => {
     setCurrentView('kitchen');
     setSelectedItemId(null);
@@ -159,8 +169,8 @@ const App: React.FC = () => {
             {(currentView === 'service' || currentView === 'kitchen') && (
               <div className="flex h-full w-full">
                   <div className="w-80 h-full flex-shrink-0 border-r border-[#333333]">
-                    <Sidebar 
-                      onSelectItem={handleSelectItem} 
+                    <Sidebar
+                      onSelectItem={handleSelectItem}
                       activeTab={libraryTab}
                       availableTabs={availableTabs}
                       allTabs={availableTabs}
@@ -172,6 +182,7 @@ const App: React.FC = () => {
                       onNewRecipe={handleNewRecipe}
                       onNewDish={handleNewDish}
                       kitchenMode={currentView === 'kitchen'}
+                      onScaleRecipe={handleScaleRecipe}
                     />
                   </div>
                   <div className="flex-1 h-full overflow-hidden">
@@ -190,8 +201,8 @@ const App: React.FC = () => {
                         forceNewDish={forceNewDish}
                       />
                     ) : (
-                      <RecipeBuilder 
-                        stagedItemId={selectedItemId} 
+                      <RecipeBuilder
+                        stagedItemId={selectedItemId}
                         stagedItemType={selectionType as any}
                         clearStaged={() => setSelectedItemId(null)}
                         onSetLibraryTab={setLibraryTab as any}
@@ -203,6 +214,8 @@ const App: React.FC = () => {
                         inspectedItem={inspectedItem}
                         forceNew={forceNewRecipe}
                         onForceNewHandled={() => setForceNewRecipe(false)}
+                        startInScaleMode={requestScaleMode}
+                        onScaleModeConsumed={() => setRequestScaleMode(false)}
                       />
                     )}
                   </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useKitchenData, SupplierPriceItem } from '../hooks/useKitchenData';
 import { Ingredient, Unit, Allergen } from '../types';
 import { UI_STYLES, APPROVED_SUPPLIERS } from '../constants';
+import { AllergenMatrix } from './AllergenMatrix';
 import { detectCategory, detectAllergens, normalizeName } from '../utils/intelligence';
 import { getProduceYield } from '../utils/yields';
 
@@ -76,7 +77,7 @@ export const IngredientManager: React.FC<Props> = ({ initialEditId, isRecursive,
 
   // David Catt autocomplete (only on new ingredient)
   useEffect(() => {
-    if (form.supplier !== 'David Catt' || String(form.name).length < 2) {
+    if (!isNew || form.supplier !== 'David Catt' || String(form.name).length < 2) {
       setSuggestions([]);
       return;
     }
@@ -84,7 +85,7 @@ export const IngredientManager: React.FC<Props> = ({ initialEditId, isRecursive,
       setSuggestions(await searchSupplierPriceGuide(String(form.name)));
     }, 300);
     return () => clearTimeout(t);
-  }, [form.name, form.supplier, searchSupplierPriceGuide]);
+  }, [isNew, form.name, form.supplier, searchSupplierPriceGuide]);
 
   const handleNameChange = (val: string) => {
     setForm(f => ({
@@ -313,18 +314,14 @@ export const IngredientManager: React.FC<Props> = ({ initialEditId, isRecursive,
 
         <div>
           <label className={lbl}>Allergens <span className="text-[#555] normal-case font-normal">(auto-detected, toggle to override)</span></label>
-          <div className="flex flex-wrap gap-1.5 mt-1">
-            {Object.values(Allergen).map(a => {
-              const active = form.allergens.includes(a);
-              return (
-                <button key={a} type="button"
-                  onClick={() => setForm(f => ({ ...f, allergens: active ? f.allergens.filter(x => x !== a) : [...f.allergens, a] }))}
-                  className={`text-[9px] uppercase font-bold px-2 py-1 border transition-colors ${active ? 'bg-[#c8a96e] text-black border-[#c8a96e]' : 'text-[#555] border-[#333] hover:border-[#c8a96e] hover:text-[#c8a96e]'}`}>
-                  {a}
-                </button>
-              );
-            })}
-          </div>
+          <AllergenMatrix
+            active={form.allergens}
+            onToggle={(a: Allergen) => setForm((f: ReturnType<typeof blankForm>) => ({
+              ...f,
+              allergens: f.allergens.includes(a) ? f.allergens.filter((x: Allergen) => x !== a) : [...f.allergens, a]
+            }))}
+            className="mt-1"
+          />
         </div>
       </div>
 

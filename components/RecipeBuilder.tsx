@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Ingredient, Recipe, RecipeItem, Unit } from '../types';
+import { Ingredient, Recipe, RecipeItem, Unit, Allergen } from '../types';
 import { useKitchenData } from '../hooks/useKitchenData';
 import { useConfirmation } from '../hooks/useConfirmation';
 import { UI_STYLES, COLORS } from '../constants';
 import { OCRScanner } from './OCRScanner';
 import { SourceTag } from './SourceTag';
-import { getConvertedQuantity, calculateBatchTotal } from '../utils/units';
+import { AllergenMatrix } from './AllergenMatrix';
+import { getConvertedQuantity, calculateBatchTotal, toGrams } from '../utils/units';
 
 interface SearchOption {
   id: string;
@@ -155,11 +156,14 @@ interface RecipeBuilderProps {
   inspectedItem?: {id: string, type: 'ingredient' | 'recipe'} | null;
   forceNew?: boolean;
   onForceNewHandled?: () => void;
+  startInScaleMode?: boolean;
+  onScaleModeConsumed?: () => void;
 }
 
 const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
   stagedItemId, stagedItemType, clearStaged, onSetLibraryTab, onSetAvailableTabs,
-  onPushIngredient, onInspect, inspectedItem, forceNew, onForceNewHandled
+  onPushIngredient, onInspect, inspectedItem, forceNew, onForceNewHandled,
+  startInScaleMode, onScaleModeConsumed,
 }) => {
   const { ingredients, recipes, saveRecipe, updateRecipe, deleteRecipe } = useKitchenData();
   const { confirm } = useConfirmation();
@@ -188,6 +192,11 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
   
   // Confirmation states for destructive actions
   const [confirmAction, setConfirmAction] = useState<'delete' | 'discard' | null>(null);
+
+  // Scale mode — non-destructive: pick a limiting ingredient, enter available qty, all others scale
+  const [scaleActive, setScaleActive] = useState(false);
+  const [scaleItemIdx, setScaleItemIdx] = useState<number | null>(null);
+  const [scaleAvailable, setScaleAvailable] = useState('');
 
   const stagedObject = stagedItemType === 'ingredient' 
     ? ingredients.find(i => i.id === stagedItemId) 
@@ -298,7 +307,34 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
     return i.sort((a, b) => a.name.localeCompare(b.name));
   }, [ingredients]);
 
-  // VIEW MODE SYNC: If a recipe is selected and we are NOT editing, populate fields and auto-enter edit mode.
+  // Aggregate allergens from all ingredient rows
+  const aggregatedAllergens = useMemo(() => {
+    const allergenSet = new Set<Allergen>();
+    gridItems.forEach(item => {
+      const rawId = item.id || (item as any).ingredientId || '';
+      if (!rawId) return;
+      ingredients.find(i => i.id === rawId)?.allergens?.forEach(a => allergenSet.add(a));
+    });
+    return Array.from(allergenSet).sort();
+  }, [gridItems, ingredients]);
+
+  // Total kcal for the batch + kcal per 100g of output
+  const recipeKcal = useMemo(() => {
+    const totalKcal = gridItems.reduce((acc, item) => {
+      const rawId = item.id || (item as any).ingredientId || '';
+      if (!rawId) return acc;
+      const ing = ingredients.find(i => i.id === rawId);
+      if (!ing) return acc;
+      return acc + toGrams(item.quantity, item.unit) * ((ing.kcalPer100 || 0) / 100);
+    }, 0);
+    const batchG = toGrams(batchSize, batchUnit);
+    const kcalPer100 = batchG > 0 ? (totalKcal / batchG) * 100 : 0;
+    return { totalKcal, kcalPer100 };
+  }, [gridItems, ingredients, batchSize, batchUnit]);
+
+  // VIEW MODE SYNC: Populate fields when a recipe is selected.
+  // If startInScaleMode is true (right-click), stay in view mode and activate scale.
+  // Otherwise auto-enter edit mode (normal click).
   useEffect(() => {
     if (stagedItemType === 'recipe' && stagedObject && !isEditing && !isManualNew) {
       const r = stagedObject as Recipe;
@@ -310,11 +346,19 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
         setGridItems(r.items || []);
         setInstructions(r.instructions || '');
         setActiveRecipeId(r.id);
-        // Auto-enter edit mode when recipe selected
-        setIsEditing(true);
-        // Ingredients only - no recipe loops
-        onSetAvailableTabs(['ingredients']);
-        onSetLibraryTab('ingredients');
+        if (startInScaleMode) {
+          // Scale mode: stay in view mode, activate scale overlay
+          setScaleActive(true); setScaleItemIdx(null); setScaleAvailable('');
+          onScaleModeConsumed?.();
+          onSetAvailableTabs(['ingredients', 'recipes']);
+          onSetLibraryTab('recipes');
+        } else {
+          // Normal click: enter edit mode
+          setScaleActive(false); setScaleItemIdx(null); setScaleAvailable('');
+          setIsEditing(true);
+          onSetAvailableTabs(['ingredients']);
+          onSetLibraryTab('ingredients');
+        }
       }
     } else if (!stagedItemId && !isEditing && !isManualNew) {
       // Reset if nothing selected and not editing
@@ -329,7 +373,7 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
       onSetAvailableTabs(['recipes']);
       onSetLibraryTab('recipes');
     }
-  }, [stagedObject, stagedItemId, stagedItemType, isEditing, isManualNew, activeRecipeId]);
+  }, [stagedObject, stagedItemId, stagedItemType, isEditing, isManualNew, activeRecipeId, startInScaleMode]);
 
   // Auto-calculate batch size from item quantities (accounting for waste/yield)
   useEffect(() => {
@@ -465,6 +509,21 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
     setShowScanner(false);
   };
 
+  // Scale factor — ratio of available : original for the constrained ingredient
+  const scaleFactor = (() => {
+    if (!scaleActive || scaleItemIdx === null) return 1;
+    const original = gridItems[scaleItemIdx]?.quantity;
+    const available = parseFloat(scaleAvailable);
+    if (!original || !available || isNaN(available)) return 1;
+    return available / original;
+  })();
+
+  const exitScale = () => {
+    setScaleActive(false);
+    setScaleItemIdx(null);
+    setScaleAvailable('');
+  };
+
   // Derive display flags
   const isViewMode = !isEditing && !isManualNew && !!stagedItemId && stagedItemType === 'recipe';
   const isSessionActive = isEditing;
@@ -517,8 +576,8 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
                 {isManualNew && (
                   <button onClick={() => setShowScanner(true)} className={`${UI_STYLES.button} border border-[#c8a96e] text-[#c8a96e] hover:bg-[#c8a96e] hover:text-black`}>OCR Scan</button>
                 )}
-                <button 
-                  onClick={handleDiscard} 
+                <button
+                  onClick={handleDiscard}
                   className={`${UI_STYLES.button} ${confirmAction === 'discard' ? 'border border-yellow-600 text-yellow-400 bg-yellow-900/20' : 'border border-[#333333] text-[#888888] hover:text-white'}`}
                 >
                   {confirmAction === 'discard' ? 'CONFIRM DISCARD?' : 'Discard'}
@@ -540,8 +599,17 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
               <>
                 {isViewMode && (
                   <>
-                    <button 
-                      onClick={() => { setConfirmAction(null); setIsEditing(true); }} 
+                    {scaleActive ? (
+                      <button onClick={exitScale} className={`${UI_STYLES.button} border border-amber-600 text-amber-400 bg-amber-900/20 hover:bg-amber-900/40`}>
+                        Exit Scale
+                      </button>
+                    ) : (
+                      <button onClick={() => { setScaleActive(true); setScaleItemIdx(null); setScaleAvailable(''); }} className={`${UI_STYLES.button} border border-[#444] text-[#888] hover:border-amber-600 hover:text-amber-400`}>
+                        Scale
+                      </button>
+                    )}
+                    <button
+                      onClick={() => { setConfirmAction(null); setIsEditing(true); exitScale(); }}
                       className={`${UI_STYLES.button} border border-[#333333] text-[#e0e0e0] hover:bg-[#c8a96e] hover:text-black`}
                     >
                       Edit
@@ -566,6 +634,48 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
             )}
           </div>
         </div>
+
+        {/* SCALE MODE PANEL */}
+        {scaleActive && (
+          <div className="border-b border-amber-800/50 bg-amber-950/20 px-4 py-3 flex flex-wrap items-center gap-4 flex-shrink-0">
+            <span className="text-[9px] font-bold uppercase tracking-widest text-amber-500 font-mono">Scale Mode</span>
+            <div className="flex items-center gap-2">
+              <label className="text-[9px] uppercase text-[#888] font-mono">Limiting ingredient</label>
+              <select
+                value={scaleItemIdx ?? ''}
+                onChange={e => { setScaleItemIdx(e.target.value === '' ? null : Number(e.target.value)); setScaleAvailable(''); }}
+                className="bg-[#1c1c1c] border border-[#444] text-[10px] font-mono text-[#e0e0e0] px-2 py-1 outline-none hover:border-amber-600"
+              >
+                <option value="">— select —</option>
+                {gridItems.map((item, idx) => {
+                  const ing = ingredients.find(i => i.id === (item.id || (item as any).ingredientId || ''));
+                  return <option key={idx} value={idx}>{ing?.name || `Row ${idx + 1}`} ({item.quantity} {item.unit})</option>;
+                })}
+              </select>
+            </div>
+            {scaleItemIdx !== null && (
+              <div className="flex items-center gap-2">
+                <label className="text-[9px] uppercase text-[#888] font-mono">I have</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={scaleAvailable}
+                  onChange={e => setScaleAvailable(e.target.value)}
+                  placeholder="0"
+                  className="w-20 bg-[#1c1c1c] border border-amber-700 text-amber-300 font-mono text-[11px] px-2 py-1 outline-none text-right"
+                  autoFocus
+                />
+                <span className="text-[10px] font-mono text-[#888]">{gridItems[scaleItemIdx]?.unit}</span>
+              </div>
+            )}
+            {scaleItemIdx !== null && scaleFactor !== 1 && (
+              <span className="text-[9px] font-mono text-amber-400 border border-amber-800/50 px-2 py-0.5">
+                × {scaleFactor.toFixed(3)} &nbsp;({(scaleFactor * 100).toFixed(1)}% of full batch)
+              </span>
+            )}
+          </div>
+        )}
 
         <div className={`flex-1 overflow-y-auto p-4 transition-opacity ${!isSessionActive ? 'opacity-80' : ''}`}>
           {/* ONLY RENDER GRID IF ITEMS EXIST */}
@@ -619,14 +729,29 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <input
-                          ref={el => (quantityRefs.current[idx] = el)}
-                          type="number"
-                          value={item.quantity}
-                          readOnly={!isEditing}
-                          onChange={(e) => isEditing && updateGridItem(idx, { quantity: parseFloat(e.target.value) || 0 })}
-                          className={`bg-transparent text-right font-mono text-xs w-16 outline-none text-[#c8a96e]`}
-                        />
+                        {scaleActive && scaleItemIdx === idx ? (
+                          /* Constraining row — show available qty in amber */
+                          <span className="text-right font-mono text-xs w-16 text-amber-400 font-bold">
+                            {scaleAvailable || item.quantity}
+                          </span>
+                        ) : scaleActive && scaleFactor !== 1 ? (
+                          /* Scaled row — show original struck out + scaled value */
+                          <div className="flex flex-col items-end w-20">
+                            <span className="text-[9px] font-mono text-[#444] line-through leading-none">{item.quantity}</span>
+                            <span className="text-right font-mono text-xs text-amber-300 font-bold leading-none">
+                              {(item.quantity * scaleFactor).toFixed(item.quantity * scaleFactor < 10 ? 2 : 0)}
+                            </span>
+                          </div>
+                        ) : (
+                          <input
+                            ref={el => (quantityRefs.current[idx] = el)}
+                            type="number"
+                            value={item.quantity}
+                            readOnly={!isEditing}
+                            onChange={(e) => isEditing && updateGridItem(idx, { quantity: parseFloat(e.target.value) || 0 })}
+                            className={`bg-transparent text-right font-mono text-xs w-16 outline-none text-[#c8a96e]`}
+                          />
+                        )}
                         <select disabled={!isEditing} value={item.unit} onChange={(e) => updateGridItem(idx, { unit: e.target.value as Unit })} className="bg-transparent text-[10px] font-mono text-[#888] outline-none">
                           <option value="g">g</option><option value="ml">ml</option><option value="kg">kg</option><option value="l">l</option><option value="ea">ea</option>
                         </select>
@@ -639,20 +764,38 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
                 })}
               </div>
               <div ref={scrollBottomRef}></div>
-              <div className="mt-8">
-                 <label className={UI_STYLES.label}>Method</label>
-                 <textarea 
-                   value={instructions} 
-                   onChange={e => setInstructions(e.target.value)} 
-                   className={`w-full h-48 bg-transparent outline-none resize-none font-sans text-sm text-[#e0e0e0] placeholder-[#444] border border-[#333333]`} 
-                   placeholder="Operating procedure..." 
-                 />
+              <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-3">
+                  <label className={UI_STYLES.label}>Allergen Risk Profile</label>
+                  <AllergenMatrix active={aggregatedAllergens} />
+                </div>
+                <div className="space-y-3">
+                  <label className={UI_STYLES.label}>Method</label>
+                  <textarea
+                    value={instructions}
+                    onChange={e => setInstructions(e.target.value)}
+                    className={`w-full h-48 bg-transparent outline-none resize-none font-sans text-sm text-[#e0e0e0] placeholder-[#444] border border-[#333333]`}
+                    placeholder="Operating procedure..."
+                  />
+                </div>
               </div>
             </>
           )}
         </div>
 
-        <div className={`p-4 border-t border-[#333333] bg-[#1c1c1c] flex-shrink-0`}>
+        <div className={`p-4 border-t border-[#333333] bg-[#1c1c1c] flex-shrink-0 flex justify-between items-center`}>
+          {gridItems.length > 0 ? (
+            <div className="flex gap-12">
+              <div>
+                <label className={UI_STYLES.label}>Batch Kcal</label>
+                <div className="font-mono text-lg text-[#7D8C7C]">{Math.round(recipeKcal.totalKcal)}<span className="text-xs ml-1 text-[#555]">kcal</span></div>
+              </div>
+              <div>
+                <label className={UI_STYLES.label}>Kcal / 100g</label>
+                <div className="font-mono text-lg text-[#7D8C7C]">{Math.round(recipeKcal.kcalPer100)}<span className="text-xs ml-1 text-[#555]">kcal</span></div>
+              </div>
+            </div>
+          ) : <div />}
           <div className="text-right">
             <label className={UI_STYLES.label}>Integrity Status</label>
             <div className={`text-[10px] font-mono uppercase ${isEditing && gridItems.length > 0 ? 'text-yellow-500 animate-pulse' : 'text-[#444]'}`}>{isEditing ? 'Uncommitted' : 'Synchronized'}</div>

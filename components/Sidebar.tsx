@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Ingredient, Recipe, Dish } from '../types';
 import { useKitchenData } from '../hooks/useKitchenData';
 import { useConfirmation } from '../hooks/useConfirmation';
@@ -20,6 +20,7 @@ interface SidebarProps {
   onNewRecipe?: () => void;
   onNewDish?: () => void;
   kitchenMode?: boolean;
+  onScaleRecipe?: (id: string) => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -36,11 +37,31 @@ const Sidebar: React.FC<SidebarProps> = ({
   onNewRecipe,
   onNewDish,
   kitchenMode = false,
+  onScaleRecipe,
 }) => {
   const { ingredients, recipes, dishes, loading } = useKitchenData();
   const [search, setSearch] = useState('');
   const [filterSupplier, setFilterSupplier] = useState('ALL');
   const [filterCategory, setFilterCategory] = useState('ALL');
+
+  // Long-press tracking for touch devices (scale mode)
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTriggered = useRef(false);
+
+  const handleRecipeTouchStart = (id: string) => {
+    longPressTriggered.current = false;
+    longPressTimer.current = setTimeout(() => {
+      longPressTriggered.current = true;
+      onScaleRecipe?.(id);
+    }, 600);
+  };
+
+  const cancelLongPress = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
 
   const suppliers = useMemo(() => {
     const all = new Set<string>();
@@ -213,7 +234,19 @@ const Sidebar: React.FC<SidebarProps> = ({
             return (
               <div
                 key={item.id}
-                onClick={() => onSelectItem(item.id, itemType)}
+                onClick={() => {
+                  if (longPressTriggered.current) { longPressTriggered.current = false; return; }
+                  onSelectItem(item.id, itemType);
+                }}
+                onContextMenu={(e: React.MouseEvent) => {
+                  if (itemType === 'recipe' && onScaleRecipe) {
+                    e.preventDefault();
+                    onScaleRecipe(item.id);
+                  }
+                }}
+                onTouchStart={() => { if (itemType === 'recipe') handleRecipeTouchStart(item.id); }}
+                onTouchEnd={cancelLongPress}
+                onTouchMove={cancelLongPress}
                 className={`px-4 py-3 cursor-pointer group transition-colors border-r border-[#333333]
                   ${isIncomplete ? 'bg-red-950/10 border-b border-[#333333]' : ''}
                   ${isRecipeDirty ? 'border border-dashed border-[#A65D43] bg-[#A65D43]/5 my-1' : 'border-b border-[#333333] hover:bg-[#1c1c1c]'}
@@ -227,15 +260,13 @@ const Sidebar: React.FC<SidebarProps> = ({
                        ${isRecipeDirty ? 'text-[#A65D43] group-hover:text-white' : 'group-hover:text-white'}
                     `}>
                       {/* Source Tag Logic */}
-                      {(isHybrid || itemType !== 'dish') && (
-                        <SourceTag 
-                          type={itemType === 'recipe' ? 'recipe' : 'ingredient'} 
-                          active={isInspecting}
-                          onClick={(e) => {
-                             if (onInspect) onInspect(item.id, itemType === 'recipe' ? 'recipe' : 'ingredient');
-                          }}
-                        />
-                      )}
+                      <SourceTag
+                        type={itemType === 'recipe' ? 'recipe' : itemType === 'dish' ? 'dish' : 'ingredient'}
+                        active={isInspecting}
+                        onClick={() => {
+                          if (onInspect && itemType !== 'dish') onInspect(item.id, itemType === 'recipe' ? 'recipe' : 'ingredient');
+                        }}
+                      />
                       {item.name}
                       {isRecipeDirty && <span className="ml-2 text-[9px] font-bold text-[#A65D43]">[!]</span>}
                     </span>

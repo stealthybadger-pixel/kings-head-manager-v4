@@ -132,9 +132,8 @@ export async function lookupKcal(query: string): Promise<KcalResult | null> {
     }
   }
 
-  // 2. Try USDA (Real API call if key exists)
-  // Casting import.meta to any to avoid TS error about missing 'env' property
-  const USDA_KEY = (import.meta as any).env?.VITE_USDA_API_KEY;
+  // 2. Try USDA — env var preferred, hardcoded key as fallback
+  const USDA_KEY = (import.meta as any).env?.VITE_USDA_API_KEY || 'PttXmd7s9Unxj72jBPg02elhSgOdxhQtT5uRidbf';
   if (USDA_KEY) {
      try {
        const res = await fetch(`https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(query)}&pageSize=1&api_key=${USDA_KEY}`);

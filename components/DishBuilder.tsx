@@ -5,7 +5,8 @@ import { useKitchenData } from '../hooks/useKitchenData';
 import { useConfirmation } from '../hooks/useConfirmation';
 import { UI_STYLES, COLORS } from '../constants';
 import { SourceTag } from './SourceTag';
-import { getConvertedQuantity } from '../utils/units';
+import { AllergenMatrix } from './AllergenMatrix';
+import { getConvertedQuantity, toGrams } from '../utils/units';
 
 interface SearchOption {
   id: string;
@@ -240,6 +241,7 @@ export const DishBuilder: React.FC<DishBuilderProps> = ({
       setItems(d.items || []);
       setInstructions(d.instructions || '');
       setActiveDishId(d.id);
+      setIsEditing(true);
     } else if (!stagedItemId && !isEditing) {
       setDishName('New Service Dish');
       setItems([]);
@@ -311,19 +313,42 @@ export const DishBuilder: React.FC<DishBuilderProps> = ({
     return recipe.batchSize > 0 ? totalBatchCost / recipe.batchSize : 0;
   };
 
+  // kcal per gram of a recipe's batch output (for use when a recipe appears in a dish)
+  const getRecipeKcalPerGram = (recipeId: string): number => {
+    const recipe = recipes.find(r => r.id === recipeId);
+    if (!recipe) return 0;
+    const batchG = toGrams(recipe.batchSize, recipe.batchUnit || 'g');
+    if (batchG === 0) return 0;
+    const totalKcal = recipe.items.reduce((acc, ri) => {
+      const riId = ri.id || (ri as any).ingredientId;
+      if (!riId || ri.type !== 'ingredient') return acc;
+      const ing = ingredients.find(i => i.id === riId);
+      if (!ing) return acc;
+      return acc + toGrams(ri.quantity, ri.unit) * ((ing.kcalPer100 || 0) / 100);
+    }, 0);
+    return totalKcal / batchG;
+  };
+
   const dishFinancials = useMemo(() => {
-    const totalCost = items.reduce((acc, item) => {
+    let totalCost = 0;
+    let totalKcal = 0;
+
+    items.forEach(item => {
       const itemId = item.id || (item as any).ingredientId || (item as any).recipeId;
-      if (!itemId) return acc;
+      if (!itemId) return;
 
       if (item.type === 'ingredient') {
         const ing = ingredients.find(i => i.id === itemId);
-        if (!ing) return acc;
-        return acc + (getConvertedQuantity(item.quantity, item.unit, getIngredientPackUnit(ing)) * getIngredientCost(ing));
+        if (!ing) return;
+        totalCost += getConvertedQuantity(item.quantity, item.unit, getIngredientPackUnit(ing)) * getIngredientCost(ing);
+        totalKcal += toGrams(item.quantity, item.unit) * ((ing.kcalPer100 || 0) / 100);
+      } else {
+        totalCost += item.quantity * calculateRecipeUnitCost(itemId);
+        totalKcal += toGrams(item.quantity, item.unit) * getRecipeKcalPerGram(itemId);
       }
-      return acc + (item.quantity * calculateRecipeUnitCost(itemId));
-    }, 0);
-    return { totalCost, sellPrice: totalCost / (1 - (targetGP / 100)) };
+    });
+
+    return { totalCost, sellPrice: totalCost / (1 - (targetGP / 100)), totalKcal };
   }, [items, ingredients, recipes, targetGP]);
 
   const aggregatedAllergens = useMemo(() => {
@@ -512,9 +537,7 @@ export const DishBuilder: React.FC<DishBuilderProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-4">
                      <label className={UI_STYLES.label}>Allergen Risk Profile</label>
-                     <div className="flex flex-wrap gap-2">
-                        {aggregatedAllergens.length === 0 ? <span className="text-[10px] text-[#444] font-mono uppercase">NO_RISKS</span> : aggregatedAllergens.map(a => <span key={a} className="px-3 py-1.5 border border-[#333] bg-[#1c1c1c] text-[#888] text-[9px] font-bold uppercase">{a}</span>)}
-                     </div>
+                     <AllergenMatrix active={aggregatedAllergens} />
                   </div>
                   <div className="space-y-4">
                      <label className={UI_STYLES.label}>The Build</label>
@@ -534,6 +557,7 @@ export const DishBuilder: React.FC<DishBuilderProps> = ({
            <div className="flex gap-16">
               <div><label className={UI_STYLES.label}>Plate Cost</label><div className="text-3xl font-mono text-white">£{dishFinancials.totalCost.toFixed(4)}</div></div>
               <div><label className={UI_STYLES.label}>Retail (@{targetGP}%)</label><div className="text-3xl font-mono text-[#c8a96e]">£{dishFinancials.sellPrice.toFixed(2)}</div></div>
+              <div><label className={UI_STYLES.label}>Plate Kcal</label><div className="text-3xl font-mono text-[#7D8C7C]">{Math.round(dishFinancials.totalKcal)}<span className="text-sm ml-1 text-[#555]">kcal</span></div></div>
            </div>
            <div className="text-right text-[10px] font-mono text-[#666] uppercase">Telemetry: {isEditing ? 'ACTIVE' : 'IDLE'}</div>
         </div>

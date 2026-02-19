@@ -121,27 +121,113 @@ const CATEGORY_TO_SUPPLIER: Record<string, string> = {
 };
 
 const COMMON_TYPOS: Record<string, string> = {
-  'tomatos': 'Tomatoes',
-  'tomatoe': 'Tomato',
-  'potatos': 'Potatoes',
-  'potatoe': 'Potato',
-  'chili': 'Chilli', 
-  'chilis': 'Chillis',
-  'yoghurt': 'Yogurt',
-  'yogurt': 'Yogurt',
-  'spinich': 'Spinach',
-  'brocolli': 'Broccoli',
-  'broccoli': 'Broccoli',
-  'avocadoe': 'Avocado',
-  'omlette': 'Omelette',
-  'omnelette': 'Omelette',
-  'mayonaise': 'Mayonnaise',
-  'vinagar': 'Vinegar',
-  'vinager': 'Vinegar',
-  'mozarella': 'Mozzarella',
-  'parmesian': 'Parmesan',
-  'vanila': 'Vanilla',
-  'whiskey': 'Whisky',
+  // Vegetables
+  'tomatos': 'tomatoes', 'tomatoe': 'tomato',
+  'potatos': 'potatoes', 'potatoe': 'potato',
+  'brocolli': 'broccoli', 'brocoli': 'broccoli',
+  'courgett': 'courgette', 'zuchini': 'zucchini', 'zuchetti': 'zucchetti',
+  'aubergene': 'aubergine', 'aubergiene': 'aubergine',
+  'coriander': 'coriander', 'corainder': 'coriander', 'corriander': 'coriander',
+  'parsly': 'parsley', 'parsely': 'parsley',
+  'celery': 'celery', 'sellery': 'celery',
+  'leek': 'leek', 'leeks': 'leeks',
+  'brussel': 'brussels', 'brussell': 'brussels',
+  'mushoom': 'mushroom', 'mushroon': 'mushroom',
+  'shallott': 'shallot', 'shalot': 'shallot',
+  'coliflower': 'cauliflower', 'califlower': 'cauliflower',
+  'sweed': 'swede', 'sweede': 'swede',
+  'spinich': 'spinach', 'spinache': 'spinach',
+  'chesnut': 'chestnut', 'chesnuts': 'chestnuts', 'chestuts': 'chestnuts',
+
+  // Fruit
+  'avocadoe': 'avocado', 'avacado': 'avocado',
+  'rasberry': 'raspberry', 'raspbery': 'raspberry',
+  'strawbery': 'strawberry', 'straberry': 'strawberry',
+  'blueberry': 'blueberry', 'bluberry': 'blueberry',
+  'goosberry': 'gooseberry',
+  'pomegranete': 'pomegranate', 'pomegranet': 'pomegranate',
+
+  // Dairy / eggs
+  'mozarella': 'mozzarella', 'mozzerella': 'mozzarella', 'mozzarela': 'mozzarella',
+  'parmesian': 'parmesan', 'parmesean': 'parmesan', 'parmigiano': 'parmesan',
+  'mascapone': 'mascarpone', 'mascarponi': 'mascarpone',
+  'creme': 'cream', 'crème': 'cream',
+  'fraiche': 'fraiche', // keep as-is — it's correct
+  'yougurt': 'yogurt', 'yoghurt': 'yogurt', 'yogurt': 'yogurt',
+  'buttermilk': 'buttermilk',
+
+  // Meat / fish
+  'chiken': 'chicken', 'chciken': 'chicken',
+  'lambb': 'lamb',
+  'samon': 'salmon', 'salman': 'salmon',
+  'anchovy': 'anchovy', 'anchovie': 'anchovy',
+  'prawm': 'prawn', 'prwn': 'prawn',
+
+  // Spices / dry store
+  'tumeric': 'turmeric', 'tumerick': 'turmeric',
+  'cumin': 'cumin', 'cummin': 'cumin', 'cumen': 'cumin',
+  'cinamon': 'cinnamon', 'cinnamon': 'cinnamon', 'cinnaomon': 'cinnamon',
+  'nutmeg': 'nutmeg', 'nutmegg': 'nutmeg',
+  'cardemom': 'cardamom', 'cardamom': 'cardamom', 'cardamon': 'cardamom',
+  'fennell': 'fennel', 'fenel': 'fennel',
+  'vanila': 'vanilla', 'vanilia': 'vanilla',
+  'saffron': 'saffron', 'safron': 'saffron',
+  'paprica': 'paprika', 'papricka': 'paprika',
+  'oregeno': 'oregano', 'origano': 'oregano',
+  'tymme': 'thyme', 'timme': 'thyme',
+  'rosemery': 'rosemary', 'rosmary': 'rosemary',
+  'lavendar': 'lavender', 'lavander': 'lavender',
+  'bayleaf': 'bay leaf', 'bay-leaf': 'bay leaf',
+  'chilli': 'chilli', 'chili': 'chilli', 'chilis': 'chillis',
+  'cayene': 'cayenne', 'cayanne': 'cayenne',
+
+  // Condiments / pantry
+  'mayonaise': 'mayonnaise', 'mayyonnaise': 'mayonnaise', 'mayonnaisse': 'mayonnaise',
+  'vinagar': 'vinegar', 'vinager': 'vinegar', 'vinegear': 'vinegar',
+  'ketchup': 'ketchup', 'ketchap': 'ketchup',
+  'worcester': 'worcestershire', 'worcestershire': 'worcestershire',
+  'tabassco': 'tabasco', 'tobasco': 'tabasco',
+  'musterd': 'mustard', 'mustad': 'mustard',
+  'marmite': 'marmite',
+  'anchovey': 'anchovy',
+
+  // Cooking terms (for method text)
+  'refridgerate': 'refrigerate', 'refridgeration': 'refrigeration',
+  'refridgerator': 'refrigerator', 'fridge': 'fridge',
+  'occaisionally': 'occasionally', 'ocasionally': 'occasionally',
+  'consistancy': 'consistency', 'consistenct': 'consistency',
+  'tempurature': 'temperature', 'temperture': 'temperature',
+  'seperate': 'separate', 'seperately': 'separately', 'seperation': 'separation',
+  'recieve': 'receive',
+  'untill': 'until', 'unti': 'until',
+  'simmer': 'simmer',
+  'thermometre': 'thermometer', 'thermomitor': 'thermometer',
+  'colander': 'colander', 'colandar': 'colander',
+  'chinoise': 'chinois', 'chinoice': 'chinois',
+  'cartouche': 'cartouche',
+  'bains': 'bain',
+  'omlette': 'omelette', 'omnelette': 'omelette',
+  'whiskey': 'whisky',
+  'liquer': 'liquor', 'liqueur': 'liqueur',
+};
+
+/**
+ * Apply spell correction to a block of text word-by-word.
+ * Preserves the case style of the original word (capitalised → capitalised, etc.).
+ * Safe to apply to both ingredient names and method text.
+ */
+export const spellCorrect = (text: string): string => {
+  if (!text) return text;
+  return text.replace(/\b([a-zA-Zéèêëàâùûüîïôœç]+)\b/g, (word) => {
+    const key = word.toLowerCase();
+    const fix = COMMON_TYPOS[key];
+    if (!fix) return word;
+    // Preserve capitalisation: if original word was Title Case, title-case the fix
+    if (word[0] === word[0].toUpperCase() && word[0] !== word[0].toLowerCase()) {
+      return fix.charAt(0).toUpperCase() + fix.slice(1);
+    }
+    return fix;
+  });
 };
 
 const TITLE_CASE_EXCEPTIONS = ['and', 'of', 'in', 'with', 'a', 'the', 'or', 'for', 'w/', 'b/l', 's/r'];
