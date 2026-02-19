@@ -177,7 +177,11 @@ export const InvoiceScanner: React.FC<InvoiceScannerProps> = ({ onCancel }) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => setPreviewUrl(reader.result as string);
+      reader.onloadend = () => {
+        const dataUrl = reader.result as string;
+        // Store both data URL and mime type
+        setPreviewUrl(dataUrl);
+      };
       reader.readAsDataURL(file);
     }
   };
@@ -197,11 +201,15 @@ export const InvoiceScanner: React.FC<InvoiceScannerProps> = ({ onCancel }) => {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const base64Data = previewUrl.split(',')[1];
 
+      // Detect MIME type from data URL
+      const mimeTypeMatch = previewUrl.match(/data:([^;]+)/);
+      const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
+
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: {
           parts: [
-            { inlineData: { mimeType: 'image/png', data: base64Data } },
+            { inlineData: { mimeType, data: base64Data } },
             {
               text: `EXTRACT INVOICE DATA.
               Find the supplier name, invoice date, and invoice reference number.
@@ -257,7 +265,7 @@ export const InvoiceScanner: React.FC<InvoiceScannerProps> = ({ onCancel }) => {
       setProgress(100);
     } catch (err: any) {
       console.error("OCR Error:", err);
-      setError("SYSTEM ERROR EXTRACTION FAILED");
+      setError(err?.message || "SCAN FAILED - CHECK CONSOLE");
     } finally {
       setTimeout(() => setIsProcessing(false), 500);
     }
