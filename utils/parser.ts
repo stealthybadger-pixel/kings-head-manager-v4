@@ -11,6 +11,7 @@ export interface ParsedIngredient {
   normalizedName: string;
   matchedId?: string;
   mappedNote?: string; // For Alias Mapping or Prep Notes
+  needsReview?: boolean; // OCR fix was applied to this line
 }
 
 export interface ParsedRecipe {
@@ -51,6 +52,26 @@ const FRACTION_MAP: Record<string, number> = {
   '½': 0.5, '⅓': 1/3, '¼': 0.25, '¾': 0.75, '⅕': 0.2, '⅖': 0.4, '⅗': 0.6, '⅘': 0.8, 
   '⅙': 1/6, '⅚': 5/6, '⅛': 0.125, '⅜': 0.375, '⅝': 0.625, '⅞': 0.875
 };
+
+// ── OCR Artefact Fix Table ────────────────────────────────────────────────
+// Scanned recipe documents commonly drop the first letter of a word.
+// Apply these whole-word substitutions before any other processing.
+const OCR_FIXES: Record<string, string> = {
+  'emon': 'lemon', 'ime': 'lime', 'reen': 'green', 'eeks': 'leeks',
+  'eaf': 'leaf', 'eaves': 'leaves', 'elatin': 'gelatin', 'elatine': 'gelatine',
+  'itre': 'litre', 'itres': 'litres', 'uinea': 'guinea',
+  'rated': 'grated', 'arlic': 'garlic', 'arge': 'large',
+};
+
+const applyOCRFixes = (line: string): string =>
+  line.replace(/\b([A-Za-z]+)\b/g, (word) => {
+    const fix = OCR_FIXES[word.toLowerCase()];
+    if (!fix) return word;
+    // Preserve capitalisation of the original word
+    return word[0] === word[0].toUpperCase() && word[0] !== word[0].toLowerCase()
+      ? fix.charAt(0).toUpperCase() + fix.slice(1)
+      : fix;
+  });
 
 // Comprehensive Kitchen Noise Blacklist
 // These words are stripped from ingredient names before DB matching.
@@ -121,17 +142,29 @@ const parseQuantity = (raw: string): number => {
   return parseFloat(raw) || 0;
 };
 
+// Irregular plurals that basic s/es stripping won't handle correctly
+const PLURAL_MAP: Record<string, string> = {
+  'chillies': 'chilli', 'chilies': 'chilli',
+  'potatoes': 'potato', 'tomatoes': 'tomato',
+  'raspberries': 'raspberry', 'blackberries': 'blackberry', 'strawberries': 'strawberry',
+  'blueberries': 'blueberry', 'cranberries': 'cranberry', 'gooseberries': 'gooseberry',
+  'cherries': 'cherry', 'anchovies': 'anchovy', 'leaves': 'leaf',
+};
+
 // Normalization: Lowercase + Strip common plurals ('s', 'es')
 const normalizeName = (name: string): string => {
   let lower = name.trim().toLowerCase();
-  
+
+  // Check irregular plurals first
+  if (PLURAL_MAP[lower]) return PLURAL_MAP[lower];
+
   // Basic plural stripping
   if (lower.endsWith('es') && lower.length > 4) {
     lower = lower.slice(0, -2);
   } else if (lower.endsWith('s') && !lower.endsWith('ss') && lower.length > 3) {
     lower = lower.slice(0, -1);
   }
-  
+
   return lower;
 };
 
@@ -260,6 +293,25 @@ const UNIT_WEIGHTS: Record<string, number> = {
   'pomegranate': 300,
   'pineapple': 900,         // whole (usually sliced in recipes — edge case)
 
+  // ── Fresh herbs (per bunch unless noted) ─────────────────────────────────
+  // "½ bunch parsley" → 0.5 ea → 0.5 × 30 = 15 g
+  // Sprigs (thyme, rosemary) are ~5 g each — less precise but better than 0
+  'flat leaf parsley': 30,
+  'curly parsley': 30,
+  'parsley': 30,
+  'coriander': 30,
+  'cilantro': 30,
+  'dill': 25,
+  'mint': 25,
+  'tarragon': 15,
+  'chervil': 15,
+  'chives': 20,
+  'basil': 20,
+  'sage': 15,               // 1 bunch (small bunch by UK convention)
+  'thyme': 5,               // per sprig
+  'rosemary': 5,            // per sprig
+  'oregano': 5,             // per sprig
+
   // ── Small produce / flavourings ──────────────────────────────────────────
   'vanilla pod': 3,         // 1 pod
   'vanilla bean': 3,
@@ -280,13 +332,66 @@ const wordBoundaryMatch = (text: string, phrase: string): boolean =>
 // Pre-sorted keys (longest/most-specific first) so "cherry tomato" wins over "tomato".
 const UNIT_WEIGHT_KEYS = Object.keys(UNIT_WEIGHTS).sort((a, b) => b.length - a.length);
 
+// Action verbs that start method/instruction lines (never ingredient lines)
+const METHOD_VERBS = new Set([
+  'peel', 'boil', 'steam', 'simmer', 'roast', 'bake', 'cook', 'heat', 'mix', 'combine',
+  'place', 'add', 'remove', 'pass', 'reduce', 'allow', 'transfer', 'cover', 'season',
+  'fry', 'blend', 'blitz', 'whisk', 'melt', 'stir', 'bring', 'rest', 'roll', 'cut',
+  'slice', 'shape', 'mould', 'freeze', 'chill', 'turn', 'glaze', 'arrange', 'fold',
+  'knead', 'prove', 'hang', 'take', 'once', 'after', 'using', 'done', 'make', 'fill',
+  'brush', 'pour', 'drain', 'coat', 'store', 'when', 'while', 'leave', 'serve', 'note',
+  'total', 'yield', 'serves', 'portion', 'method', 'instruction', 'preparation',
+  'etc', 'this', 'you', 'the', 'if', 'in', 'for', 'sift', 'skim', 'shred',
+  'separate', 'set', 'confit', 'deglaze', 'deseed', 'divide', 'gently', 'marinate',
+]);
+
 const isMethodLine = (line: string): boolean => {
-  const lower = line.toLowerCase();
+  const lower = line.toLowerCase().trim();
+  if (!lower) return false;
+
+  // Explicit section header words on their own
   if (lower === 'method' || lower === 'instructions' || lower === 'preparation') return true;
+
+  // Line starts with a recognised method/instruction verb
+  const firstWord = lower.split(/[\s,]+/)[0];
+  if (METHOD_VERBS.has(firstWord)) return true;
+
+  // Long lines with no measurement unit are almost certainly method sentences
+  if (line.length > 60) {
+    const hasUnit = /\b(g|kg|ml|l|litres?|tsp|tbsp|teaspoons?|tablespoons?|bunches?|cloves?|sprigs?|heads?|oz|lb|pints?|rashers?|sheets?)\b/i.test(line);
+    if (!hasUnit) return true;
+  }
+
   return false;
 };
 
-// SCORCHED EARTH: Force Ingredient Matching Only. 
+// Remove bracket content and truncate at first comma before prep-word extraction.
+// e.g. "butter (unsalted)"      → "butter"
+// e.g. "garlic, finely chopped" → "garlic"
+const preCleanName = (rawName: string): string => {
+  let clean = rawName.replace(/\s*\([^)]*\)/g, '').trim();   // strip (...)
+  const commaIdx = clean.indexOf(',');
+  if (commaIdx > 0) clean = clean.substring(0, commaIdx).trim();
+  return clean.replace(/[.,;:]+$/, '').trim();
+};
+
+// Ingredients that should never be sourced / saved.
+// Plain 'salt' is a seasoning; specific salt types (rock salt, sea salt) are kept.
+// Zests are a technique applied to fruit, not a separate item to order.
+// Water in any form is not a sourced ingredient.
+const SKIP_INGREDIENT_NAMES = new Set([
+  'water', 'tepid water', 'warm water', 'cold water', 'hot water', 'boiling water', 'iced water',
+  'salt',
+]);
+
+const shouldSkipIngredient = (cleanName: string): boolean => {
+  const lower = cleanName.toLowerCase().trim();
+  if (SKIP_INGREDIENT_NAMES.has(lower)) return true;
+  if (/\bzest\b/.test(lower)) return true;
+  return false;
+};
+
+// SCORCHED EARTH: Force Ingredient Matching Only.
 // This function must NEVER accept a Recipe list for matching.
 export const parseRecipeContent = (text: string, ingredientsDB: Ingredient[], recipeTitle?: string): ParsedRecipe => {
   if (!text) return { ingredients: [], method: [], matchRate: 0 };
@@ -305,26 +410,37 @@ export const parseRecipeContent = (text: string, ingredientsDB: Ingredient[], re
   let totalWeight = 0; // grams
   let totalVolume = 0; // ml
 
+  // Standalone ingredient expansions — only when the whole name matches exactly.
+  // Plain 'salt' removed: standalone salt is a seasoning, not a sourced ingredient.
+  const INGREDIENT_EXPANSIONS: Record<string, string> = {
+    'flour': 'plain flour',
+  };
+
   for (const line of lines) {
-    // Check for Section Headers that force a strict switch
-    if (isMethodLine(line)) {
+    // ── STEP 1: Fix OCR artefacts (dropped first-letter) ──────────────────
+    const fixedLine = applyOCRFixes(line);
+
+    // ── STEP 2: Detect method/instruction lines ────────────────────────────
+    if (isMethodLine(fixedLine)) {
       parsingMethodSection = true;
       continue;
     }
 
     if (parsingMethodSection) {
-      methodLines.push(spellCorrect(line));
+      methodLines.push(spellCorrect(fixedLine));
       continue;
     }
 
-    // Attempt NER Parse
-    const match = line.match(QTY_REGEX);
-    
+    // ── STEP 3: NER Parse — [Qty] [Unit?] [Name] ──────────────────────────
+    const match = fixedLine.match(QTY_REGEX);
+
     if (match) {
-      // It looks like an ingredient line: [Qty] [Unit?] [Name]
       let qty = parseQuantity(match[1]);
       const rawUnit = match[2]?.toLowerCase();
       const rawName = match[3];
+
+      // ── STEP 4: Pre-clean name (brackets, comma-after) ────────────────
+      const preCleaned = preCleanName(rawName);
 
       // Apply quantity multiplier BEFORE unit normalisation
       // e.g. "2 tbsp" → qty × 15 = 30, then unit → 'ml'
@@ -334,18 +450,16 @@ export const parseRecipeContent = (text: string, ingredientsDB: Ingredient[], re
 
       // Unit Normalization
       let unit: Unit = rawUnit && NORMALIZE_UNITS[rawUnit] ? NORMALIZE_UNITS[rawUnit] : 'ea';
-      
-      // Extraction: Separate Prep Notes from Name, then spell-correct
-      const { cleanName: rawClean, notes } = extractPrepNotes(rawName);
+
+      // ── STEP 5: Separate prep notes, then spell-correct ───────────────
+      const { cleanName: rawClean, notes } = extractPrepNotes(preCleaned);
       const spellCorrected = spellCorrect(rawClean);
 
-      // Standalone ingredient expansions — only when the whole name matches exactly
-      const INGREDIENT_EXPANSIONS: Record<string, string> = {
-        'flour': 'plain flour',
-        'salt': 'table salt',
-      };
       const cleanName = INGREDIENT_EXPANSIONS[spellCorrected.toLowerCase().trim()] ?? spellCorrected;
-      
+
+      // ── STEP 6: Skip non-ingredient items (water, plain salt, zests) ──
+      if (shouldSkipIngredient(cleanName)) continue;
+
       // ea → g conversion: for whole counted items (onion, garlic, egg, lemon, etc.)
       // Uses pre-sorted UNIT_WEIGHT_KEYS (longest first) with word-boundary matching.
       if (unit === 'ea') {
@@ -365,8 +479,8 @@ export const parseRecipeContent = (text: string, ingredientsDB: Ingredient[], re
 
       // TITLE GUARD: Prevent parsing the recipe title as an ingredient of itself
       if (normalizedTitle && (comparisonName === normalizedTitle)) {
-         console.debug(`[GUARD] REMOVED TITLE "${recipeTitle}" FROM INGREDIENTS`);
-         continue; 
+        console.debug(`[GUARD] REMOVED TITLE "${recipeTitle}" FROM INGREDIENTS`);
+        continue;
       }
 
       // Batch Accumulation
@@ -397,14 +511,23 @@ export const parseRecipeContent = (text: string, ingredientsDB: Ingredient[], re
         originalName: rawName,
         normalizedName: normalized,
         matchedId: matchedIng?.id,
-        mappedNote: notes // Store extracted prep words
+        mappedNote: notes,
+        needsReview: fixedLine !== line, // OCR fix was applied
       });
 
     } else {
       // If line doesn't match Qty Regex, treat as Method (or title)
-      methodLines.push(line);
+      methodLines.push(fixedLine);
     }
   }
+
+  // DEDUPLICATION: keep the first occurrence of each normalised name
+  const seenNormalized = new Set<string>();
+  parsedIngredients = parsedIngredients.filter(ing => {
+    if (seenNormalized.has(ing.normalizedName)) return false;
+    seenNormalized.add(ing.normalizedName);
+    return true;
+  });
 
   // METHOD SANITATION FILTER
   const fullMethodText = methodLines.join('\n');

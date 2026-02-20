@@ -181,6 +181,16 @@ const COMMON_TYPOS: Record<string, string> = {
   'chilli': 'chilli', 'chili': 'chilli', 'chilis': 'chillis',
   'cayene': 'cayenne', 'cayanne': 'cayenne',
 
+  // Dry store / baking (from spec)
+  'suger': 'sugar',
+  'evapourated': 'evaporated',
+  'demerera': 'demerara',
+  'desicated': 'desiccated',
+  'philidelphia': 'philadelphia',
+  'seasme': 'sesame',
+  'yoke': 'yolk',
+  'palenta': 'polenta',
+
   // Condiments / pantry
   'mayonaise': 'mayonnaise', 'mayyonnaise': 'mayonnaise', 'mayonnaisse': 'mayonnaise',
   'vinagar': 'vinegar', 'vinager': 'vinegar', 'vinegear': 'vinegar',

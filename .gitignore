@@ -4,3 +4,6 @@ dist/
 .env.local
 .firebase/
 *.local
+tmpclaude-*
+SESSION-*.md
+screngrabs/

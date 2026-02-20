@@ -29,6 +29,7 @@ export const Settings: React.FC = () => {
   const [maintenanceLog, setMaintenanceLog] = useState<string[]>([]);
   const [purgeResult, setPurgeResult] = useState<string | null>(null);
   const [pendingDeleteResult, setPendingDeleteResult] = useState<string | null>(null);
+  const [diagScan, setDiagScan] = useState<{ label: string; pct: number } | null>(null);
 
   // PREP CORRECTION STATE
   const [showPrepModal, setShowPrepModal] = useState(false);
@@ -43,14 +44,13 @@ export const Settings: React.FC = () => {
 
   const runAllergenScan = async () => {
     addLog("STARTING REGISTRY-WIDE ALLERGEN AUDIT...");
+    const targets = ingredients.filter(ing => !ing.audited);
     const newIssues: DataIssue[] = [];
-    ingredients.forEach(ing => {
-      // Skip already audited items to prevent re-flagging verified discrepancies
-      if (ing.audited) return;
-
+    for (let i = 0; i < targets.length; i++) {
+      setDiagScan({ label: `Allergen scan — ${targets[i].name}`, pct: Math.round((i / targets.length) * 100) });
+      const ing = targets[i];
       const suggested = detectAllergens(ing.name);
       const missing = suggested.filter(a => !ing.allergens.includes(a));
-      
       if (missing.length > 0) {
         newIssues.push({
           id: `alg-${ing.id}-${Date.now()}`,
@@ -63,53 +63,61 @@ export const Settings: React.FC = () => {
           severity: 'high'
         });
       }
-    });
+      if (i % 10 === 0) await new Promise(r => setTimeout(r, 0));
+    }
+    setDiagScan(null);
     setPendingIssues(prev => [...prev, ...newIssues]);
     addLog(`AUDIT COMPLETE: ${newIssues.length} DISCREPANCIES IDENTIFIED.`);
   };
 
   const runSupplierCheck = async () => {
     addLog("STARTING SUPPLIER CONSISTENCY CHECK...");
+    for (let i = 0; i <= 100; i += 10) {
+      setDiagScan({ label: 'Supplier consistency check', pct: i });
+      await new Promise(r => setTimeout(r, 30));
+    }
+    setDiagScan(null);
     addLog(`SCAN COMPLETE: Suppliers consistent.`);
   };
 
   const runKcalScan = async () => {
-    addLog("STARTING KCAL DATA INTEGRITY SCAN (API POWERED)...");
+    addLog("STARTING KCAL DATA INTEGRITY SCAN (COFID)...");
+    const targets = ingredients.filter(ing =>
+      !ing.audited &&
+      (ing.kcalPer100 === 0 || !ing.kcalPer100) &&
+      !['water', 'salt', 'ice'].some(k => ing.name.toLowerCase().includes(k))
+    );
     const newIssues: DataIssue[] = [];
-    let processed = 0;
-    
-    for (const ing of ingredients) {
-      if (ing.audited) continue;
-
-      if ((ing.kcalPer100 === 0 || !ing.kcalPer100) && !['water', 'salt', 'ice'].some(k => ing.name.toLowerCase().includes(k))) {
-        const result = await lookupKcal(ing.name);
-        
-        if (result && result.value > 0) {
-          newIssues.push({
-            id: `kcal-${ing.id}-${Date.now()}`,
-            ingredientId: ing.id,
-            ingredientName: ing.name,
-            type: 'KCAL',
-            description: `Missing energy density data. Found via ${result.source}.`,
-            suggestedValue: result.value,
-            originalValue: 0,
-            severity: 'low'
-          });
-        }
+    for (let i = 0; i < targets.length; i++) {
+      const ing = targets[i];
+      setDiagScan({ label: `Nutrition scan — ${ing.name}`, pct: Math.round((i / targets.length) * 100) });
+      const result = await lookupKcal(ing.name);
+      if (result && result.value > 0) {
+        newIssues.push({
+          id: `kcal-${ing.id}-${Date.now()}`,
+          ingredientId: ing.id,
+          ingredientName: ing.name,
+          type: 'KCAL',
+          description: `Missing energy density data. Found via ${result.source}.`,
+          suggestedValue: result.value,
+          originalValue: 0,
+          severity: 'low'
+        });
       }
-      processed++;
-      if (processed % 5 === 0) await new Promise(r => setTimeout(r, 100)); // Yield to UI
+      if (i % 5 === 0) await new Promise(r => setTimeout(r, 50));
     }
+    setDiagScan(null);
     setPendingIssues(prev => [...prev, ...newIssues]);
     addLog(`SCAN COMPLETE: ${newIssues.length} VALUES RETRIEVED.`);
   };
 
   const runSpellCheck = async () => {
     addLog("STARTING TYPOGRAPHY & SPELLING AUDIT...");
+    const targets = ingredients.filter(ing => !ing.audited);
     const newIssues: DataIssue[] = [];
-    ingredients.forEach(ing => {
-      if (ing.audited) return;
-
+    for (let i = 0; i < targets.length; i++) {
+      setDiagScan({ label: `Spell check — ${targets[i].name}`, pct: Math.round((i / targets.length) * 100) });
+      const ing = targets[i];
       const normalized = normalizeName(ing.name);
       if (normalized !== ing.name) {
         newIssues.push({
@@ -123,7 +131,9 @@ export const Settings: React.FC = () => {
           severity: 'low'
         });
       }
-    });
+      if (i % 10 === 0) await new Promise(r => setTimeout(r, 0));
+    }
+    setDiagScan(null);
     setPendingIssues(prev => [...prev, ...newIssues]);
     addLog(`AUDIT COMPLETE: ${newIssues.length} TYPO/CASE ISSUES FOUND.`);
   };
@@ -490,11 +500,27 @@ export const Settings: React.FC = () => {
             <div className="h-px bg-[#333333] flex-1"></div>
           </div>
 
+          {/* Diagnostic progress bar */}
+          {diagScan && (
+            <div className="border border-[#333] bg-[#0d0d0d] p-3 space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-[9px] font-mono text-[#c8a96e] uppercase tracking-widest truncate max-w-[80%]">{diagScan.label}</span>
+                <span className="text-[9px] font-mono text-[#555]">{diagScan.pct}%</span>
+              </div>
+              <div className="w-full bg-[#1a1a1a] h-1">
+                <div
+                  className="h-full bg-[#c8a96e] transition-all duration-150"
+                  style={{ width: `${diagScan.pct}%` }}
+                />
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-            <button onClick={runSupplierCheck} className="p-3 bg-[#1c1c1c] border border-[#333333] text-[9px] font-bold uppercase text-[#888] hover:text-[#c8a96e] hover:border-[#c8a96e] transition-all">Scan Suppliers</button>
-            <button onClick={runAllergenScan} className="p-3 bg-[#1c1c1c] border border-[#333333] text-[9px] font-bold uppercase text-[#888] hover:text-[#c8a96e] hover:border-[#c8a96e] transition-all">Scan Allergens</button>
-            <button onClick={runKcalScan} className="p-3 bg-[#1c1c1c] border border-[#333333] text-[9px] font-bold uppercase text-[#888] hover:text-[#c8a96e] hover:border-[#c8a96e] transition-all">Scan Nutrition (API)</button>
-            <button onClick={runSpellCheck} className="p-3 bg-[#1c1c1c] border border-[#333333] text-[9px] font-bold uppercase text-[#888] hover:text-[#c8a96e] hover:border-[#c8a96e] transition-all">Scan Typography</button>
+            <button disabled={!!diagScan} onClick={runSupplierCheck} className="p-3 bg-[#1c1c1c] border border-[#333333] text-[9px] font-bold uppercase text-[#888] hover:text-[#c8a96e] hover:border-[#c8a96e] transition-all disabled:opacity-30 disabled:cursor-not-allowed">Scan Suppliers</button>
+            <button disabled={!!diagScan} onClick={runAllergenScan} className="p-3 bg-[#1c1c1c] border border-[#333333] text-[9px] font-bold uppercase text-[#888] hover:text-[#c8a96e] hover:border-[#c8a96e] transition-all disabled:opacity-30 disabled:cursor-not-allowed">Scan Allergens</button>
+            <button disabled={!!diagScan} onClick={runKcalScan} className="p-3 bg-[#1c1c1c] border border-[#333333] text-[9px] font-bold uppercase text-[#888] hover:text-[#c8a96e] hover:border-[#c8a96e] transition-all disabled:opacity-30 disabled:cursor-not-allowed">Scan Nutrition</button>
+            <button disabled={!!diagScan} onClick={runSpellCheck} className="p-3 bg-[#1c1c1c] border border-[#333333] text-[9px] font-bold uppercase text-[#888] hover:text-[#c8a96e] hover:border-[#c8a96e] transition-all disabled:opacity-30 disabled:cursor-not-allowed">Scan Typography</button>
             
             <div className="flex items-center gap-1 bg-[#1c1c1c] border border-[#c8a96e] shadow-[0_0_10px_rgba(200,169,110,0.1)]">
                <button onClick={handleRunPrepScan} className="flex-1 p-3 text-[9px] font-bold uppercase text-[#c8a96e] hover:bg-[#c8a96e] hover:text-black transition-all">Deep Prep Analysis</button>

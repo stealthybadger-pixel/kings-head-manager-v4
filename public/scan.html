@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>King's Head — Scan</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body {
+      background: #111;
+      color: #e0e0e0;
+      font-family: system-ui, -apple-system, sans-serif;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+    }
+    header {
+      background: #111;
+      border-bottom: 1px solid #333;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    header h1 {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: #c8a96e;
+    }
+    header span {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: #555;
+    }
+    .screen {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 24px 20px;
+      gap: 20px;
+    }
+    .screen.hidden { display: none; }
+
+    /* Type selection */
+    .label {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: #666;
+      margin-bottom: 4px;
+    }
+    .type-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .type-btn {
+      border: 1px solid #333;
+      background: #1c1c1c;
+      color: #888;
+      padding: 28px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      cursor: pointer;
+      transition: all 0.15s;
+      border-radius: 0;
+      -webkit-appearance: none;
+    }
+    .type-btn:active, .type-btn.selected {
+      border-color: #c8a96e;
+      color: #c8a96e;
+      background: #1a1508;
+    }
+    .type-btn svg { opacity: 0.6; }
+    .type-btn.selected svg { opacity: 1; }
+    .type-icon { font-size: 32px; }
+
+    /* File capture */
+    .capture-area {
+      flex: 1;
+      border: 1px dashed #333;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 32px 20px;
+      min-height: 200px;
+      position: relative;
+      overflow: hidden;
+    }
+    .capture-area img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0.7;
+    }
+    .capture-overlay {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    .capture-hint {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #555;
+      text-align: center;
+    }
+
+    /* Buttons */
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 18px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      text-align: center;
+      border: none;
+      cursor: pointer;
+      border-radius: 0;
+      -webkit-appearance: none;
+      transition: all 0.15s;
+    }
+    .btn-primary {
+      background: #c8a96e;
+      color: #111;
+    }
+    .btn-primary:active { background: #e0c080; }
+    .btn-primary:disabled { opacity: 0.3; }
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid #333;
+      color: #666;
+    }
+    .btn-secondary:active { border-color: #888; color: #aaa; }
+    .btn-camera {
+      background: #1c1c1c;
+      border: 1px solid #444;
+      color: #c8a96e;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 18px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      width: 100%;
+      cursor: pointer;
+    }
+    .btn-camera:active { background: #222; }
+
+    /* Note field */
+    textarea {
+      width: 100%;
+      background: #1c1c1c;
+      border: 1px solid #333;
+      color: #e0e0e0;
+      font-size: 13px;
+      padding: 12px;
+      resize: none;
+      height: 72px;
+      font-family: inherit;
+      border-radius: 0;
+      outline: none;
+    }
+    textarea:focus { border-color: #c8a96e; }
+    textarea::placeholder { color: #444; }
+
+    /* Progress */
+    .progress-wrap {
+      background: #222;
+      height: 4px;
+      width: 100%;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      background: #c8a96e;
+      transition: width 0.2s;
+    }
+    .status-text {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: #888;
+      text-align: center;
+    }
+
+    /* Success */
+    .success-icon {
+      font-size: 64px;
+      text-align: center;
+    }
+    .success-title {
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: #c8a96e;
+      text-align: center;
+    }
+    .success-sub {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #555;
+      text-align: center;
+      line-height: 1.6;
+    }
+
+    /* Error */
+    .error-box {
+      background: #1a0505;
+      border: 1px solid #661111;
+      padding: 12px;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #ff6666;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>King's Head</h1>
+    <span>Scan Upload</span>
+  </header>
+
+  <!-- SCREEN 1: Type selection -->
+  <div class="screen" id="screen-type">
+    <div>
+      <div class="label">What are you scanning?</div>
+    </div>
+    <div class="type-grid">
+      <button class="type-btn" id="btn-invoice" onclick="selectType('invoice')">
+        <span class="type-icon">🧾</span>
+        Invoice
+      </button>
+      <button class="type-btn" id="btn-recipe" onclick="selectType('recipe')">
+        <span class="type-icon">📋</span>
+        Recipe
+      </button>
+    </div>
+    <div id="type-error" class="error-box hidden">Please select a type first</div>
+  </div>
+
+  <!-- SCREEN 2: Capture -->
+  <div class="screen hidden" id="screen-capture">
+    <div>
+      <div class="label" id="capture-label">Scan Invoice</div>
+    </div>
+
+    <div class="capture-area" id="capture-area" onclick="document.getElementById('file-input').click()">
+      <div class="capture-overlay" id="capture-placeholder">
+        <svg width="40" height="40" fill="none" stroke="#555" viewBox="0 0 24 24">
+          <path stroke-linecap="square" stroke-linejoin="miter" stroke-width="1.5"
+            d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+          <circle cx="12" cy="13" r="3" stroke-linecap="square" stroke-linejoin="miter" stroke-width="1.5" />
+        </svg>
+        <div class="capture-hint">Tap to take photo<br/>or choose from gallery</div>
+      </div>
+      <img id="preview-img" class="hidden" />
+    </div>
+
+    <input type="file" id="file-input" accept="image/*" capture="environment" class="hidden" style="display:none" />
+
+    <label class="label" for="note-field">Note (optional)</label>
+    <textarea id="note-field" placeholder="e.g. David Catt Tuesday delivery…"></textarea>
+
+    <button class="btn btn-primary" id="upload-btn" onclick="doUpload()">Send to Kitchen</button>
+    <button class="btn btn-secondary" onclick="goBack()">Back</button>
+    <div id="upload-error" class="error-box hidden"></div>
+  </div>
+
+  <!-- SCREEN 3: Uploading -->
+  <div class="screen hidden" id="screen-uploading">
+    <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px;">
+      <div class="status-text" id="upload-status">Uploading…</div>
+      <div class="progress-wrap" style="width:100%">
+        <div class="progress-bar" id="progress-bar" style="width:0%"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 4: Done -->
+  <div class="screen hidden" id="screen-done">
+    <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px;">
+      <div class="success-icon">✓</div>
+      <div class="success-title">Sent to Kitchen</div>
+      <div class="success-sub" id="done-sub">The document is now in the queue<br/>on the desktop app.</div>
+    </div>
+    <button class="btn btn-primary" onclick="resetApp()">Scan Another</button>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+    import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js';
+    import { getFirestore, addDoc, collection, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBx_7Raw_xgM2dQWBmUU29W9ggbcmVmo_Y",
+      authDomain: "kings-head-kitchen-claude.firebaseapp.com",
+      projectId: "kings-head-kitchen-claude",
+      storageBucket: "kings-head-kitchen-claude.firebasestorage.app",
+      messagingSenderId: "661815699598",
+      appId: "1:661815699598:web:e05a12781db09844f241df"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const storage = getStorage(app);
+    const db = getFirestore(app);
+
+    let selectedType = null;
+    let selectedFile = null;
+
+    // Expose to global scope so onclick handlers work
+    window.selectType = (type) => {
+      selectedType = type;
+      document.getElementById('btn-invoice').classList.toggle('selected', type === 'invoice');
+      document.getElementById('btn-recipe').classList.toggle('selected', type === 'recipe');
+      document.getElementById('type-error').classList.add('hidden');
+      setTimeout(() => {
+        document.getElementById('capture-label').textContent = type === 'invoice' ? 'Scan Invoice' : 'Scan Recipe';
+        show('screen-capture');
+      }, 150);
+    };
+
+    window.goBack = () => {
+      selectedFile = null;
+      document.getElementById('preview-img').classList.add('hidden');
+      document.getElementById('capture-placeholder').style.display = '';
+      document.getElementById('note-field').value = '';
+      document.getElementById('upload-error').classList.add('hidden');
+      show('screen-type');
+    };
+
+    window.doUpload = async () => {
+      if (!selectedFile) {
+        showError('upload-error', 'Please take or select a photo first');
+        return;
+      }
+      show('screen-uploading');
+
+      try {
+        const uid = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+        const ext = selectedFile.type.includes('png') ? 'png' : 'jpg';
+        const storagePath = `scan_queue/${uid}.${ext}`;
+        const storageRef = ref(storage, storagePath);
+
+        const uploadTask = uploadBytesResumable(storageRef, selectedFile);
+
+        uploadTask.on('state_changed',
+          (snapshot) => {
+            const pct = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            document.getElementById('progress-bar').style.width = pct + '%';
+            document.getElementById('upload-status').textContent =
+              `Uploading… ${Math.round(pct)}%`;
+          },
+          (err) => {
+            console.error(err);
+            show('screen-capture');
+            showError('upload-error', 'Upload failed: ' + err.message);
+          },
+          async () => {
+            const imageUrl = await getDownloadURL(uploadTask.snapshot.ref);
+            const note = document.getElementById('note-field').value.trim();
+
+            await addDoc(collection(db, 'scan_queue'), {
+              type: selectedType,
+              storagePath,
+              imageUrl,
+              note: note || null,
+              status: 'pending',
+              uploadedAt: serverTimestamp(),
+            });
+
+            document.getElementById('done-sub').textContent =
+              `${selectedType === 'invoice' ? 'Invoice' : 'Recipe'} queued on the desktop app.`;
+            show('screen-done');
+          }
+        );
+      } catch (err) {
+        console.error(err);
+        show('screen-capture');
+        showError('upload-error', 'Error: ' + err.message);
+      }
+    };
+
+    window.resetApp = () => {
+      selectedType = null;
+      selectedFile = null;
+      document.getElementById('btn-invoice').classList.remove('selected');
+      document.getElementById('btn-recipe').classList.remove('selected');
+      document.getElementById('preview-img').classList.add('hidden');
+      document.getElementById('capture-placeholder').style.display = '';
+      document.getElementById('note-field').value = '';
+      document.getElementById('progress-bar').style.width = '0%';
+      show('screen-type');
+    };
+
+    function show(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+      document.getElementById(id).classList.remove('hidden');
+    }
+
+    function showError(id, msg) {
+      const el = document.getElementById(id);
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
+
+    // File input handler
+    document.getElementById('file-input').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      selectedFile = file;
+      const url = URL.createObjectURL(file);
+      const img = document.getElementById('preview-img');
+      img.src = url;
+      img.classList.remove('hidden');
+      document.getElementById('capture-placeholder').style.display = 'none';
+      document.getElementById('upload-error').classList.add('hidden');
+    });
+  </script>
+</body>
+</html>

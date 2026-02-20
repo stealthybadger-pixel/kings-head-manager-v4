@@ -508,7 +508,7 @@ export const DishBuilder: React.FC<DishBuilderProps> = ({
                       <div className="flex items-center gap-8">
                         <div className="flex items-center gap-2">
                           <input 
-                            ref={el => (quantityRefs.current[idx] = el)}
+                            ref={el => { quantityRefs.current[idx] = el; }}
                             type="number" 
                             value={item.quantity} 
                             onChange={(e) => updateItem(idx, { quantity: parseFloat(e.target.value) || 0 })} 

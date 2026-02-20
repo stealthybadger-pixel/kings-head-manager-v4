@@ -152,12 +152,16 @@ interface RecipeBuilderProps {
   onSetAvailableTabs: (tabs: ('ingredients' | 'recipes')[]) => void;
   isLibraryTabRecipes: boolean;
   onPushIngredient?: (name?: string) => void;
+  onPushRecipe?: (name?: string) => void;
   onInspect?: (id: string, type: 'ingredient' | 'recipe') => void;
   inspectedItem?: {id: string, type: 'ingredient' | 'recipe'} | null;
   forceNew?: boolean;
   onForceNewHandled?: () => void;
   startInScaleMode?: boolean;
   onScaleModeConsumed?: () => void;
+  isRecursive?: boolean;
+  initialName?: string;
+  onComplete?: (id: string) => void;
 }
 
 const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
@@ -744,7 +748,7 @@ const RecipeBuilder: React.FC<RecipeBuilderProps> = ({
                           </div>
                         ) : (
                           <input
-                            ref={el => (quantityRefs.current[idx] = el)}
+                            ref={el => { quantityRefs.current[idx] = el; }}
                             type="number"
                             value={item.quantity}
                             readOnly={!isEditing}

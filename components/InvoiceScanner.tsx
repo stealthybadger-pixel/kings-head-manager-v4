@@ -17,6 +17,9 @@ interface ExtractedInvoiceItem {
 
 interface InvoiceScannerProps {
   onCancel: () => void;
+  initialImageUrl?: string;
+  queueItemId?: string;
+  onQueueItemDone?: (id: string) => void;
 }
 
 const SearchableIngredientDropdown: React.FC<{
@@ -128,14 +131,14 @@ const SearchableIngredientDropdown: React.FC<{
   );
 };
 
-export const InvoiceScanner: React.FC<InvoiceScannerProps> = ({ onCancel }) => {
+export const InvoiceScanner: React.FC<InvoiceScannerProps> = ({ onCancel, initialImageUrl, queueItemId, onQueueItemDone }) => {
   const { ingredients, addIngredient, addInvoice } = useKitchenData();
   const { confirm } = useConfirmation();
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(initialImageUrl ?? null);
   const [stagedItems, setStagedItems] = useState<ExtractedInvoiceItem[]>([]);
   const [invoiceSupplier, setInvoiceSupplier] = useState('');
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().slice(0, 10));
@@ -400,6 +403,7 @@ export const InvoiceScanner: React.FC<InvoiceScannerProps> = ({ onCancel }) => {
         totalCost: totalCost,
       }, movements);
 
+      if (queueItemId && onQueueItemDone) onQueueItemDone(queueItemId);
       onCancel();
     } catch (err) {
       console.error("Failed to commit invoice:", err);

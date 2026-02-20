@@ -9,6 +9,16 @@ import { getProduceYield } from '../utils/yields';
 import { COFID_DATA } from '../utils/nutritionLookup';
 
 // TODO: Move to types.ts
+export interface ScanQueueItem {
+  id: string;
+  type: 'invoice' | 'recipe';
+  imageUrl: string;
+  storagePath: string;
+  status: 'pending' | 'done';
+  note?: string | null;
+  uploadedAt: any; // Firestore Timestamp
+}
+
 export interface SupplierPriceItem {
   id: string;
   name: string;
@@ -140,6 +150,7 @@ export const useKitchenData = () => {
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [stockMovements, setStockMovements] = useState<StockMovement[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [scanQueue, setScanQueue] = useState<ScanQueueItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
@@ -348,6 +359,15 @@ export const useKitchenData = () => {
       const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Invoice[];
       setInvoices(data);
     }, (err) => console.error("Error fetching invoices:", err));
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const q = query(collection(db, 'scan_queue'), where('status', '==', 'pending'), orderBy('uploadedAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as ScanQueueItem[];
+      setScanQueue(data);
+    }, (err) => console.error("Error fetching scan_queue:", err));
     return () => unsubscribe();
   }, []);
 
@@ -1002,12 +1022,17 @@ export const useKitchenData = () => {
     }
   }, []);
 
+  const dismissScanQueueItem = useCallback(async (id: string) => {
+    await updateDoc(doc(db, 'scan_queue', id), { status: 'done' });
+  }, []);
+
   return {
     ingredients,
     recipes,
     dishes,
     stockMovements,
     invoices,
+    scanQueue,
     loading,
     error,
     connectionStatus,
@@ -1033,6 +1058,7 @@ export const useKitchenData = () => {
     logUnresolvedIngredient,
     updateRecipeStatus,
     searchSupplierPriceGuide,
-    seedSupplierPriceGuide
+    seedSupplierPriceGuide,
+    dismissScanQueueItem
   };
 };

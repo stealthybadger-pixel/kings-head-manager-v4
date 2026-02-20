@@ -20,6 +20,9 @@ interface OCRScannerProps {
   onCancel: () => void;
   onIngredientCreateRequest: (name: string) => void;
   onInspect?: (id: string, type: 'ingredient' | 'recipe') => void;
+  initialImageUrl?: string;
+  queueItemId?: string;
+  onQueueItemDone?: (id: string) => void;
 }
 
 const SearchableIngredientDropdown: React.FC<{
@@ -141,14 +144,14 @@ const SearchableIngredientDropdown: React.FC<{
   );
 };
 
-export const OCRScanner: React.FC<OCRScannerProps> = ({ onAddItems, onCancel, onIngredientCreateRequest, onInspect }) => {
+export const OCRScanner: React.FC<OCRScannerProps> = ({ onAddItems, onCancel, onIngredientCreateRequest, onInspect, initialImageUrl, queueItemId, onQueueItemDone }) => {
   const { ingredients, addIngredient } = useKitchenData();
   const { confirm } = useConfirmation();
-  
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(initialImageUrl ?? null);
   const [stagedItems, setStagedItems] = useState<ExtractedItem[]>([]);
   const [stagedInstructions, setStagedInstructions] = useState<string>('');
   const [documentTitle, setDocumentTitle] = useState<string>('');
@@ -359,6 +362,7 @@ export const OCRScanner: React.FC<OCRScannerProps> = ({ onAddItems, onCancel, on
 
     const ok = await confirm(`ARE YOU SURE? This will add ${validItems.length} items and instructions to your recipe build.`);
     if (ok) {
+      if (queueItemId && onQueueItemDone) onQueueItemDone(queueItemId);
       onAddItems(validItems, stagedInstructions, documentTitle);
     }
   };

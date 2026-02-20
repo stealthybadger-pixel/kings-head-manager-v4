@@ -172,6 +172,22 @@ export const ResolutionDashboard: React.FC = () => {
     });
   };
 
+  const handleAddIngredientRow = () => {
+    if (!parseResult) return;
+    const updated = [
+      ...parseResult.ingredients,
+      { originalText: '', qty: 1, unit: 'ea' as Unit, name: '', originalName: '', normalizedName: '', matchedId: undefined },
+    ];
+    setParseResult({ ...parseResult, ingredients: updated, matchRate: parseResult.ingredients.filter(i => i.matchedId).length / updated.length });
+  };
+
+  const handleRemoveIngredientRow = (index: number) => {
+    if (!parseResult) return;
+    const updated = parseResult.ingredients.filter((_, i) => i !== index);
+    const matchedCount = updated.filter(i => i.matchedId).length;
+    setParseResult({ ...parseResult, ingredients: updated, matchRate: updated.length ? matchedCount / updated.length : 0 });
+  };
+
   // --- BULK COMMIT ACTIONS ---
 
   const handleOpenBulkCommit = () => {
@@ -408,7 +424,19 @@ export const ResolutionDashboard: React.FC = () => {
   };
 
   const handleOpenMap = (rawName: string) => {
-    setMappingData({ isOpen: true, originalName: rawName, targetId: '', targetName: '', preserveNote: true, search: '' });
+    // Pre-fill search with the ingredient name so matches appear immediately.
+    // If there is exactly one candidate, auto-select it so the chef only needs to confirm.
+    const term = rawName.toLowerCase();
+    const candidates = ingredients.filter(i => i.name.toLowerCase().includes(term)).slice(0, 10);
+    const autoMatch = candidates.length === 1 ? candidates[0] : null;
+    setMappingData({
+      isOpen: true,
+      originalName: rawName,
+      targetId: autoMatch?.id || '',
+      targetName: autoMatch?.name || '',
+      preserveNote: true,
+      search: rawName,
+    });
   };
 
   const handleMapConfirm = () => {
@@ -517,7 +545,16 @@ export const ResolutionDashboard: React.FC = () => {
   const mappingCandidates = useMemo(() => {
     if (!mappingData.search) return [];
     const term = mappingData.search.toLowerCase();
-    return ingredients.filter(i => i.name.toLowerCase().includes(term)).slice(0, 10);
+    // Primary: ingredient name contains the full search term
+    // Fallback: any meaningful word (>2 chars) from the search appears in the ingredient name
+    const words = term.split(/\s+/).filter(w => w.length > 2);
+    return ingredients
+      .filter(i => {
+        const name = i.name.toLowerCase();
+        if (name.includes(term)) return true;
+        return words.some(w => name.includes(w));
+      })
+      .slice(0, 12);
   }, [ingredients, mappingData.search]);
 
   const unitCost = creationData.packCost && creationData.packSize ? (creationData.packCost / creationData.packSize) : 0;
@@ -809,7 +846,7 @@ export const ResolutionDashboard: React.FC = () => {
                                       const isLoopRisk = selectedRecipe && normalizeName(ing.name).toLowerCase() === normalizeName(selectedRecipe.name).toLowerCase();
                                       
                                       return (
-                                      <tr key={idx} className={`hover:bg-[#1a1a1a] ${!ing.matchedId ? 'bg-red-950/10' : ''} ${isLoopRisk ? 'outline outline-1 outline-dashed outline-red-500' : ''}`}>
+                                      <tr key={idx} className={`group/row hover:bg-[#1a1a1a] ${!ing.matchedId ? 'bg-red-950/10' : ''} ${isLoopRisk ? 'outline outline-1 outline-dashed outline-red-500' : ''}`}>
                                         <td className="p-2 text-[10px] font-mono text-white border-r border-[#333] text-right">
                                             <input 
                                                 type="number"
@@ -855,21 +892,41 @@ export const ResolutionDashboard: React.FC = () => {
                                           {isLoopRisk && <div className="text-[8px] text-red-500 mt-0.5 font-bold animate-pulse">! RECURSION LOOP RISK</div>}
                                         </td>
                                         <td className="p-2">
-                                          {ing.matchedId ? <span className="text-[9px] font-bold text-[#c8a96e] uppercase tracking-wider">VERIFIED</span> : (
-                                            <div className="flex items-center gap-2">
-                                              <span className="text-[9px] font-bold text-red-500 uppercase tracking-wider">UNRESOLVED</span>
-                                              <div className="flex gap-1">
-                                                <button onClick={() => handleOpenCreate(ing.name)} className="px-2 py-0.5 border border-red-900 bg-red-900/20 text-[8px] font-bold text-red-400 uppercase hover:bg-red-900 hover:text-white transition-all">+ Create</button>
-                                                <button onClick={() => handleOpenMap(ing.name)} className="px-2 py-0.5 border border-[#333] bg-[#1a1a1a] text-[8px] font-bold text-[#888] uppercase hover:bg-[#333] hover:text-white transition-all">Link</button>
-                                              </div>
+                                          <div className="flex items-center justify-between gap-2">
+                                            <div>
+                                              {ing.matchedId ? <span className="text-[9px] font-bold text-[#c8a96e] uppercase tracking-wider">VERIFIED</span> : (
+                                                <div className="flex items-center gap-2">
+                                                  <span className="text-[9px] font-bold text-red-500 uppercase tracking-wider">UNRESOLVED</span>
+                                                  <div className="flex gap-1">
+                                                    <button onClick={() => handleOpenCreate(ing.name)} className="px-2 py-0.5 border border-red-900 bg-red-900/20 text-[8px] font-bold text-red-400 uppercase hover:bg-red-900 hover:text-white transition-all">+ Create</button>
+                                                    <button onClick={() => handleOpenMap(ing.name)} className="px-2 py-0.5 border border-[#333] bg-[#1a1a1a] text-[8px] font-bold text-[#888] uppercase hover:bg-[#333] hover:text-white transition-all">Link</button>
+                                                  </div>
+                                                </div>
+                                              )}
                                             </div>
-                                          )}
+                                            <button
+                                              onClick={() => handleRemoveIngredientRow(idx)}
+                                              title="Remove row"
+                                              className="opacity-0 group-hover/row:opacity-100 text-[#333] hover:text-red-500 transition-all flex-shrink-0"
+                                            >
+                                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                            </button>
+                                          </div>
                                         </td>
                                       </tr>
                                     );
                                     })}
                                   </tbody>
                                 </table>
+                                <div className="border-t border-[#222] px-2 py-1.5">
+                                  <button
+                                    onClick={handleAddIngredientRow}
+                                    className="text-[8px] font-bold uppercase tracking-widest text-[#555] hover:text-[#c8a96e] transition-colors flex items-center gap-1"
+                                  >
+                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                                    Add Ingredient
+                                  </button>
+                                </div>
                                 {parseResult.method.length > 0 && (
                                   <div className="p-4 border-t border-[#333]">
                                      <h4 className="text-[9px] font-bold text-[#666] uppercase mb-2">EXTRACTED METHOD</h4>
