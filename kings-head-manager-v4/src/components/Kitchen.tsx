@@ -1,0 +1,776 @@
+import React, { useState, useMemo } from 'react';
+import { useRecipes, useIngredients, useRecipeMutations, useIngredientMutations, useDishes } from '../hooks/useKitchenData';
+import { useStore } from '../store/useStore';
+import { Search, Plus, Trash2, Camera, AlertCircle, Check, HelpCircle, ExternalLink } from 'lucide-react';
+import { Recipe, RecipeItem, Ingredient, Unit } from '../types';
+import { calculateIngredientCost } from '../utils/costing';
+
+const calculateDynamicBatchSize = (items: RecipeItem[], targetUnit: string) => {
+  if (!items || items.length === 0) return 1;
+  
+  let totalGramsOrMls = 0;
+  
+  items.forEach(item => {
+    if (!item) return;
+    const qty = item.quantity || 0;
+    const unit = item.unit || 'g';
+    
+    // Normalise to g/ml
+    if (unit === 'g') {
+      totalGramsOrMls += qty;
+    } else if (unit === 'kg') {
+      totalGramsOrMls += qty * 1000;
+    } else if (unit === 'ml') {
+      totalGramsOrMls += qty;
+    } else if (unit === 'l') {
+      totalGramsOrMls += qty * 1000;
+    } else if (unit === 'ea') {
+      // Piece fallback: assume 50g per piece for weight calculation
+      totalGramsOrMls += qty * 50; 
+    }
+  });
+
+  // Convert total back to target unit (kg, g, l, ml)
+  if (targetUnit === 'kg' || targetUnit === 'l') {
+    const rawVal = totalGramsOrMls / 1000;
+    return rawVal > 0 ? rawVal : 1;
+  }
+  return totalGramsOrMls > 0 ? totalGramsOrMls : 1;
+};
+
+export const Kitchen: React.FC = () => {
+  const { data: recipes = [], isLoading: loadingRecs } = useRecipes();
+  const { data: ingredients = [], isLoading: loadingIngs } = useIngredients();
+  const { data: dishes = [] } = useDishes();
+  
+  const { addRecipe, updateRecipe, deleteRecipe } = useRecipeMutations();
+  const { addIngredient } = useIngredientMutations();
+
+  const selectedId = useStore((state) => state.selectedRecipeId);
+  const selectRecipe = useStore((state) => state.selectRecipe);
+  const showToast = useStore((state) => state.showToast);
+  const navigateToPantryWithIngredient = useStore((state) => state.navigateToPantryWithIngredient);
+
+  // Directory Search
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Recipe Scanner modal state
+  const [showScanner, setShowScanner] = useState(false);
+  const [scanFile, setScanFile] = useState<File | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanResults, setScanResults] = useState<{
+    name: string;
+    ingredients: { rawName: string; parsedName: string; qty: number; unit: Unit; matchedId?: string }[];
+    instructions: string;
+  } | null>(null);
+
+  // Form edit state
+  const [isEditing, setIsEditing] = useState(false);
+  const [isNew, setIsNew] = useState(false);
+  const [formState, setFormState] = useState<Omit<Recipe, 'id'> & { id?: string }>({
+    name: '',
+    batchSize: 1,
+    batchUnit: 'kg',
+    items: [],
+    instructions: ''
+  });
+
+  const [itemSearchQuery, setItemSearchQuery] = useState('');
+
+  // Filtered recipe list
+  const filteredRecipes = useMemo(() => {
+    return recipes.filter(r => r.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  }, [recipes, searchQuery]);
+
+  // Active recipe
+  const activeRecipe = useMemo(() => {
+    return recipes.find(r => r.id === selectedId) || null;
+  }, [recipes, selectedId]);
+
+  const activeRecipeDishes = useMemo(() => {
+    if (!activeRecipe) return [];
+    return dishes.filter(d => 
+      d.items?.some(item => item.type === 'recipe' && item.subRecipeId === activeRecipe.id)
+    );
+  }, [activeRecipe, dishes]);
+
+  // Set up form
+  React.useEffect(() => {
+    if (activeRecipe) {
+      setFormState(activeRecipe);
+      setIsEditing(true);
+      setIsNew(false);
+    } else {
+      setIsEditing(false);
+    }
+  }, [activeRecipe]);
+
+  const handleStartNew = () => {
+    setFormState({
+      name: '',
+      batchSize: 1,
+      batchUnit: 'kg',
+      items: [],
+      instructions: ''
+    });
+    setIsNew(true);
+    setIsEditing(true);
+    selectRecipe(null);
+  };
+
+  // Trigger create new recipe view when selectedId is 'new'
+  React.useEffect(() => {
+    if (selectedId === 'new') {
+      handleStartNew();
+    }
+  }, [selectedId]);
+
+  // Recalculate batch size dynamically from ingredients list
+  React.useEffect(() => {
+    const calculated = calculateDynamicBatchSize(formState.items, formState.batchUnit);
+    // Only update if it actually changed to prevent infinite rendering loops
+    if (Math.abs(formState.batchSize - calculated) > 0.0001) {
+      setFormState(prev => ({
+        ...prev,
+        batchSize: parseFloat(calculated.toFixed(4))
+      }));
+    }
+  }, [formState.items, formState.batchUnit, formState.batchSize]);
+
+  const isSaving = addRecipe.isPending || updateRecipe.isPending;
+
+  const handleSave = async () => {
+    if (!formState.name) {
+      showToast("Recipe name is required", "error");
+      return;
+    }
+    try {
+      if (isNew) {
+        await addRecipe.mutateAsync(formState);
+        showToast(`Recipe "${formState.name}" created successfully!`, "success");
+      } else if (formState.id) {
+        await updateRecipe.mutateAsync({ id: formState.id, data: formState });
+        showToast(`Recipe "${formState.name}" updated successfully!`, "success");
+      }
+      setIsEditing(false);
+      setIsNew(false);
+    } catch (err: any) {
+      console.error(err);
+      showToast(err.message || "Failed to save recipe", "error");
+    }
+  };
+
+  // Add Item to Recipe (Pantry-First helper)
+  const handleAddIngredientRow = (ing: Ingredient) => {
+    // Check if ingredient already in list
+    if (formState.items.some(i => i.type === 'ingredient' && i.ingredientId === ing.id)) return;
+    
+    setFormState(prev => ({
+      ...prev,
+      items: [
+        ...prev.items,
+        { type: 'ingredient', ingredientId: ing.id, quantity: 100, unit: 'g' }
+      ]
+    }));
+  };
+
+  const handleUpdateItemQty = (index: number, qty: number) => {
+    setFormState(prev => {
+      const items = [...prev.items];
+      items[index] = { ...items[index], quantity: qty };
+      return { ...prev, items };
+    });
+  };
+
+  const handleUpdateItemUnit = (index: number, unit: Unit) => {
+    setFormState(prev => {
+      const items = [...prev.items];
+      items[index] = { ...items[index], unit };
+      return { ...prev, items };
+    });
+  };
+
+  const handleRemoveRow = (index: number) => {
+    setFormState(prev => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== index)
+    }));
+  };
+
+  // Calculating total recipe costs based on ingredient costing utility
+  const calculateTotalCost = (items: RecipeItem[]) => {
+    let cost = 0;
+    items.forEach(item => {
+      if (item.type === 'ingredient' && item.ingredientId) {
+        const ing = ingredients.find(i => i.id === item.ingredientId);
+        if (ing) {
+          cost += calculateIngredientCost(ing, item.quantity, item.unit);
+        }
+      } else if (item.type === 'recipe' && item.subRecipeId) {
+        const sub = recipes.find(r => r.id === item.subRecipeId);
+        if (sub && sub.batchSize) {
+          const batchCost = calculateTotalCost(sub.items);
+          let batchSizeG = sub.batchSize;
+          if (sub.batchUnit === 'kg' || sub.batchUnit === 'l') batchSizeG *= 1000;
+          
+          let qtyG = item.quantity;
+          if (item.unit === 'kg' || item.unit === 'l') qtyG *= 1000;
+          
+          cost += (batchCost / batchSizeG) * qtyG;
+        }
+      }
+    });
+    return cost;
+  };
+
+  const totalCost = useMemo(() => {
+    return calculateTotalCost(formState.items);
+  }, [formState.items, ingredients]);
+
+  // Mock scan handler
+  const handleRunScanner = () => {
+    if (!scanFile) return;
+    setScanning(true);
+    
+    setTimeout(() => {
+      // Look up ingredients
+      const mockIngredients = [
+        { rawName: '500g chicken breast', parsedName: 'Chicken Breast', qty: 500, unit: 'g' as Unit },
+        { rawName: '200g double cream', parsedName: 'Double Cream', qty: 200, unit: 'g' as Unit },
+        { rawName: '50g wild garlic', parsedName: 'Wild Garlic', qty: 50, unit: 'g' as Unit } // Missing in DB
+      ];
+
+      const mapped = mockIngredients.map(item => {
+        const match = ingredients.find(i => i.name.toLowerCase() === item.parsedName.toLowerCase());
+        return {
+          ...item,
+          matchedId: match?.id
+        };
+      });
+
+      setScanResults({
+        name: 'Creamy Garlic Chicken',
+        ingredients: mapped,
+        instructions: '1. Fry the chicken breast in butter until golden.\n2. Stir in double cream and chopped wild garlic.\n3. Simmer for 10 minutes until chicken is cooked through.'
+      });
+      setScanning(false);
+    }, 1500);
+  };
+
+  // Inline Quick-Add for missing scanner ingredients
+  const handleCreateScannerIngredient = async (index: number, name: string) => {
+    try {
+      const newIng = await addIngredient.mutateAsync({
+        name,
+        category: 'Dry Store',
+        wastePercent: 0,
+        allergens: [],
+        kcalPer100: 0,
+        stockLevel: 0,
+        suppliers: [{ name: 'Internal', packCost: 5.00, packSize: 1000, packUnit: 'g', isPreferred: true }]
+      });
+      
+      if (scanResults) {
+        const updated = [...scanResults.ingredients];
+        updated[index] = { ...updated[index], matchedId: newIng.id };
+        setScanResults({ ...scanResults, ingredients: updated });
+      }
+    } catch(err) {
+      console.error(err);
+    }
+  };
+
+  // Commit scanned recipe directly to local edit state
+  const handleCommitScan = () => {
+    if (!scanResults) return;
+    
+    const items: RecipeItem[] = scanResults.ingredients
+      .filter(i => i.matchedId)
+      .map(i => ({
+        type: 'ingredient',
+        ingredientId: i.matchedId!,
+        quantity: i.qty,
+        unit: i.unit
+      }));
+
+    setFormState({
+      name: scanResults.name,
+      batchSize: 1,
+      batchUnit: 'kg',
+      items,
+      instructions: scanResults.instructions
+    });
+    
+    setShowScanner(false);
+    setScanFile(null);
+    setScanResults(null);
+    setIsNew(true);
+    setIsEditing(true);
+  };
+
+  const isLoading = loadingIngs || loadingRecs;
+
+  if (isLoading) {
+    return (
+      <div className="h-full flex items-center justify-center bg-surface-container-lowest">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-full w-full bg-surface-container-lowest">
+      
+      {/* 1. LEFT PANEL: RECIPES DIRECTORY (35%) */}
+      <div className="w-[35%] border-r border-outline-variant h-full flex flex-col bg-surface-container-lowest">
+        <div className="p-4 border-b border-outline-variant bg-surface flex flex-col gap-3">
+          <div className="flex justify-between items-center">
+            <span className="label-caps text-outline font-bold">Kitchen Library</span>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setShowScanner(true)}
+                className="h-8 px-3 border border-outline text-[10px] label-caps font-bold rounded-sm bg-surface hover:bg-surface-container-low flex items-center gap-1"
+              >
+                <Camera className="h-3.5 w-3.5" />
+                Scan
+              </button>
+              <button 
+                onClick={handleStartNew}
+                className="h-8 w-8 bg-primary text-white flex items-center justify-center rounded-sm hover:bg-opacity-90"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="relative flex items-center bg-surface-container-lowest border border-outline-variant rounded-sm px-3 py-1.5 focus-within:border-primary">
+            <Search className="h-4 w-4 text-outline mr-2" />
+            <input 
+              type="text" 
+              placeholder="Search recipes..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1 text-sm bg-transparent outline-none border-none focus:ring-0 p-0"
+            />
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto divide-y divide-outline-variant">
+          {filteredRecipes.map((recipe, idx) => {
+            const usageDishes = dishes.filter(d => 
+              d.items?.some(item => item.type === 'recipe' && item.subRecipeId === recipe.id)
+            );
+            const usageText = usageDishes.length > 0
+              ? `Used in: ${usageDishes.length} dish${usageDishes.length > 1 ? 'es' : ''}`
+              : 'Unused in menu';
+            const tooltipText = usageDishes.length > 0
+              ? `Used in:\n${usageDishes.map(d => `• ${d.name}`).join('\n')}`
+              : 'Not linked to any menu dishes';
+
+            return (
+              <div 
+                key={recipe.id}
+                onClick={() => selectRecipe(recipe.id)}
+                className={`p-4 hover:bg-surface-container cursor-pointer flex justify-between items-center transition-colors ${
+                  selectedId === recipe.id 
+                    ? 'bg-surface-container' 
+                    : idx % 2 === 0 
+                      ? 'bg-transparent' 
+                      : 'bg-black/[0.0075]'
+                }`}
+              >
+                <div>
+                  <div className="font-semibold text-sm text-on-surface">{recipe.name}</div>
+                  <div className="text-xs text-on-surface-variant mt-0.5 flex items-center gap-1.5">
+                    <span>Batch: {recipe.batchSize} {recipe.batchUnit}</span>
+                    <span className="text-outline-variant">•</span>
+                    <span 
+                      className={`font-semibold cursor-help ${usageDishes.length > 0 ? 'text-primary' : 'text-outline'}`}
+                      title={tooltipText}
+                    >
+                      {usageText}
+                    </span>
+                  </div>
+                </div>
+                <div className="data-tabular text-sm text-primary font-bold">
+                  £{calculateTotalCost(recipe.items).toFixed(2)}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 2. RIGHT PANEL: RECIPE WORKSPACE (65%) */}
+      <div className="flex-1 h-full p-8 overflow-y-auto bg-surface-container-lowest flex flex-col gap-6">
+        {isEditing ? (
+          <>
+            <div className="flex justify-between items-center border-b border-outline-variant pb-4">
+              <div>
+                <h2 className="headline-sm font-semibold">{isNew ? 'New Recipe Formulation' : formState.name}</h2>
+                <div className="flex flex-wrap gap-2 items-center mt-1">
+                  <span className="text-xs text-outline label-caps">Total Cost:</span>
+                  <span className="text-xs text-primary font-bold data-tabular">£{totalCost.toFixed(2)}</span>
+                  {!isNew && (
+                    <>
+                      <span className="text-outline-variant">•</span>
+                      <span className="text-xs text-outline label-caps">
+                        {activeRecipeDishes.length > 0
+                          ? `Used in: ${activeRecipeDishes.map(d => d.name).join(', ')}`
+                          : 'Not linked to any dishes'}
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-4">
+                {!isNew && (
+                  <>
+                    <button
+                      onClick={async () => {
+                        try {
+                          const { id: _, createdAt: __, updatedAt: ___, ...rest } = formState as any;
+                          const copy = { ...rest, name: `${formState.name} (Copy)` };
+                          const saved = await addRecipe.mutateAsync(copy);
+                          showToast(`Duplicated as "${copy.name}" — rename and edit below`, "success");
+                          setFormState(saved as any);
+                          setIsNew(false);
+                          setIsEditing(true);
+                        } catch (err: any) {
+                          showToast(err.message || "Failed to duplicate recipe", "error");
+                        }
+                      }}
+                      disabled={isSaving}
+                      className="h-10 px-4 border border-outline-variant text-on-surface-variant text-xs font-bold label-caps rounded-sm hover:bg-surface-container disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Duplicate
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (confirm("Delete this recipe permanently?")) {
+                          try {
+                            await deleteRecipe.mutateAsync(formState.id!);
+                            showToast("Recipe deleted successfully", "success");
+                            selectRecipe(null);
+                          } catch (err: any) {
+                            showToast(err.message || "Failed to delete recipe", "error");
+                          }
+                        }
+                      }}
+                      disabled={isSaving}
+                      className="h-10 px-4 border border-error text-error text-xs font-bold label-caps rounded-sm hover:bg-error-container disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Delete
+                    </button>
+                  </>
+                )}
+                <button 
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className={`h-10 px-6 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90 flex items-center gap-2 ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {isSaving ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Formulation'
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Header info */}
+            <div className="grid grid-cols-3 gap-6">
+              <div className="col-span-2">
+                <label className="label-caps text-outline block mb-2">Recipe Name</label>
+                <input 
+                  type="text" 
+                  value={formState.name}
+                  onChange={(e) => setFormState(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full px-3 py-2 border border-outline-variant rounded-sm text-sm"
+                  placeholder="e.g., Peppercorn Sauce"
+                />
+              </div>
+              <div>
+                <label className="label-caps text-outline block mb-2">Batch Yield Size</label>
+                <div className="flex">
+                  <input 
+                    type="number" 
+                    value={formState.batchSize}
+                    readOnly
+                    className="w-2/3 px-3 py-2 border border-outline-variant rounded-l-sm text-sm data-tabular bg-surface-container-low text-outline cursor-not-allowed"
+                    title="Calculated automatically from recipe ingredients total"
+                  />
+                  <select 
+                    value={formState.batchUnit}
+                    onChange={(e) => setFormState(prev => ({ ...prev, batchUnit: e.target.value as any }))}
+                    className="w-1/3 border-t border-b border-r border-outline-variant bg-surface text-xs rounded-r-sm"
+                  >
+                    <option value="kg">kg</option>
+                    <option value="g">g</option>
+                    <option value="l">l</option>
+                    <option value="ml">ml</option>
+                  </select>
+                </div>
+                <span className="text-[9px] text-outline mt-1 block">Sum of ingredient components. Select unit to convert.</span>
+              </div>
+            </div>
+
+            {/* Ingredient lines */}
+            <div className="mt-4 border-t border-outline-variant pt-6">
+              <h3 className="label-caps text-on-surface font-bold mb-4">Recipe Ingredients</h3>
+              
+              <div className="flex flex-col gap-3 mb-6">
+                {formState.items.map((item, idx) => {
+                  const ing = ingredients.find(i => i.id === item.ingredientId);
+                  let cost = 0;
+                  if (item.type === 'ingredient' && ing) {
+                    cost = calculateIngredientCost(ing, item.quantity, item.unit);
+                  } else if (item.type === 'recipe' && item.subRecipeId) {
+                    const sub = recipes.find(r => r.id === item.subRecipeId);
+                    if (sub && sub.batchSize) {
+                      const batchCost = calculateTotalCost(sub.items);
+                      let batchSizeG = sub.batchSize;
+                      if (sub.batchUnit === 'kg' || sub.batchUnit === 'l') batchSizeG *= 1000;
+                      let qtyG = item.quantity;
+                      if (item.unit === 'kg' || item.unit === 'l') qtyG *= 1000;
+                      cost = (batchCost / batchSizeG) * qtyG;
+                    }
+                  }
+
+                  return (
+                    <div key={idx} className="flex gap-4 items-center bg-surface p-4 border border-outline-variant rounded-sm">
+                      <div className="flex-1">
+                        <span className="font-semibold text-sm text-on-surface">{ing?.name || 'Unknown Item'}</span>
+                        <div className="text-[10px] text-outline uppercase tracking-wider mt-0.5">
+                          {ing?.category} • Waste: {ing?.wastePercent || 0}%
+                        </div>
+                      </div>
+
+                      <div className="w-24">
+                        <input 
+                          type="number" 
+                          value={item.quantity}
+                          onChange={(e) => handleUpdateItemQty(idx, Math.max(0, parseFloat(e.target.value) || 0))}
+                          className="w-full px-2 py-1 border border-outline-variant text-xs data-tabular text-center"
+                        />
+                      </div>
+
+                      <div className="w-20">
+                        <select 
+                          value={item.unit}
+                          onChange={(e) => handleUpdateItemUnit(idx, e.target.value as any)}
+                          className="w-full px-2 py-1 border border-outline-variant bg-surface-container-lowest text-xs"
+                        >
+                          <option value="g">g</option>
+                          <option value="kg">kg</option>
+                          <option value="ml">ml</option>
+                          <option value="l">l</option>
+                          <option value="ea">ea</option>
+                        </select>
+                      </div>
+
+                      <div className="w-20 text-right data-tabular text-sm font-bold text-primary">
+                        £{cost.toFixed(2)}
+                      </div>
+
+                      {item.type === 'ingredient' && ing && (
+                        <button
+                          onClick={() => navigateToPantryWithIngredient(ing.id)}
+                          title="Open in Pantry"
+                          className="p-1 text-outline hover:text-primary"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleRemoveRow(idx)}
+                        className="p-1 text-error hover:bg-error-container"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Add row search block */}
+              <div className="bg-surface p-4 border border-outline-variant rounded-sm flex flex-col gap-3">
+                <span className="text-xs label-caps text-outline font-bold">Add Ingredient to Recipe</span>
+                <div className="flex gap-2">
+                  <div className="relative flex-1 flex items-center bg-surface-container-lowest border border-outline-variant rounded-sm px-3 py-1.5 focus-within:border-primary">
+                    <Search className="h-4 w-4 text-outline mr-2" />
+                    <input 
+                      type="text" 
+                      placeholder="Search ingredients..." 
+                      value={itemSearchQuery}
+                      onChange={(e) => setItemSearchQuery(e.target.value)}
+                      className="flex-1 text-xs bg-transparent outline-none border-none focus:ring-0 p-0"
+                    />
+                  </div>
+                </div>
+
+                {itemSearchQuery.trim().length > 1 && (
+                  <div className="max-h-48 overflow-y-auto bg-surface-container-lowest border border-outline-variant divide-y divide-outline-variant rounded-sm">
+                    {ingredients
+                      .filter(i => i.name.toLowerCase().includes(itemSearchQuery.toLowerCase()))
+                      .slice(0, 5)
+                      .map(ing => (
+                        <div 
+                          key={ing.id}
+                          onClick={() => {
+                            handleAddIngredientRow(ing);
+                            setItemSearchQuery('');
+                          }}
+                          className="p-3 hover:bg-surface-container text-xs cursor-pointer flex justify-between font-semibold"
+                        >
+                          <span>{ing.name}</span>
+                          <span className="text-primary label-caps">+ Add</span>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+
+            </div>
+
+            {/* Method Box */}
+            <div className="mt-4 border-t border-outline-variant pt-6">
+              <label className="label-caps text-outline block mb-2">Preparation Instructions</label>
+              <textarea 
+                value={formState.instructions}
+                onChange={(e) => setFormState(prev => ({ ...prev, instructions: e.target.value }))}
+                rows={6}
+                placeholder="Step 1: Prep... Step 2: Combine..."
+                className="w-full px-3 py-2 border border-outline-variant rounded-sm text-sm"
+              />
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 flex flex-col justify-center items-center text-outline">
+            <ChefHatIcon className="h-12 w-12 text-outline mb-2" />
+            <span className="label-caps">Select a recipe to view formulation</span>
+          </div>
+        )}
+      </div>
+
+      {/* 3. RECIPE SCANNER MODAL */}
+      {showScanner && (
+        <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-8">
+          <div className="w-full max-w-2xl bg-surface-container-lowest border border-outline-variant rounded-sm flex flex-col relative p-6">
+            <h2 className="headline-sm font-semibold border-b border-outline-variant pb-3 mb-4 flex items-center gap-2">
+              <Camera className="h-5 w-5 text-primary" />
+              Single Recipe OCR Scanner
+            </h2>
+
+            <div className="flex flex-col gap-4">
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Take a photo or upload a recipe image. The scanner will run OCR, extract ingredient lines, and verify them against your Pantry.
+              </p>
+
+              <div className="border-2 border-dashed border-outline-variant p-6 text-center bg-surface hover:bg-surface-container cursor-pointer transition-colors">
+                <input 
+                  type="file" 
+                  onChange={(e) => setScanFile(e.target.files?.[0] || null)}
+                  className="hidden" 
+                  id="recipe-file-input"
+                  accept="image/*"
+                />
+                <label htmlFor="recipe-file-input" className="cursor-pointer">
+                  {scanFile ? (
+                    <span className="font-semibold text-sm text-primary">{scanFile.name}</span>
+                  ) : (
+                    <span className="text-xs text-outline label-caps">Select Recipe Image</span>
+                  )}
+                </label>
+              </div>
+
+              {scanResults ? (
+                <div className="flex flex-col gap-3 border-t border-outline-variant pt-4">
+                  <h3 className="label-caps font-bold text-xs">Extraction & Pantry Verification</h3>
+                  <div className="max-h-60 overflow-y-auto border border-outline-variant divide-y divide-outline-variant rounded-sm bg-surface">
+                    {scanResults.ingredients.map((item, idx) => (
+                      <div key={idx} className="p-3 flex items-center justify-between text-xs">
+                        <div>
+                          <span className="font-mono text-outline mr-2">{item.rawName}</span>
+                          <span className="font-semibold text-on-surface">&rarr; {item.parsedName}</span>
+                        </div>
+                        
+                        <div>
+                          {item.matchedId ? (
+                            <span className="text-primary font-bold label-caps flex items-center gap-1">
+                              <Check className="h-3.5 w-3.5" /> Matched
+                            </span>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span className="text-error font-bold label-caps flex items-center gap-1">
+                                <AlertCircle className="h-3.5 w-3.5" /> Missing
+                              </span>
+                              <button 
+                                onClick={() => handleCreateScannerIngredient(idx, item.parsedName)}
+                                className="px-2 py-1 bg-primary text-white label-caps text-[9px] font-bold rounded-sm"
+                              >
+                                + Create
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex justify-end gap-3 border-t border-outline-variant pt-4 mt-2">
+                    <button 
+                      onClick={() => setScanResults(null)}
+                      className="h-10 px-4 border border-outline text-xs font-bold label-caps rounded-sm hover:bg-surface-container"
+                    >
+                      Clear
+                    </button>
+                    <button 
+                      onClick={handleCommitScan}
+                      disabled={scanResults.ingredients.some(i => !i.matchedId)}
+                      className="h-10 px-6 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90 disabled:opacity-50"
+                    >
+                      Populate Form
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex justify-end gap-3 border-t border-outline-variant pt-4 mt-2">
+                  <button 
+                    onClick={() => {
+                      setShowScanner(false);
+                      setScanFile(null);
+                    }}
+                    className="h-10 px-4 border border-outline text-xs font-bold label-caps rounded-sm hover:bg-surface-container"
+                  >
+                    Close
+                  </button>
+                  <button 
+                    onClick={handleRunScanner}
+                    disabled={!scanFile || scanning}
+                    className="h-10 px-6 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90 disabled:opacity-50"
+                  >
+                    {scanning ? 'Reading...' : 'Run OCR'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+};
+
+const ChefHatIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M6 18V6a4 4 0 0 1 8 0v12"></path>
+    <path d="M18 18V9a4 4 0 0 0-8 0v9"></path>
+    <path d="M3 18h18a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"></path>
+  </svg>
+);
+export default Kitchen;

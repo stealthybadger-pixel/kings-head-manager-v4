@@ -1,0 +1,555 @@
+import React, { useState, useMemo } from 'react';
+import { useDishes, useIngredients, useRecipes, useDishMutations } from '../hooks/useKitchenData';
+import { useStore } from '../store/useStore';
+import { Search, Plus, Trash2, AlertTriangle, CheckCircle, TrendingUp, Radio } from 'lucide-react';
+import { Dish, DishItem, Ingredient, Recipe, Unit } from '../types';
+import { calculateIngredientCost } from '../utils/costing';
+
+export const Service: React.FC = () => {
+  const { data: dishes = [], isLoading: loadingDishes } = useDishes();
+  const { data: ingredients = [], isLoading: loadingIngs } = useIngredients();
+  const { data: recipes = [], isLoading: loadingRecs } = useRecipes();
+  
+  const { addDish, updateDish, deleteDish } = useDishMutations();
+
+  const selectedId = useStore((state) => state.selectedDishId);
+  const selectDish = useStore((state) => state.selectDish);
+  const showToast = useStore((state) => state.showToast);
+
+  // Search
+  const [searchQuery, setSearchQuery] = useState('');
+  const [itemSearchQuery, setItemSearchQuery] = useState('');
+
+  // Form edit state
+  const [isEditing, setIsEditing] = useState(false);
+  const [isNew, setIsNew] = useState(false);
+  const [formState, setFormState] = useState<Omit<Dish, 'id'> & { id?: string }>({
+    name: '',
+    retailPrice: 0,
+    targetGP: 72,
+    items: []
+  });
+
+  // Filtered dishes
+  const filteredDishes = useMemo(() => {
+    return dishes.filter(d => d && d.name && d.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  }, [dishes, searchQuery]);
+
+  // Active dish
+  const activeDish = useMemo(() => {
+    return dishes.find(d => d.id === selectedId) || null;
+  }, [dishes, selectedId]);
+
+  // Set form
+  React.useEffect(() => {
+    if (activeDish) {
+      setFormState({
+        ...activeDish,
+        targetGP: activeDish.targetGP !== undefined ? activeDish.targetGP : 72,
+        retailPrice: activeDish.retailPrice !== undefined ? activeDish.retailPrice : 0,
+        items: activeDish.items || []
+      });
+      setIsEditing(true);
+      setIsNew(false);
+    } else {
+      setIsEditing(false);
+    }
+  }, [activeDish]);
+
+  const handleStartNew = () => {
+    setFormState({
+      name: '',
+      retailPrice: 0,
+      targetGP: 72,
+      items: []
+    });
+    setIsNew(true);
+    setIsEditing(true);
+    selectDish(null);
+  };
+
+  const isSaving = addDish.isPending || updateDish.isPending;
+
+  const handleSave = async () => {
+    if (!formState.name) {
+      showToast("Dish name is required", "error");
+      return;
+    }
+    try {
+      if (isNew) {
+        await addDish.mutateAsync(formState);
+        showToast(`Dish "${formState.name}" created successfully!`, "success");
+      } else if (formState.id) {
+        await updateDish.mutateAsync({ id: formState.id, data: formState });
+        showToast(`Dish "${formState.name}" updated successfully!`, "success");
+      }
+      setIsEditing(false);
+      setIsNew(false);
+    } catch (err: any) {
+      console.error(err);
+      showToast(err.message || "Failed to save dish", "error");
+    }
+  };
+
+  // Add Component to Dish
+  const handleAddComponentRow = (item: { id: string; name: string; type: 'ingredient' | 'recipe' }) => {
+    if (formState.items.some(i => i.type === item.type && (item.type === 'ingredient' ? i.ingredientId : i.subRecipeId) === item.id)) return;
+
+    const newRow: DishItem = {
+      type: item.type,
+      ingredientId: item.type === 'ingredient' ? item.id : undefined,
+      subRecipeId: item.type === 'recipe' ? item.id : undefined,
+      quantity: 100,
+      unit: 'g'
+    };
+
+    setFormState(prev => ({
+      ...prev,
+      items: [...prev.items, newRow]
+    }));
+  };
+
+  const handleUpdateItemQty = (index: number, qty: number) => {
+    setFormState(prev => {
+      const items = [...prev.items];
+      items[index] = { ...items[index], quantity: qty };
+      return { ...prev, items };
+    });
+  };
+
+  const handleUpdateItemUnit = (index: number, unit: Unit) => {
+    setFormState(prev => {
+      const items = [...prev.items];
+      items[index] = { ...items[index], unit };
+      return { ...prev, items };
+    });
+  };
+
+  const handleRemoveRow = (index: number) => {
+    setFormState(prev => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== index)
+    }));
+  };
+
+  // Helper cost calculations
+  const getIngredientCost = (ingId: string, quantity: number, unit: Unit) => {
+    const ing = ingredients.find(i => i.id === ingId);
+    if (!ing) return 0;
+    return calculateIngredientCost(ing, quantity, unit);
+  };
+
+  const getRecipeCost = (recipeId: string, quantity: number, unit: Unit) => {
+    const rec = recipes.find(r => r.id === recipeId);
+    if (!rec || !rec.batchSize || !rec.items) return 0;
+
+    // Calculate total batch cost
+    let batchCost = 0;
+    rec.items.forEach(item => {
+      if (!item) return;
+      if (item.type === 'ingredient' && item.ingredientId) {
+        batchCost += getIngredientCost(item.ingredientId, item.quantity, item.unit);
+      } else if (item.type === 'recipe' && item.subRecipeId) {
+        batchCost += getRecipeCost(item.subRecipeId, item.quantity, item.unit);
+      }
+    });
+
+    // Translate batch cost to unit cost
+    let batchSizeG = rec.batchSize;
+    if (rec.batchUnit === 'kg') batchSizeG *= 1000;
+    if (rec.batchUnit === 'l') batchSizeG *= 1000;
+    const costPerG = batchCost / batchSizeG;
+
+    let qtyG = quantity;
+    if (unit === 'kg') qtyG *= 1000;
+    if (unit === 'l') qtyG *= 1000;
+
+    return costPerG * qtyG;
+  };
+
+  const calculatePlateCost = (items: DishItem[]) => {
+    let cost = 0;
+    if (!items) return 0;
+    items.forEach(item => {
+      if (item.type === 'ingredient' && item.ingredientId) {
+        cost += getIngredientCost(item.ingredientId, item.quantity, item.unit);
+      } else if (item.type === 'recipe' && item.subRecipeId) {
+        cost += getRecipeCost(item.subRecipeId, item.quantity, item.unit);
+      }
+    });
+    return cost;
+  };
+
+  // Financial values
+  const plateCost = useMemo(() => {
+    return calculatePlateCost(formState.items);
+  }, [formState.items, ingredients, recipes]);
+
+  const currentGP = useMemo(() => {
+    if (!formState.retailPrice || formState.retailPrice === 0) return 0;
+    return ((formState.retailPrice - plateCost) / formState.retailPrice) * 100;
+  }, [plateCost, formState.retailPrice]);
+
+  const suggestedSellPrice = useMemo(() => {
+    if (formState.targetGP === 100) return 0;
+    return plateCost / (1 - formState.targetGP / 100);
+  }, [plateCost, formState.targetGP]);
+
+  const isMarginAlert = currentGP < formState.targetGP;
+
+  const isLoading = loadingDishes || loadingIngs || loadingRecs;
+
+  if (isLoading) {
+    return (
+      <div className="h-full flex items-center justify-center bg-surface-container-lowest">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-full w-full bg-surface-container-lowest">
+      
+      {/* 1. LEFT PANEL: DISH DIRECTORY (35%) */}
+      <div className="w-[35%] border-r border-outline-variant h-full flex flex-col bg-surface-container-lowest">
+        <div className="p-4 border-b border-outline-variant bg-surface flex flex-col gap-3">
+          <div className="flex justify-between items-center">
+            <span className="label-caps text-outline font-bold">Menu List</span>
+            <button 
+              onClick={handleStartNew}
+              className="h-8 w-8 bg-primary text-white flex items-center justify-center rounded-sm hover:bg-opacity-90"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="relative flex items-center bg-surface-container-lowest border border-outline-variant rounded-sm px-3 py-1.5 focus-within:border-primary">
+            <Search className="h-4 w-4 text-outline mr-2" />
+            <input 
+              type="text" 
+              placeholder="Search dishes..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1 text-sm bg-transparent outline-none border-none focus:ring-0 p-0"
+            />
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto divide-y divide-outline-variant">
+          {filteredDishes.map((dish, idx) => {
+            if (!dish) return null;
+            const cost = calculatePlateCost(dish.items);
+            const gp = dish.retailPrice ? ((dish.retailPrice - cost) / dish.retailPrice) * 100 : 0;
+            const price = dish.retailPrice || 0;
+            const targetGP = dish.targetGP !== undefined ? dish.targetGP : 72;
+            return (
+              <div
+                key={dish.id}
+                onClick={() => selectDish(dish.id)}
+                className={`p-4 hover:bg-surface-container cursor-pointer flex justify-between items-center transition-colors ${
+                  selectedId === dish.id
+                    ? 'bg-surface-container'
+                    : idx % 2 === 0
+                      ? 'bg-transparent'
+                      : 'bg-black/[0.0075]'
+                }`}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      updateDish.mutate({ id: dish.id, data: { isLive: !dish.isLive } });
+                    }}
+                    title={dish.isLive ? 'Remove from live menu' : 'Add to live menu'}
+                    className={`shrink-0 p-1 rounded-full transition-colors ${dish.isLive ? 'text-emerald-400' : 'text-outline hover:text-on-surface-variant'}`}
+                  >
+                    <Radio className="h-4 w-4" />
+                  </button>
+                  <div className="min-w-0">
+                    <div className="font-semibold text-sm text-on-surface">{dish.name || 'Unnamed Dish'}</div>
+                    <div className="text-xs text-on-surface-variant mt-0.5">
+                      Retail Price: £{price.toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+                <div className={`data-tabular text-sm font-bold shrink-0 ${gp < targetGP ? 'text-error' : 'text-primary'}`}>
+                  {gp.toFixed(1)}% GP
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 2. RIGHT PANEL: COSTING WORKSPACE (65%) */}
+      <div className="flex-1 h-full p-8 overflow-y-auto bg-surface-container-lowest flex flex-col gap-6">
+        {isEditing ? (
+          <>
+            <div className="flex justify-between items-center border-b border-outline-variant pb-4">
+              <div>
+                <h2 className="headline-sm font-semibold">{isNew ? 'New Dish Profile' : formState.name}</h2>
+                <span className="text-xs text-outline label-caps">Plate Cost Calculator</span>
+              </div>
+              <div className="flex gap-4">
+                {!isNew && (
+                  <button 
+                    onClick={async () => {
+                      if (confirm("Delete this dish permanently?")) {
+                        try {
+                          await deleteDish.mutateAsync(formState.id!);
+                          showToast("Dish deleted successfully", "success");
+                          selectDish(null);
+                        } catch (err: any) {
+                          showToast(err.message || "Failed to delete dish", "error");
+                        }
+                      }
+                    }}
+                    disabled={isSaving}
+                    className="h-10 px-4 border border-error text-error text-xs font-bold label-caps rounded-sm hover:bg-error-container disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Delete
+                  </button>
+                )}
+                <button 
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className={`h-10 px-6 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90 flex items-center gap-2 ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {isSaving ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Dish'
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Inputs Grid */}
+            <div className="grid grid-cols-3 gap-6">
+              <div className="col-span-2">
+                <label className="label-caps text-outline block mb-2">Dish Name</label>
+                <input 
+                  type="text" 
+                  value={formState.name}
+                  onChange={(e) => setFormState(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full px-3 py-2 border border-outline-variant rounded-sm text-sm"
+                  placeholder="e.g., Roast Cod with Parsley Mash"
+                />
+              </div>
+
+              <div>
+                <label className="label-caps text-outline block mb-2">Retail Sell Price (£)</label>
+                <input 
+                  type="number" 
+                  step="0.01"
+                  value={formState.retailPrice}
+                  onChange={(e) => setFormState(prev => ({ ...prev, retailPrice: Math.max(0, parseFloat(e.target.value) || 0) }))}
+                  className="w-full px-3 py-2 border border-outline-variant rounded-sm text-sm data-tabular"
+                />
+              </div>
+            </div>
+
+            {/* Dish rows */}
+            <div className="mt-4 border-t border-outline-variant pt-6">
+              <h3 className="label-caps text-on-surface font-bold mb-4">Dish Components (Recipes / Ingredients)</h3>
+              
+              <div className="flex flex-col gap-3 mb-6">
+                {(formState.items || []).map((item, idx) => {
+                  if (!item) return null;
+                  const name = item.type === 'ingredient' 
+                    ? ingredients.find(i => i.id === item.ingredientId)?.name 
+                    : recipes.find(r => r.id === item.subRecipeId)?.name;
+                    
+                  const cost = item.type === 'ingredient' && item.ingredientId
+                    ? getIngredientCost(item.ingredientId, item.quantity || 0, item.unit)
+                    : item.subRecipeId 
+                      ? getRecipeCost(item.subRecipeId, item.quantity || 0, item.unit) 
+                      : 0;
+
+                  return (
+                    <div key={idx} className="flex gap-4 items-center bg-surface p-4 border border-outline-variant rounded-sm">
+                      <div className="flex-1">
+                        <span className="font-semibold text-sm text-on-surface">{name || 'Unknown Component'}</span>
+                        <div className="text-[10px] text-outline uppercase tracking-wider mt-0.5">
+                          {item.type}
+                        </div>
+                      </div>
+
+                      <div className="w-24">
+                        <input 
+                          type="number" 
+                          value={item.quantity}
+                          onChange={(e) => handleUpdateItemQty(idx, Math.max(0, parseFloat(e.target.value) || 0))}
+                          className="w-full px-2 py-1 border border-outline-variant text-xs data-tabular text-center"
+                        />
+                      </div>
+
+                      <div className="w-20">
+                        <select 
+                          value={item.unit}
+                          onChange={(e) => handleUpdateItemUnit(idx, e.target.value as any)}
+                          className="w-full px-2 py-1 border border-outline-variant bg-surface-container-lowest text-xs"
+                        >
+                          <option value="g">g</option>
+                          <option value="kg">kg</option>
+                          <option value="ml">ml</option>
+                          <option value="l">l</option>
+                          <option value="ea">ea</option>
+                        </select>
+                      </div>
+
+                      <div className="w-20 text-right data-tabular text-sm font-bold text-primary">
+                        £{cost.toFixed(2)}
+                      </div>
+
+                      <button 
+                        onClick={() => handleRemoveRow(idx)}
+                        className="p-1 text-error hover:bg-error-container"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Add component search block */}
+              <div className="bg-surface p-4 border border-outline-variant rounded-sm flex flex-col gap-3">
+                <span className="text-xs label-caps text-outline font-bold">Add Ingredient or Recipe to Dish</span>
+                <div className="flex gap-2">
+                  <div className="relative flex-1 flex items-center bg-surface-container-lowest border border-outline-variant rounded-sm px-3 py-1.5 focus-within:border-primary">
+                    <Search className="h-4 w-4 text-outline mr-2" />
+                    <input 
+                      type="text" 
+                      placeholder="Search items..." 
+                      value={itemSearchQuery}
+                      onChange={(e) => setItemSearchQuery(e.target.value)}
+                      className="flex-1 text-xs bg-transparent outline-none border-none focus:ring-0 p-0"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-3 text-[10px] label-caps font-bold">
+                  <button 
+                    onClick={() => {
+                      useStore.setState({
+                        currentView: 'pantry',
+                        selectedIngredientId: 'new',
+                        selectedRecipeId: null,
+                        selectedDishId: null
+                      });
+                    }}
+                    className="text-primary hover:underline flex items-center gap-1"
+                  >
+                    + Create New Master Ingredient
+                  </button>
+                  <span className="text-outline-variant">•</span>
+                  <button 
+                    onClick={() => {
+                      useStore.setState({
+                        currentView: 'kitchen',
+                        selectedRecipeId: 'new',
+                        selectedIngredientId: null,
+                        selectedDishId: null
+                      });
+                    }}
+                    className="text-primary hover:underline flex items-center gap-1"
+                  >
+                    + Create New Recipe
+                  </button>
+                </div>
+
+                {itemSearchQuery.trim().length > 1 && (
+                  <div className="max-h-48 overflow-y-auto bg-surface-container-lowest border border-outline-variant divide-y divide-outline-variant rounded-sm">
+                    {/* Ingredients match */}
+                    {ingredients
+                      .filter(i => i.name.toLowerCase().includes(itemSearchQuery.toLowerCase()))
+                      .slice(0, 3)
+                      .map(ing => (
+                        <div 
+                          key={ing.id}
+                          onClick={() => {
+                            handleAddComponentRow({ id: ing.id, name: ing.name, type: 'ingredient' });
+                            setItemSearchQuery('');
+                          }}
+                          className="p-3 hover:bg-surface-container text-xs cursor-pointer flex justify-between font-semibold"
+                        >
+                          <span>{ing.name} <span className="text-[9px] text-outline uppercase font-mono ml-2">Ingredient</span></span>
+                          <span className="text-primary label-caps">+ Add</span>
+                        </div>
+                      ))}
+                    {/* Recipes match */}
+                    {recipes
+                      .filter(r => r.name.toLowerCase().includes(itemSearchQuery.toLowerCase()))
+                      .slice(0, 3)
+                      .map(rec => (
+                        <div 
+                          key={rec.id}
+                          onClick={() => {
+                            handleAddComponentRow({ id: rec.id, name: rec.name, type: 'recipe' });
+                            setItemSearchQuery('');
+                          }}
+                          className="p-3 hover:bg-surface-container text-xs cursor-pointer flex justify-between font-semibold"
+                        >
+                          <span>{rec.name} <span className="text-[9px] text-outline uppercase font-mono ml-2">Recipe</span></span>
+                          <span className="text-primary label-caps">+ Add</span>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* FINANCIAL CALCULATOR BOARD */}
+            <div className="mt-8 border-t border-outline-variant pt-6 grid grid-cols-3 gap-6 bg-surface p-6 border border-outline-variant rounded-sm">
+              <div className="flex flex-col">
+                <span className="label-caps text-outline">Total Plate Cost</span>
+                <span className="text-2xl font-bold text-primary data-tabular mt-1">£{plateCost.toFixed(2)}</span>
+              </div>
+
+              <div className="flex flex-col">
+                <span className="label-caps text-outline">Current GP %</span>
+                <span className={`text-2xl font-bold mt-1 data-tabular ${isMarginAlert ? 'text-error' : 'text-primary'}`}>
+                  {currentGP.toFixed(1)}%
+                </span>
+                <span className="text-[10px] text-secondary mt-1">Target: {formState.targetGP}%</span>
+              </div>
+
+              <div className="flex flex-col">
+                <span className="label-caps text-outline">Suggested Retail Price</span>
+                <span className="text-2xl font-bold text-primary data-tabular mt-1">£{suggestedSellPrice.toFixed(2)}</span>
+                <span className="text-[10px] text-secondary mt-1">Based on target GP%</span>
+              </div>
+
+              {isMarginAlert && (
+                <div className="col-span-3 bg-error-container border border-error p-3 text-on-error-container flex gap-2 items-center text-xs mt-2">
+                  <AlertTriangle className="h-4 w-4 text-error" />
+                  <span>The sell price is below target GP margin. Consider increasing the retail price or cutting component sizes.</span>
+                </div>
+              )}
+            </div>
+
+          </>
+        ) : (
+          <div className="flex-1 flex flex-col justify-center items-center text-outline">
+            <UtensilsIcon className="h-12 w-12 text-outline mb-2" />
+            <span className="label-caps">Select a dish to view costing sheet</span>
+          </div>
+        )}
+      </div>
+
+    </div>
+  );
+};
+
+const UtensilsIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"></path>
+    <path d="M7 2v20"></path>
+    <path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"></path>
+  </svg>
+);
+export default Service;

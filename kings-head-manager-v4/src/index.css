@@ -1,0 +1,74 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply font-sans bg-surface text-on-surface select-none;
+  }
+
+  /* Anti-glare inputs: force strong border & typography contrast */
+  input, select, textarea {
+    @apply bg-surface-container-lowest text-on-surface border-outline-variant rounded-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none;
+  }
+
+  /* Tactile scrollbars for kitchen environment */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-surface-container-low;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-surface-dim rounded-sm hover:bg-outline;
+  }
+}
+
+@layer utilities {
+  /* Text heading styles from DESIGN.md */
+  .display-lg {
+    @apply font-sans text-[48px] font-bold leading-[56px] tracking-tight;
+  }
+  
+  .headline-md {
+    @apply font-sans text-[24px] font-semibold leading-[32px];
+  }
+  
+  .headline-sm {
+    @apply font-sans text-[20px] font-semibold leading-[28px];
+  }
+  
+  .body-lg {
+    @apply font-sans text-[18px] font-medium leading-[26px];
+  }
+  
+  .body-md {
+    @apply font-sans text-[16px] font-medium leading-[24px];
+  }
+  
+  .data-tabular {
+    @apply font-mono text-[16px] font-semibold leading-[20px];
+  }
+  
+  .label-caps {
+    @apply font-sans text-[12px] font-bold leading-[16px] tracking-wider uppercase;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-0.75rem) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
