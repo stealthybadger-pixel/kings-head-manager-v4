@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "public": "dist",
+    "public": "kings-head-manager-v4/dist",
     "ignore": [
       "firebase.json",
       "**/.*",
