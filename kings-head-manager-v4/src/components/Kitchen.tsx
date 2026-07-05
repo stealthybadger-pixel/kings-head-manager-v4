@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { useRecipes, useIngredients, useRecipeMutations, useIngredientMutations, useDishes } from '../hooks/useKitchenData';
 import { useStore } from '../store/useStore';
-import { Search, Plus, Trash2, Camera, AlertCircle, Check, HelpCircle, ExternalLink, Upload, RefreshCw, X } from 'lucide-react';
+import { Search, Plus, Trash2, Camera, AlertCircle, Check, HelpCircle, ExternalLink, Upload, RefreshCw, X, Link2, Unlink } from 'lucide-react';
 import { Recipe, RecipeItem, Ingredient, Unit } from '../types';
 import { calculateIngredientCost } from '../utils/costing';
 
@@ -124,6 +124,7 @@ export const Kitchen: React.FC = () => {
   });
 
   const [itemSearchQuery, setItemSearchQuery] = useState('');
+  const [scalingEnabled, setScalingEnabled] = useState(false);
 
   // Filtered + sorted recipe list
   const filteredRecipes = useMemo(() => {
@@ -233,6 +234,17 @@ export const Kitchen: React.FC = () => {
   const handleUpdateItemQty = (index: number, qty: number) => {
     setFormState(prev => {
       const items = [...prev.items];
+      if (scalingEnabled && items[index].quantity > 0 && qty > 0) {
+        const ratio = qty / items[index].quantity;
+        return {
+          ...prev,
+          items: items.map((item, i) =>
+            i === index
+              ? { ...item, quantity: qty }
+              : { ...item, quantity: parseFloat((item.quantity * ratio).toFixed(4)) }
+          )
+        };
+      }
       items[index] = { ...items[index], quantity: qty };
       return { ...prev, items };
     });
@@ -595,7 +607,21 @@ export const Kitchen: React.FC = () => {
 
             {/* Ingredient lines */}
             <div className="mt-4 border-t border-outline-variant pt-6">
-              <h3 className="label-caps text-on-surface font-bold mb-4">Recipe Ingredients</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="label-caps text-on-surface font-bold">Recipe Ingredients</h3>
+                <button
+                  onClick={() => setScalingEnabled(s => !s)}
+                  title={scalingEnabled ? 'Proportional scaling ON — changing one qty scales all others' : 'Proportional scaling OFF'}
+                  className={`flex items-center gap-1.5 h-7 px-3 rounded-sm border text-[10px] font-bold label-caps transition-colors ${
+                    scalingEnabled
+                      ? 'bg-primary text-white border-primary'
+                      : 'bg-surface text-outline border-outline-variant hover:bg-surface-container-low'
+                  }`}
+                >
+                  {scalingEnabled ? <Link2 className="h-3.5 w-3.5" /> : <Unlink className="h-3.5 w-3.5" />}
+                  Scale
+                </button>
+              </div>
               
               <div className="flex flex-col gap-3 mb-6">
                 {formState.items.map((item, idx) => {
