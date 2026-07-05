@@ -2,8 +2,64 @@ import React, { useState, useMemo } from 'react';
 import { useDishes, useIngredients, useRecipes, useDishMutations } from '../hooks/useKitchenData';
 import { useStore } from '../store/useStore';
 import { Search, Plus, Trash2, AlertTriangle, CheckCircle, TrendingUp, Radio } from 'lucide-react';
-import { Dish, DishItem, Ingredient, Recipe, Unit } from '../types';
+import { Allergen, AllergenSchema, Dish, DishItem, DishType, Ingredient, Recipe, Unit } from '../types';
 import { calculateIngredientCost } from '../utils/costing';
+
+const DISH_TYPES: DishType[] = ['Starter', 'Main', 'Side', 'Dessert', 'Drink', 'Other'];
+const ALL_ALLERGENS = AllergenSchema.options as Allergen[];
+
+// Module-level cost helper so it can be called before component const-functions are defined
+function computePlateCost(
+  items: DishItem[],
+  ingredients: Ingredient[],
+  recipes: Recipe[],
+  depth = 0
+): number {
+  if (depth > 5) return 0;
+  let cost = 0;
+  for (const item of (items ?? [])) {
+    if (item.type === 'ingredient' && item.ingredientId) {
+      const ing = ingredients.find(i => i.id === item.ingredientId);
+      if (ing) cost += calculateIngredientCost(ing, item.quantity, item.unit);
+    } else if (item.type === 'recipe' && item.subRecipeId) {
+      const rec = recipes.find(r => r.id === item.subRecipeId);
+      if (rec && rec.batchSize) {
+        const batchCost = computePlateCost(rec.items ?? [], ingredients, recipes, depth + 1);
+        let batchSizeG = rec.batchSize;
+        if (rec.batchUnit === 'kg' || rec.batchUnit === 'l') batchSizeG *= 1000;
+        const costPerG = batchCost / batchSizeG;
+        let qtyG = item.quantity;
+        if (item.unit === 'kg' || item.unit === 'l') qtyG *= 1000;
+        cost += costPerG * qtyG;
+      }
+    }
+  }
+  return cost;
+}
+
+function getDishAllergens(
+  items: DishItem[],
+  ingredients: Ingredient[],
+  recipes: Recipe[]
+): Allergen[] {
+  const allergens = new Set<Allergen>();
+  const ingMap = new Map(ingredients.map(i => [i.id, i]));
+  const recMap = new Map(recipes.map(r => [r.id, r]));
+
+  function collect(dishItems: DishItem[], depth = 0) {
+    if (depth > 5) return;
+    for (const item of (dishItems ?? [])) {
+      if (item.type === 'ingredient' && item.ingredientId) {
+        (ingMap.get(item.ingredientId)?.allergens ?? []).forEach(a => allergens.add(a));
+      } else if (item.type === 'recipe' && item.subRecipeId) {
+        const rec = recMap.get(item.subRecipeId);
+        if (rec) collect(rec.items ?? [], depth + 1);
+      }
+    }
+  }
+  collect(items ?? []);
+  return ALL_ALLERGENS.filter(a => allergens.has(a));
+}
 
 export const Service: React.FC = () => {
   const { data: dishes = [], isLoading: loadingDishes } = useDishes();
@@ -19,6 +75,7 @@ export const Service: React.FC = () => {
   // Search
   const [searchQuery, setSearchQuery] = useState('');
   const [itemSearchQuery, setItemSearchQuery] = useState('');
+  const [dishSort, setDishSort] = useState<'name' | 'date'>('name');
 
   // Form edit state
   const [isEditing, setIsEditing] = useState(false);
@@ -30,10 +87,18 @@ export const Service: React.FC = () => {
     items: []
   });
 
-  // Filtered dishes
+  // Filtered + sorted dishes
   const filteredDishes = useMemo(() => {
-    return dishes.filter(d => d && d.name && d.name.toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [dishes, searchQuery]);
+    const filtered = dishes.filter(d => d && d.name && d.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    if (dishSort === 'date') {
+      return [...filtered].sort((a, b) => {
+        const aTime = (a as any).createdAt ? new Date((a as any).createdAt).getTime() : 0;
+        const bTime = (b as any).createdAt ? new Date((b as any).createdAt).getTime() : 0;
+        return bTime - aTime;
+      });
+    }
+    return [...filtered].sort((a, b) => a.name.localeCompare(b.name));
+  }, [dishes, searchQuery, dishSort]);
 
   // Active dish
   const activeDish = useMemo(() => {
@@ -182,7 +247,7 @@ export const Service: React.FC = () => {
 
   // Financial values
   const plateCost = useMemo(() => {
-    return calculatePlateCost(formState.items);
+    return computePlateCost(formState.items, ingredients, recipes);
   }, [formState.items, ingredients, recipes]);
 
   const currentGP = useMemo(() => {
@@ -215,19 +280,35 @@ export const Service: React.FC = () => {
         <div className="p-4 border-b border-outline-variant bg-surface flex flex-col gap-3">
           <div className="flex justify-between items-center">
             <span className="label-caps text-outline font-bold">Menu List</span>
-            <button 
-              onClick={handleStartNew}
-              className="h-8 w-8 bg-primary text-white flex items-center justify-center rounded-sm hover:bg-opacity-90"
-            >
-              <Plus className="h-4 w-4" />
-            </button>
+            <div className="flex gap-2">
+              <div className="flex border border-outline-variant rounded-sm overflow-hidden text-[10px] font-bold label-caps">
+                <button
+                  onClick={() => setDishSort('name')}
+                  className={`h-8 px-2.5 transition-colors ${dishSort === 'name' ? 'bg-primary text-white' : 'bg-surface text-outline hover:bg-surface-container-low'}`}
+                >
+                  A–Z
+                </button>
+                <button
+                  onClick={() => setDishSort('date')}
+                  className={`h-8 px-2.5 border-l border-outline-variant transition-colors ${dishSort === 'date' ? 'bg-primary text-white' : 'bg-surface text-outline hover:bg-surface-container-low'}`}
+                >
+                  New
+                </button>
+              </div>
+              <button
+                onClick={handleStartNew}
+                className="h-8 w-8 bg-primary text-white flex items-center justify-center rounded-sm hover:bg-opacity-90"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
           </div>
 
           <div className="relative flex items-center bg-surface-container-lowest border border-outline-variant rounded-sm px-3 py-1.5 focus-within:border-primary">
             <Search className="h-4 w-4 text-outline mr-2" />
-            <input 
-              type="text" 
-              placeholder="Search dishes..." 
+            <input
+              type="text"
+              placeholder="Search dishes..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="flex-1 text-sm bg-transparent outline-none border-none focus:ring-0 p-0"
@@ -238,7 +319,7 @@ export const Service: React.FC = () => {
         <div className="flex-1 overflow-y-auto divide-y divide-outline-variant">
           {filteredDishes.map((dish, idx) => {
             if (!dish) return null;
-            const cost = calculatePlateCost(dish.items);
+            const cost = computePlateCost(dish.items, ingredients, recipes);
             const gp = dish.retailPrice ? ((dish.retailPrice - cost) / dish.retailPrice) * 100 : 0;
             const price = dish.retailPrice || 0;
             const targetGP = dish.targetGP !== undefined ? dish.targetGP : 72;
@@ -331,8 +412,8 @@ export const Service: React.FC = () => {
             <div className="grid grid-cols-3 gap-6">
               <div className="col-span-2">
                 <label className="label-caps text-outline block mb-2">Dish Name</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={formState.name}
                   onChange={(e) => setFormState(prev => ({ ...prev, name: e.target.value }))}
                   className="w-full px-3 py-2 border border-outline-variant rounded-sm text-sm"
@@ -342,13 +423,59 @@ export const Service: React.FC = () => {
 
               <div>
                 <label className="label-caps text-outline block mb-2">Retail Sell Price (£)</label>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   step="0.01"
                   value={formState.retailPrice}
                   onChange={(e) => setFormState(prev => ({ ...prev, retailPrice: Math.max(0, parseFloat(e.target.value) || 0) }))}
                   className="w-full px-3 py-2 border border-outline-variant rounded-sm text-sm data-tabular"
                 />
+              </div>
+
+              <div>
+                <label className="label-caps text-outline block mb-2">Dish Type</label>
+                <select
+                  value={(formState as any).dishType ?? ''}
+                  onChange={(e) => setFormState(prev => ({ ...prev, dishType: e.target.value as DishType || undefined }))}
+                  className="w-full px-3 py-2 border border-outline-variant bg-surface-container-lowest rounded-sm text-sm"
+                >
+                  <option value="">— Select type —</option>
+                  {DISH_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* Sliders */}
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="label-caps text-outline">Target GP %</label>
+                  <span className="data-tabular text-sm font-bold text-primary">{formState.targetGP}%</span>
+                </div>
+                <input
+                  type="range" min={0} max={100} step={1}
+                  value={formState.targetGP}
+                  onChange={e => setFormState(prev => ({ ...prev, targetGP: Number(e.target.value) }))}
+                  className="w-full accent-primary h-1.5"
+                />
+                <div className="flex justify-between text-[10px] text-outline mt-0.5">
+                  <span>0%</span><span>50%</span><span>100%</span>
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="label-caps text-outline">Retail Price</label>
+                  <span className="data-tabular text-sm font-bold text-primary">£{formState.retailPrice.toFixed(2)}</span>
+                </div>
+                <input
+                  type="range" min={0} max={100} step={0.25}
+                  value={formState.retailPrice}
+                  onChange={e => setFormState(prev => ({ ...prev, retailPrice: Number(e.target.value) }))}
+                  className="w-full accent-primary h-1.5"
+                />
+                <div className="flex justify-between text-[10px] text-outline mt-0.5">
+                  <span>£0</span><span>£50</span><span>£100</span>
+                </div>
               </div>
             </div>
 
@@ -502,6 +629,27 @@ export const Service: React.FC = () => {
                 )}
               </div>
             </div>
+
+            {/* Allergens (derived from components) */}
+            {(() => {
+              const dishAllergens = getDishAllergens(formState.items, ingredients, recipes);
+              return (
+                <div className="border-t border-outline-variant pt-4">
+                  <label className="label-caps text-outline block mb-2">Allergens in this dish</label>
+                  {dishAllergens.length === 0 ? (
+                    <p className="text-xs text-outline italic">None detected from current components</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {dishAllergens.map(a => (
+                        <span key={a} className="px-2.5 py-1 text-xs font-semibold bg-error-container text-error border border-error rounded-sm">
+                          {a}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* FINANCIAL CALCULATOR BOARD */}
             <div className="mt-8 border-t border-outline-variant pt-6 grid grid-cols-3 gap-6 bg-surface p-6 border border-outline-variant rounded-sm">

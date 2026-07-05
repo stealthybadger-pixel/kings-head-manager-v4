@@ -1,9 +1,54 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { useRecipes, useIngredients, useRecipeMutations, useIngredientMutations, useDishes } from '../hooks/useKitchenData';
 import { useStore } from '../store/useStore';
-import { Search, Plus, Trash2, Camera, AlertCircle, Check, HelpCircle, ExternalLink } from 'lucide-react';
+import { Search, Plus, Trash2, Camera, AlertCircle, Check, HelpCircle, ExternalLink, Upload, RefreshCw, X } from 'lucide-react';
 import { Recipe, RecipeItem, Ingredient, Unit } from '../types';
 import { calculateIngredientCost } from '../utils/costing';
+
+async function scanRecipeWithGemini(base64Image: string, mimeType: string): Promise<{
+  name: string;
+  ingredients: { rawName: string; parsedName: string; qty: number; unit: Unit }[];
+  instructions: string;
+}> {
+  const key = localStorage.getItem('geminiApiKey');
+  if (!key) throw new Error('No Gemini API key set. Add it in Settings.');
+
+  const prompt = `You are analysing a recipe card, handwritten recipe, printed recipe, or cookbook page.
+Extract the recipe name, all ingredients with quantities, and the preparation instructions.
+
+Return ONLY valid JSON in this exact shape, no markdown, no explanation:
+{
+  "name": "Recipe Name",
+  "ingredients": [
+    { "rawName": "original text as written", "parsedName": "clean ingredient name only, title case", "qty": 100, "unit": "g" }
+  ],
+  "instructions": "Full method as a single string, steps separated by newlines"
+}
+
+Units must be one of: "g", "kg", "ml", "l", "ea"
+- Convert tablespoons/teaspoons to ml (1 tbsp = 15ml, 1 tsp = 5ml)
+- Convert oz to g (1 oz = 28g), lbs to kg
+- For "each" items like eggs use "ea"
+- parsedName should be the ingredient only, no quantity or unit`;
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64Image } }] }],
+        generationConfig: { temperature: 0.1, maxOutputTokens: 4096 }
+      })
+    }
+  );
+
+  if (!response.ok) throw new Error(`Gemini API error: ${response.status}`);
+  const data = await response.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+  const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  return JSON.parse(cleaned);
+}
 
 const calculateDynamicBatchSize = (items: RecipeItem[], targetUnit: string) => {
   if (!items || items.length === 0) return 1;
@@ -53,16 +98,19 @@ export const Kitchen: React.FC = () => {
 
   // Directory Search
   const [searchQuery, setSearchQuery] = useState('');
+  const [recipeSort, setRecipeSort] = useState<'name' | 'date'>('name');
 
   // Recipe Scanner modal state
   const [showScanner, setShowScanner] = useState(false);
   const [scanFile, setScanFile] = useState<File | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
   const [scanResults, setScanResults] = useState<{
     name: string;
     ingredients: { rawName: string; parsedName: string; qty: number; unit: Unit; matchedId?: string }[];
     instructions: string;
   } | null>(null);
+  const scanFileRef = useRef<HTMLInputElement>(null);
 
   // Form edit state
   const [isEditing, setIsEditing] = useState(false);
@@ -77,10 +125,18 @@ export const Kitchen: React.FC = () => {
 
   const [itemSearchQuery, setItemSearchQuery] = useState('');
 
-  // Filtered recipe list
+  // Filtered + sorted recipe list
   const filteredRecipes = useMemo(() => {
-    return recipes.filter(r => r.name.toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [recipes, searchQuery]);
+    const filtered = recipes.filter(r => r.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    if (recipeSort === 'date') {
+      return [...filtered].sort((a, b) => {
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return bTime - aTime;
+      });
+    }
+    return [...filtered].sort((a, b) => a.name.localeCompare(b.name));
+  }, [recipes, searchQuery, recipeSort]);
 
   // Active recipe
   const activeRecipe = useMemo(() => {
@@ -227,34 +283,39 @@ export const Kitchen: React.FC = () => {
     return calculateTotalCost(formState.items);
   }, [formState.items, ingredients]);
 
-  // Mock scan handler
-  const handleRunScanner = () => {
-    if (!scanFile) return;
+  const handleScanFile = async (file: File) => {
+    setScanFile(file);
+    setScanError(null);
+    setScanResults(null);
     setScanning(true);
-    
-    setTimeout(() => {
-      // Look up ingredients
-      const mockIngredients = [
-        { rawName: '500g chicken breast', parsedName: 'Chicken Breast', qty: 500, unit: 'g' as Unit },
-        { rawName: '200g double cream', parsedName: 'Double Cream', qty: 200, unit: 'g' as Unit },
-        { rawName: '50g wild garlic', parsedName: 'Wild Garlic', qty: 50, unit: 'g' as Unit } // Missing in DB
-      ];
 
-      const mapped = mockIngredients.map(item => {
-        const match = ingredients.find(i => i.name.toLowerCase() === item.parsedName.toLowerCase());
-        return {
-          ...item,
-          matchedId: match?.id
-        };
+    try {
+      const mimeType = file.type || 'image/jpeg';
+      const base64 = await new Promise<string>((res, rej) => {
+        const reader = new FileReader();
+        reader.onload = () => res((reader.result as string).split(',')[1]);
+        reader.onerror = rej;
+        reader.readAsDataURL(file);
       });
 
-      setScanResults({
-        name: 'Creamy Garlic Chicken',
-        ingredients: mapped,
-        instructions: '1. Fry the chicken breast in butter until golden.\n2. Stir in double cream and chopped wild garlic.\n3. Simmer for 10 minutes until chicken is cooked through.'
+      const extracted = await scanRecipeWithGemini(base64, mimeType);
+
+      const mapped = extracted.ingredients.map(item => {
+        const nameLower = item.parsedName.toLowerCase();
+        const match = ingredients.find(i =>
+          i.name.toLowerCase() === nameLower ||
+          i.name.toLowerCase().includes(nameLower) ||
+          nameLower.includes(i.name.toLowerCase())
+        );
+        return { ...item, matchedId: match?.id };
       });
+
+      setScanResults({ ...extracted, ingredients: mapped });
+    } catch (e: any) {
+      setScanError(e.message || 'Scan failed');
+    } finally {
       setScanning(false);
-    }, 1500);
+    }
   };
 
   // Inline Quick-Add for missing scanner ingredients
@@ -327,14 +388,28 @@ export const Kitchen: React.FC = () => {
           <div className="flex justify-between items-center">
             <span className="label-caps text-outline font-bold">Kitchen Library</span>
             <div className="flex gap-2">
-              <button 
+              <div className="flex border border-outline-variant rounded-sm overflow-hidden text-[10px] font-bold label-caps">
+                <button
+                  onClick={() => setRecipeSort('name')}
+                  className={`h-8 px-2.5 transition-colors ${recipeSort === 'name' ? 'bg-primary text-white' : 'bg-surface text-outline hover:bg-surface-container-low'}`}
+                >
+                  A–Z
+                </button>
+                <button
+                  onClick={() => setRecipeSort('date')}
+                  className={`h-8 px-2.5 border-l border-outline-variant transition-colors ${recipeSort === 'date' ? 'bg-primary text-white' : 'bg-surface text-outline hover:bg-surface-container-low'}`}
+                >
+                  New
+                </button>
+              </div>
+              <button
                 onClick={() => setShowScanner(true)}
                 className="h-8 px-3 border border-outline text-[10px] label-caps font-bold rounded-sm bg-surface hover:bg-surface-container-low flex items-center gap-1"
               >
                 <Camera className="h-3.5 w-3.5" />
                 Scan
               </button>
-              <button 
+              <button
                 onClick={handleStartNew}
                 className="h-8 w-8 bg-primary text-white flex items-center justify-center rounded-sm hover:bg-opacity-90"
               >
@@ -639,7 +714,7 @@ export const Kitchen: React.FC = () => {
             {/* Method Box */}
             <div className="mt-4 border-t border-outline-variant pt-6">
               <label className="label-caps text-outline block mb-2">Preparation Instructions</label>
-              <textarea 
+              <textarea
                 value={formState.instructions}
                 onChange={(e) => setFormState(prev => ({ ...prev, instructions: e.target.value }))}
                 rows={6}
@@ -647,6 +722,42 @@ export const Kitchen: React.FC = () => {
                 className="w-full px-3 py-2 border border-outline-variant rounded-sm text-sm"
               />
             </div>
+
+            {/* Allergens (derived from recipe items) */}
+            {(() => {
+              const ingMap = new Map(ingredients.map(i => [i.id, i]));
+              const recMap = new Map(recipes.map(r => [r.id, r]));
+              const allergens = new Set<string>();
+              function collect(items: any[], depth = 0) {
+                if (depth > 5) return;
+                for (const item of (items ?? [])) {
+                  if (item.type === 'ingredient' && item.ingredientId) {
+                    (ingMap.get(item.ingredientId)?.allergens ?? []).forEach((a: string) => allergens.add(a));
+                  } else if (item.type === 'recipe' && item.subRecipeId) {
+                    const sub = recMap.get(item.subRecipeId);
+                    if (sub) collect(sub.items ?? [], depth + 1);
+                  }
+                }
+              }
+              collect(formState.items ?? []);
+              const list = Array.from(allergens);
+              return (
+                <div className="mt-4 border-t border-outline-variant pt-4">
+                  <label className="label-caps text-outline block mb-2">Allergens in this recipe</label>
+                  {list.length === 0 ? (
+                    <p className="text-xs text-outline italic">None detected from current ingredients</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {list.map(a => (
+                        <span key={a} className="px-2.5 py-1 text-xs font-semibold bg-error-container text-error border border-error rounded-sm">
+                          {a}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </>
         ) : (
           <div className="flex-1 flex flex-col justify-center items-center text-outline">
@@ -659,48 +770,82 @@ export const Kitchen: React.FC = () => {
       {/* 3. RECIPE SCANNER MODAL */}
       {showScanner && (
         <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-8">
-          <div className="w-full max-w-2xl bg-surface-container-lowest border border-outline-variant rounded-sm flex flex-col relative p-6">
-            <h2 className="headline-sm font-semibold border-b border-outline-variant pb-3 mb-4 flex items-center gap-2">
-              <Camera className="h-5 w-5 text-primary" />
-              Single Recipe OCR Scanner
-            </h2>
+          <div className="w-full max-w-2xl bg-surface-container-lowest border border-outline-variant rounded-sm flex flex-col relative">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant">
+              <h2 className="font-bold text-on-surface flex items-center gap-2">
+                <Camera className="h-5 w-5 text-primary" />
+                Recipe Scanner
+              </h2>
+              <button
+                onClick={() => { setShowScanner(false); setScanFile(null); setScanResults(null); setScanError(null); }}
+                className="p-1 text-outline hover:text-on-surface"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
 
-            <div className="flex flex-col gap-4">
-              <p className="text-xs text-on-surface-variant leading-relaxed">
-                Take a photo or upload a recipe image. The scanner will run OCR, extract ingredient lines, and verify them against your Pantry.
-              </p>
-
-              <div className="border-2 border-dashed border-outline-variant p-6 text-center bg-surface hover:bg-surface-container cursor-pointer transition-colors">
-                <input 
-                  type="file" 
-                  onChange={(e) => setScanFile(e.target.files?.[0] || null)}
-                  className="hidden" 
-                  id="recipe-file-input"
+            <div className="p-6 flex flex-col gap-4">
+              {/* Drop zone */}
+              <div
+                onClick={() => scanFileRef.current?.click()}
+                className={`border-2 border-dashed border-outline-variant rounded-sm p-10 text-center cursor-pointer hover:border-primary hover:bg-surface-container transition-colors ${scanning ? 'opacity-50 pointer-events-none' : ''}`}
+              >
+                <input
+                  ref={scanFileRef}
+                  type="file"
                   accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={e => e.target.files?.[0] && handleScanFile(e.target.files[0])}
                 />
-                <label htmlFor="recipe-file-input" className="cursor-pointer">
-                  {scanFile ? (
-                    <span className="font-semibold text-sm text-primary">{scanFile.name}</span>
-                  ) : (
-                    <span className="text-xs text-outline label-caps">Select Recipe Image</span>
-                  )}
-                </label>
+                {scanning ? (
+                  <div className="flex flex-col items-center gap-3">
+                    <RefreshCw className="h-8 w-8 text-primary animate-spin" />
+                    <p className="text-sm text-on-surface-variant">Reading recipe with Gemini…</p>
+                  </div>
+                ) : scanFile && !scanResults ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <Upload className="h-8 w-8 text-primary" />
+                    <p className="text-sm font-semibold text-primary">{scanFile.name}</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-3">
+                    <Upload className="h-8 w-8 text-outline" />
+                    <p className="text-sm font-semibold text-on-surface">Take a photo or upload a recipe image</p>
+                    <p className="text-xs text-on-surface-variant">Recipe cards, handwritten notes, cookbook pages, menus</p>
+                  </div>
+                )}
               </div>
 
-              {scanResults ? (
+              {scanError && (
+                <div className="border border-error bg-error-container p-3 rounded-sm flex gap-2 items-center text-xs text-on-error-container">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  {scanError}
+                </div>
+              )}
+
+              {scanResults && (
                 <div className="flex flex-col gap-3 border-t border-outline-variant pt-4">
-                  <h3 className="label-caps font-bold text-xs">Extraction & Pantry Verification</h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="label-caps font-bold text-xs">
+                      {scanResults.name} — Pantry Verification
+                    </h3>
+                    <span className="text-[10px] text-outline">
+                      {scanResults.ingredients.filter(i => i.matchedId).length}/{scanResults.ingredients.length} matched
+                    </span>
+                  </div>
                   <div className="max-h-60 overflow-y-auto border border-outline-variant divide-y divide-outline-variant rounded-sm bg-surface">
                     {scanResults.ingredients.map((item, idx) => (
-                      <div key={idx} className="p-3 flex items-center justify-between text-xs">
-                        <div>
-                          <span className="font-mono text-outline mr-2">{item.rawName}</span>
-                          <span className="font-semibold text-on-surface">&rarr; {item.parsedName}</span>
+                      <div key={idx} className="p-3 flex items-center justify-between text-xs gap-3">
+                        <div className="min-w-0 flex-1">
+                          <span className="font-semibold text-on-surface">{item.parsedName}</span>
+                          <span className="text-outline ml-2 font-mono">{item.qty}{item.unit}</span>
+                          <div className="text-[10px] text-outline-variant truncate">{item.rawName}</div>
                         </div>
-                        
-                        <div>
+                        <div className="shrink-0">
                           {item.matchedId ? (
-                            <span className="text-primary font-bold label-caps flex items-center gap-1">
+                            <span className="text-emerald-600 font-bold label-caps flex items-center gap-1">
                               <Check className="h-3.5 w-3.5" /> Matched
                             </span>
                           ) : (
@@ -708,7 +853,7 @@ export const Kitchen: React.FC = () => {
                               <span className="text-error font-bold label-caps flex items-center gap-1">
                                 <AlertCircle className="h-3.5 w-3.5" /> Missing
                               </span>
-                              <button 
+                              <button
                                 onClick={() => handleCreateScannerIngredient(idx, item.parsedName)}
                                 className="px-2 py-1 bg-primary text-white label-caps text-[9px] font-bold rounded-sm"
                               >
@@ -721,40 +866,21 @@ export const Kitchen: React.FC = () => {
                     ))}
                   </div>
 
-                  <div className="flex justify-end gap-3 border-t border-outline-variant pt-4 mt-2">
-                    <button 
-                      onClick={() => setScanResults(null)}
-                      className="h-10 px-4 border border-outline text-xs font-bold label-caps rounded-sm hover:bg-surface-container"
+                  <div className="flex justify-between items-center border-t border-outline-variant pt-4">
+                    <button
+                      onClick={() => { setScanResults(null); setScanFile(null); setScanError(null); }}
+                      className="h-9 px-4 border border-outline-variant text-xs font-bold label-caps rounded-sm hover:bg-surface-container"
                     >
-                      Clear
+                      Scan Again
                     </button>
-                    <button 
+                    <button
                       onClick={handleCommitScan}
-                      disabled={scanResults.ingredients.some(i => !i.matchedId)}
-                      className="h-10 px-6 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90 disabled:opacity-50"
+                      disabled={scanResults.ingredients.every(i => !i.matchedId)}
+                      className="h-9 px-6 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90 disabled:opacity-50"
                     >
                       Populate Form
                     </button>
                   </div>
-                </div>
-              ) : (
-                <div className="flex justify-end gap-3 border-t border-outline-variant pt-4 mt-2">
-                  <button 
-                    onClick={() => {
-                      setShowScanner(false);
-                      setScanFile(null);
-                    }}
-                    className="h-10 px-4 border border-outline text-xs font-bold label-caps rounded-sm hover:bg-surface-container"
-                  >
-                    Close
-                  </button>
-                  <button 
-                    onClick={handleRunScanner}
-                    disabled={!scanFile || scanning}
-                    className="h-10 px-6 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90 disabled:opacity-50"
-                  >
-                    {scanning ? 'Reading...' : 'Run OCR'}
-                  </button>
                 </div>
               )}
             </div>

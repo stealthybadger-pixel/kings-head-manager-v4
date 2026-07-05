@@ -191,10 +191,12 @@ export const DishSchema = z.preprocess((val: any) => {
   targetGP: z.number().min(0).max(100),
   items: z.array(DishItemSchema),
   isLive: z.boolean().optional(),
+  dishType: z.enum(['Starter', 'Main', 'Side', 'Dessert', 'Drink', 'Other']).optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional()
 }));
 export type Dish = z.infer<typeof DishSchema>;
+export type DishType = 'Starter' | 'Main' | 'Side' | 'Dessert' | 'Drink' | 'Other';
 
 export const StockMovementTypeSchema = z.enum([
   'delivery',

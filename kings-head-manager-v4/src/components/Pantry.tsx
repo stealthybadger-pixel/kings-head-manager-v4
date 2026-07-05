@@ -37,7 +37,7 @@ const CatalogRowSearch: React.FC<{
       </div>
       {open && results.length > 0 && (
         <div className="absolute z-50 top-full left-0 right-0 mt-0.5 bg-surface border border-outline-variant rounded shadow-lg max-h-48 overflow-y-auto">
-          {results.slice(0, 8).map(prod => (
+          {results.slice(0, 20).map(prod => (
             <button
               key={prod.id}
               type="button"
@@ -131,7 +131,8 @@ export const Pantry: React.FC = () => {
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  
+  const [pantrySort, setPantrySort] = useState<'name' | 'date'>('name');
+
   // Menu Auditor Modal state
   const [showMenuAuditor, setShowMenuAuditor] = useState(false);
   const [auditorFile, setAuditorFile] = useState<File | null>(null);
@@ -160,12 +161,20 @@ export const Pantry: React.FC = () => {
 
   // Filtered ingredients
   const filteredIngredients = useMemo(() => {
-    return ingredients.filter(ing => {
+    const filtered = ingredients.filter(ing => {
       const matchSearch = ing.name.toLowerCase().includes(searchQuery.toLowerCase());
       const matchCat = selectedCategory === 'All' || ing.category === selectedCategory;
       return matchSearch && matchCat;
     });
-  }, [ingredients, searchQuery, selectedCategory]);
+    if (pantrySort === 'date') {
+      return [...filtered].sort((a, b) => {
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return bTime - aTime;
+      });
+    }
+    return [...filtered].sort((a, b) => a.name.localeCompare(b.name));
+  }, [ingredients, searchQuery, selectedCategory, pantrySort]);
 
   // Active selected ingredient
   const activeIngredient = useMemo(() => {
@@ -565,13 +574,27 @@ export const Pantry: React.FC = () => {
           <div className="flex justify-between items-center">
             <span className="label-caps text-outline font-bold">Pantry Directory</span>
             <div className="flex gap-2">
-              <button 
+              <div className="flex border border-outline-variant rounded-sm overflow-hidden text-[10px] font-bold label-caps">
+                <button
+                  onClick={() => setPantrySort('name')}
+                  className={`h-8 px-2.5 transition-colors ${pantrySort === 'name' ? 'bg-primary text-white' : 'bg-surface text-outline hover:bg-surface-container-low'}`}
+                >
+                  A–Z
+                </button>
+                <button
+                  onClick={() => setPantrySort('date')}
+                  className={`h-8 px-2.5 border-l border-outline-variant transition-colors ${pantrySort === 'date' ? 'bg-primary text-white' : 'bg-surface text-outline hover:bg-surface-container-low'}`}
+                >
+                  New
+                </button>
+              </div>
+              <button
                 onClick={() => setShowMenuAuditor(true)}
                 className="h-8 px-3 border border-outline text-[10px] label-caps font-bold rounded-sm bg-surface hover:bg-surface-container-low"
               >
                 Auditor
               </button>
-              <button 
+              <button
                 onClick={handleStartNew}
                 className="h-8 w-8 bg-primary text-white flex items-center justify-center rounded-sm hover:bg-opacity-90"
               >
@@ -764,6 +787,38 @@ export const Pantry: React.FC = () => {
                 />
               </div>
              </div>
+
+            {/* Allergens */}
+            <div className="mt-6 border-t border-outline-variant pt-4">
+              <label className="label-caps text-outline block mb-3">Allergens</label>
+              <div className="flex flex-wrap gap-2">
+                {allergensList.map(allergen => {
+                  const active = (formState.allergens || []).includes(allergen);
+                  return (
+                    <button
+                      key={allergen}
+                      type="button"
+                      onClick={() => setFormState(prev => {
+                        const current = prev.allergens || [];
+                        return {
+                          ...prev,
+                          allergens: active
+                            ? current.filter(a => a !== allergen)
+                            : [...current, allergen]
+                        };
+                      })}
+                      className={`px-2.5 py-1 text-xs font-semibold border transition-all ${
+                        active
+                          ? 'bg-error text-white border-error'
+                          : 'bg-transparent border-outline-variant text-outline hover:border-primary hover:text-on-surface'
+                      }`}
+                    >
+                      {allergen}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
             {cheaperCatalogOption && (
               <div className="bg-success-container border border-success p-4 rounded-sm text-on-success-container flex items-center justify-between text-xs mt-4">

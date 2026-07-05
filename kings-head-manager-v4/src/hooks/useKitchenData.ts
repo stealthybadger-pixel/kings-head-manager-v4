@@ -216,7 +216,7 @@ export const searchSupplierProducts = async (searchTerm: string, supplier: strin
       collection(db, 'supplierProducts'),
       where('name', '>=', term),
       where('name', '<=', term + '\uf8ff'),
-      limit(50)
+      limit(200)
     );
     
     const snapshot = await getDocs(q);

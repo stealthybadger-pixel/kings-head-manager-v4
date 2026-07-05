@@ -34,7 +34,7 @@ export const Stock: React.FC = () => {
   const [wasteReason, setWasteReason] = useState('Spoil');
 
   // Stock take state
-  const [activeLocation, setActiveLocation] = useState('Dry Store');
+  const [activeLocation, setActiveLocation] = useState('All');
   const [stockCounts, setStockCounts] = useState<Record<string, number>>({});
   const [scaleTareId, setScaleTareId] = useState<string>('none');
 
@@ -152,20 +152,9 @@ export const Stock: React.FC = () => {
   // Filtered ingredients for the Stock On Hand Directory
   const filteredStockIngredients = useMemo(() => {
     return ingredients.filter(ing => {
-      const matchesSearch = ing.name.toLowerCase().includes(stockSearchQuery.toLowerCase()) || 
+      const matchesSearch = ing.name.toLowerCase().includes(stockSearchQuery.toLowerCase()) ||
                             ing.category.toLowerCase().includes(stockSearchQuery.toLowerCase());
-                            
       if (selectedStockCategory === 'All') return matchesSearch;
-      
-      if (selectedStockCategory === 'Dry Store') {
-        return matchesSearch && (ing.category === 'Dry Store' || ing.category === 'Alcohol');
-      }
-      if (selectedStockCategory === 'Walk-In Fridge') {
-        return matchesSearch && (ing.category === 'Dairy' || ing.category === 'Meat' || ing.category === 'Fish' || ing.category === 'Vegetable' || ing.category === 'Fruit');
-      }
-      if (selectedStockCategory === 'Walk-In Freezer') {
-        return matchesSearch && ing.category === 'Frozen';
-      }
       return matchesSearch && ing.category === selectedStockCategory;
     });
   }, [ingredients, stockSearchQuery, selectedStockCategory]);
@@ -303,10 +292,15 @@ export const Stock: React.FC = () => {
               onChange={(e) => setSelectedStockCategory(e.target.value)}
               className="px-2 py-1 border border-outline-variant bg-surface-container-low text-xs rounded-sm focus:outline-none"
             >
-              <option value="All">All Locations</option>
-              <option value="Dry Store">Dry Store & Alcohol</option>
-              <option value="Walk-In Fridge">Walk-In Fridge (Meat, Veg, Dairy)</option>
-              <option value="Walk-In Freezer">Walk-In Freezer (Frozen)</option>
+              <option value="All">All Categories</option>
+              <option value="Dry Store">Dry Store</option>
+              <option value="Dairy">Dairy</option>
+              <option value="Meat">Meat</option>
+              <option value="Fish">Fish</option>
+              <option value="Vegetable">Vegetable</option>
+              <option value="Fruit">Fruit</option>
+              <option value="Frozen">Frozen</option>
+              <option value="Alcohol">Alcohol</option>
             </select>
           </div>
         </div>
@@ -637,32 +631,27 @@ export const Stock: React.FC = () => {
               </div>
             )}
 
-            {/* Locations Navigation Ribbon */}
-            <div className="h-12 border-b border-outline-variant bg-surface flex items-center px-6 gap-2 flex-shrink-0">
-              {['Dry Store', 'Walk-In Fridge', 'Walk-In Freezer'].map(loc => (
-                <button 
-                  key={loc}
-                  onClick={() => setActiveLocation(loc)}
-                  className={`h-8 px-4 text-xs font-bold label-caps rounded-sm transition-colors ${
-                    activeLocation === loc 
-                      ? 'bg-primary text-white' 
+            {/* Category Navigation Ribbon */}
+            <div className="border-b border-outline-variant bg-surface flex items-center px-6 gap-2 flex-shrink-0 overflow-x-auto h-12">
+              {['All', 'Dry Store', 'Dairy', 'Meat', 'Fish', 'Vegetable', 'Fruit', 'Frozen', 'Alcohol'].map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setActiveLocation(cat)}
+                  className={`h-8 px-4 text-xs font-bold label-caps rounded-sm transition-colors whitespace-nowrap ${
+                    activeLocation === cat
+                      ? 'bg-primary text-white'
                       : 'text-outline hover:bg-surface-container'
                   }`}
                 >
-                  {loc}
+                  {cat}
                 </button>
               ))}
             </div>
 
-            {/* Ingredients Lists by Location */}
+            {/* Ingredients List by Category */}
             <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-3">
               {ingredients
-                .filter(i => {
-                  // Mock grouping: map categories to physical locations
-                  if (activeLocation === 'Dry Store') return i.category === 'Dry Store' || i.category === 'Alcohol';
-                  if (activeLocation === 'Walk-In Fridge') return i.category === 'Dairy' || i.category === 'Meat' || i.category === 'Fish' || i.category === 'Vegetable' || i.category === 'Fruit';
-                  return i.category === 'Frozen';
-                })
+                .filter(i => activeLocation === 'All' || i.category === activeLocation)
                 .map((ing, idx) => {
                   const currentVal = stockCounts[ing.id] ?? ing.stockLevel ?? 0;
                   return (

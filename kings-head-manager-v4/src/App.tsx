@@ -12,8 +12,10 @@ import {
   X,
   HelpCircle,
   Truck,
-  ClipboardList,
-  ScanLine
+  ScanLine,
+  ChevronDown,
+  UtensilsCrossed,
+  MonitorPlay
 } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import Pantry from './components/Pantry';
@@ -22,12 +24,12 @@ import Kitchen from './components/Kitchen';
 import Service from './components/Service';
 import Stock from './components/Stock';
 import Suppliers from './components/Suppliers';
-import PrepList from './components/PrepList';
 import InvoiceScanner from './components/InvoiceScanner';
 import Help from './components/Help';
+import FrontOfHouse from './components/FrontOfHouse';
 import { useStore } from './store/useStore';
 
-export type ViewType = 'dashboard' | 'pantry' | 'catalog' | 'kitchen' | 'service' | 'stock' | 'suppliers' | 'prep-list' | 'invoice' | 'settings';
+export type ViewType = 'dashboard' | 'pantry' | 'catalog' | 'kitchen' | 'service' | 'stock' | 'suppliers' | 'invoice' | 'settings' | 'foh';
 
 const App: React.FC = () => {
   const currentView = useStore((state) => state.currentView);
@@ -35,16 +37,22 @@ const App: React.FC = () => {
   const toasts = useStore((state) => state.toasts);
   const dismissToast = useStore((state) => state.dismissToast);
   const [navCollapsed, setNavCollapsed] = useState<boolean>(true);
+  const [kitchenOpen, setKitchenOpen] = useState<boolean>(true);
 
-  // Navigation Items
-  const navItems = [
+  const topItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  ] as const;
+
+  const kitchenItems = [
     { id: 'pantry', label: 'Pantry', icon: Database },
-    { id: 'catalog', label: 'Catalog', icon: BookOpen },
+    { id: 'catalog', label: 'Supplier Catalogue', icon: BookOpen },
     { id: 'kitchen', label: 'Recipes', icon: ChefHat },
     { id: 'service', label: 'Dishes', icon: Utensils },
+  ] as const;
+
+  const bottomItems = [
+    { id: 'foh', label: 'Front of House', icon: MonitorPlay },
     { id: 'stock', label: 'Stock', icon: Boxes },
-    { id: 'prep-list', label: 'Prep List', icon: ClipboardList },
     { id: 'invoice', label: 'Invoices', icon: ScanLine },
     { id: 'suppliers', label: 'Suppliers', icon: Truck },
     { id: 'settings', label: 'Help', icon: HelpCircle },
@@ -68,8 +76,10 @@ const App: React.FC = () => {
         </div>
 
         {/* Navigation Link List */}
-        <div className="flex-1 flex flex-col gap-1 py-4">
-          {navItems.map((item) => {
+        <div className="flex-1 flex flex-col gap-1 py-4 overflow-hidden">
+
+          {/* Top items */}
+          {topItems.map((item) => {
             const IconComponent = item.icon;
             const isActive = currentView === item.id;
             return (
@@ -77,23 +87,65 @@ const App: React.FC = () => {
                 key={item.id}
                 onClick={() => setCurrentView(item.id)}
                 className={`relative h-12 flex items-center transition-colors duration-150 ${
-                  isActive 
-                    ? 'bg-surface-container-high text-primary font-semibold' 
-                    : 'text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface'
+                  isActive ? 'bg-surface-container-high text-primary font-semibold' : 'text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface'
                 } ${navCollapsed ? 'justify-center' : 'px-6 gap-4'}`}
               >
-                {/* Active Indicator Bar */}
-                {isActive && (
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary" />
-                )}
-                
+                {isActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary" />}
                 <IconComponent className="h-6 w-6 flex-shrink-0" />
-                
-                {!navCollapsed && (
-                  <span className="text-sm font-sans tracking-wide truncate">
-                    {item.label}
-                  </span>
-                )}
+                {!navCollapsed && <span className="text-sm font-sans tracking-wide truncate">{item.label}</span>}
+              </button>
+            );
+          })}
+
+          {/* Kitchen group */}
+          <button
+            onClick={() => { if (!navCollapsed) setKitchenOpen(o => !o); }}
+            className={`relative h-10 flex items-center transition-colors duration-150 mt-1 text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface ${navCollapsed ? 'justify-center' : 'px-6 gap-3'}`}
+          >
+            <UtensilsCrossed className="h-5 w-5 flex-shrink-0 text-outline" />
+            {!navCollapsed && (
+              <>
+                <span className="text-[10px] font-bold label-caps tracking-widest text-outline flex-1">Kitchen</span>
+                <ChevronDown className={`h-3.5 w-3.5 text-outline transition-transform duration-200 ${kitchenOpen ? '' : '-rotate-90'}`} />
+              </>
+            )}
+          </button>
+
+          {(kitchenOpen || navCollapsed) && kitchenItems.map((item) => {
+            const IconComponent = item.icon;
+            const isActive = currentView === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setCurrentView(item.id)}
+                className={`relative h-10 flex items-center transition-colors duration-150 ${
+                  isActive ? 'bg-surface-container-high text-primary font-semibold' : 'text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface'
+                } ${navCollapsed ? 'justify-center' : 'pl-10 pr-6 gap-3'}`}
+              >
+                {isActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary" />}
+                <IconComponent className="h-5 w-5 flex-shrink-0" />
+                {!navCollapsed && <span className="text-sm font-sans tracking-wide truncate">{item.label}</span>}
+              </button>
+            );
+          })}
+
+          <div className="h-px bg-outline-variant mx-4 my-2 flex-shrink-0" />
+
+          {/* Bottom items */}
+          {bottomItems.map((item) => {
+            const IconComponent = item.icon;
+            const isActive = currentView === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setCurrentView(item.id)}
+                className={`relative h-12 flex items-center transition-colors duration-150 ${
+                  isActive ? 'bg-surface-container-high text-primary font-semibold' : 'text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface'
+                } ${navCollapsed ? 'justify-center' : 'px-6 gap-4'}`}
+              >
+                {isActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary" />}
+                <IconComponent className="h-6 w-6 flex-shrink-0" />
+                {!navCollapsed && <span className="text-sm font-sans tracking-wide truncate">{item.label}</span>}
               </button>
             );
           })}
@@ -127,8 +179,8 @@ const App: React.FC = () => {
           {currentView === 'kitchen' && <Kitchen />}
           {currentView === 'service' && <Service />}
           {currentView === 'stock' && <Stock />}
-          {currentView === 'prep-list' && <PrepList />}
           {currentView === 'invoice' && <InvoiceScanner />}
+          {currentView === 'foh' && <FrontOfHouse />}
           {currentView === 'suppliers' && <Suppliers />}
           {currentView === 'settings' && <Help />}
         </div>
