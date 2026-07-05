@@ -241,6 +241,8 @@ export const StocktakeReportSchema = z.object({
   itemCount: z.number(),
   menuOnly: z.boolean().optional(),
   type: z.enum(['stocktake', 'snapshot']).optional(),
+  columns: z.array(z.string()).optional(),
+  scope: z.enum(['all', 'menu', 'nonzero']).optional(),
   wastageTotal: z.number().optional(),
   wastageCount: z.number().optional(),
   createdAt: z.string().optional()

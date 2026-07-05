@@ -1,8 +1,32 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useIngredients, useRecipes, useDishes, useStockMutations, useStockMovements, useStocktakeReports, useStocktakeMutations } from '../hooks/useKitchenData';
 import { useStore } from '../store/useStore';
-import { Search, Trash2, Scale, FileText, CheckCircle2, X, Filter, Printer, Mail, ChevronDown, ChevronRight, BookOpen } from 'lucide-react';
+import { Search, Scale, FileText, CheckCircle2, X, Filter, Printer, Mail, ChevronDown, ChevronRight, BookOpen } from 'lucide-react';
 import { Ingredient, Recipe, RecipeItem, StocktakeReport, Unit } from '../types';
+
+interface ReportConfig {
+  stockLevel: boolean;
+  stockValue: boolean;
+  category: boolean;
+  wastePercent: boolean;
+  allergens: boolean;
+  kcal: boolean;
+  supplier: boolean;
+  includeWastage: boolean;
+  scope: 'all' | 'menu' | 'nonzero';
+}
+
+const DEFAULT_REPORT_CONFIG: ReportConfig = {
+  stockLevel: true,
+  stockValue: true,
+  category: true,
+  wastePercent: false,
+  allergens: false,
+  kcal: false,
+  supplier: false,
+  includeWastage: true,
+  scope: 'nonzero'
+};
 import { calculateIngredientCost } from '../utils/costing';
 
 // Recursively collect all ingredient IDs referenced by a set of recipe items
@@ -50,6 +74,8 @@ export const Stock: React.FC = () => {
   const [showEposImport, setShowEposImport] = useState(false);
   const [showWastageHistory, setShowWastageHistory] = useState(false);
   const [showReports, setShowReports] = useState(false);
+  const [showReportConfig, setShowReportConfig] = useState(false);
+  const [reportConfig, setReportConfig] = useState<ReportConfig>(DEFAULT_REPORT_CONFIG);
 
   // Stock on hand directory
   const [stockSearchQuery, setStockSearchQuery] = useState('');
@@ -211,25 +237,38 @@ export const Stock: React.FC = () => {
   };
 
   // ── Feature 3b: generate snapshot report from current stock ───────────────
-  const handleGenerateReport = async () => {
+  const handleGenerateReport = async (cfg: ReportConfig) => {
+    const scopedIngredients = ingredients.filter(ing => {
+      if (cfg.scope === 'nonzero') return (ing.stockLevel ?? 0) > 0;
+      if (cfg.scope === 'menu') return menuIngredientIds.has(ing.id);
+      return true;
+    });
+
     const counts: Record<string, number> = {};
     let totalValue = 0;
-    for (const ing of ingredients) {
+    for (const ing of scopedIngredients) {
       const level = ing.stockLevel ?? 0;
-      if (level === 0) continue;
       counts[ing.id] = level;
-      totalValue += calculateIngredientCost(ing, level, 'g');
+      if (cfg.stockValue) totalValue += calculateIngredientCost(ing, level, 'g');
     }
 
-    // Wastage for current week (last 7 days)
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - 7);
-    const cutoffStr = cutoff.toISOString().slice(0, 10);
-    const recentWaste = wasteMovements.filter(m => m.date >= cutoffStr);
-    const wastageTotal = recentWaste.reduce((sum, m) => {
-      const ing = ingMap.get(m.ingredientId);
-      return sum + (ing ? calculateIngredientCost(ing, Math.abs(m.quantity), 'g') : 0);
-    }, 0);
+    const columns = Object.entries(cfg)
+      .filter(([k, v]) => v === true && k !== 'includeWastage')
+      .map(([k]) => k);
+
+    let wastageTotal: number | undefined;
+    let wastageCount: number | undefined;
+    if (cfg.includeWastage) {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 7);
+      const cutoffStr = cutoff.toISOString().slice(0, 10);
+      const recentWaste = wasteMovements.filter(m => m.date >= cutoffStr);
+      wastageCount = recentWaste.length;
+      wastageTotal = recentWaste.reduce((sum, m) => {
+        const ing = ingMap.get(m.ingredientId);
+        return sum + (ing ? calculateIngredientCost(ing, Math.abs(m.quantity), 'g') : 0);
+      }, 0);
+    }
 
     try {
       await saveReport.mutateAsync({
@@ -238,10 +277,13 @@ export const Stock: React.FC = () => {
         totalValue,
         itemCount: Object.keys(counts).length,
         type: 'snapshot',
+        columns,
+        scope: cfg.scope,
         wastageTotal,
-        wastageCount: recentWaste.length
+        wastageCount
       });
-      showToast('Snapshot report generated', 'success');
+      showToast('Report generated', 'success');
+      setShowReportConfig(false);
     } catch (err: any) {
       showToast(err.message || 'Failed to generate report', 'error');
     }
@@ -253,12 +295,43 @@ export const Stock: React.FC = () => {
   };
 
   const handlePrintReport = (report: StocktakeReport) => {
+    const cols = report.columns ?? ['stockLevel', 'stockValue', 'category'];
+    const showCategory  = cols.includes('category');
+    const showLevel     = cols.includes('stockLevel');
+    const showValue     = cols.includes('stockValue');
+    const showWaste     = cols.includes('wastePercent');
+    const showAllergens = cols.includes('allergens');
+    const showKcal      = cols.includes('kcal');
+    const showSupplier  = cols.includes('supplier');
+
+    const headerCells = [
+      '<th>Ingredient</th>',
+      showCategory  ? '<th>Category</th>'       : '',
+      showLevel     ? '<th style="text-align:right">Stock Level</th>' : '',
+      showValue     ? '<th style="text-align:right">Value (£)</th>'   : '',
+      showWaste     ? '<th style="text-align:right">Waste %</th>'     : '',
+      showAllergens ? '<th>Allergens</th>'       : '',
+      showKcal      ? '<th style="text-align:right">kcal/100g</th>'   : '',
+      showSupplier  ? '<th>Supplier</th>'        : ''
+    ].join('');
+
     const rows = Object.entries(report.counts).map(([id, count]) => {
       const ing = ingMap.get(id);
-      const value = ing ? calculateIngredientCost(ing, count, 'g') : 0;
-      return `<tr><td>${ing?.name ?? id}</td><td>${ing?.category ?? ''}</td><td style="text-align:right">${count}</td><td style="text-align:right">£${value.toFixed(2)}</td></tr>`;
+      const value = (ing && showValue) ? calculateIngredientCost(ing, count, 'g') : 0;
+      const pref = ing?.suppliers?.find(s => s.isPreferred) ?? ing?.suppliers?.[0];
+      return `<tr>
+        <td>${ing?.name ?? id}</td>
+        ${showCategory  ? `<td>${ing?.category ?? ''}</td>` : ''}
+        ${showLevel     ? `<td style="text-align:right">${count}</td>` : ''}
+        ${showValue     ? `<td style="text-align:right">£${value.toFixed(2)}</td>` : ''}
+        ${showWaste     ? `<td style="text-align:right">${ing?.wastePercent ?? 0}%</td>` : ''}
+        ${showAllergens ? `<td>${(ing?.allergens ?? []).join(', ') || '—'}</td>` : ''}
+        ${showKcal      ? `<td style="text-align:right">${ing?.kcalPer100 ?? '—'}</td>` : ''}
+        ${showSupplier  ? `<td>${pref?.name ?? '—'}</td>` : ''}
+      </tr>`;
     }).join('');
 
+    const scopeLabel = report.scope === 'menu' ? 'Menu items only' : report.scope === 'nonzero' ? 'Items with stock' : 'All ingredients';
     const wastageSection = report.wastageTotal !== undefined
       ? `<h2 style="margin-top:24px;font-size:14px">Wastage (last 7 days)</h2>
          <p>${report.wastageCount ?? 0} entries · Total cost: <strong>£${report.wastageTotal.toFixed(2)}</strong></p>`
@@ -266,14 +339,15 @@ export const Stock: React.FC = () => {
 
     const win = window.open('', '_blank');
     if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><title>${report.type === 'snapshot' ? 'Stock Snapshot' : 'Stock Take'} ${report.date}</title>
+    const colSpan = [true, showCategory, showLevel, showValue, showWaste, showAllergens, showKcal, showSupplier].filter(Boolean).length;
+    win.document.write(`<!DOCTYPE html><html><head><title>${report.type === 'snapshot' ? 'Stock Report' : 'Stock Take'} ${report.date}</title>
       <style>body{font-family:sans-serif;font-size:12px;padding:20px}h1{font-size:16px}h2{font-size:14px}table{width:100%;border-collapse:collapse;margin-top:8px}th,td{border:1px solid #ccc;padding:6px 8px}th{background:#f5f5f5;text-align:left}tfoot td{font-weight:bold}</style>
       </head><body>
-      <h1>${report.type === 'snapshot' ? 'Stock Snapshot' : 'Stock Take'} — ${report.date}</h1>
-      <p>${report.itemCount} items${report.menuOnly ? ' (menu items only)' : ''} · Stock value: £${report.totalValue.toFixed(2)}</p>
-      <table><thead><tr><th>Ingredient</th><th>Category</th><th>Level</th><th>Value</th></tr></thead>
+      <h1>${report.type === 'snapshot' ? 'Stock Report' : 'Stock Take'} — ${report.date}</h1>
+      <p>${report.itemCount} items · ${scopeLabel} · Stock value: £${report.totalValue.toFixed(2)}</p>
+      <table><thead><tr>${headerCells}</tr></thead>
       <tbody>${rows}</tbody>
-      <tfoot><tr><td colspan="3">Total stock value</td><td style="text-align:right">£${report.totalValue.toFixed(2)}</td></tr></tfoot>
+      ${showValue ? `<tfoot><tr><td colspan="${colSpan - 1}">Total</td><td style="text-align:right">£${report.totalValue.toFixed(2)}</td></tr></tfoot>` : ''}
       </table>
       ${wastageSection}
       </body></html>`);
@@ -618,12 +692,11 @@ export const Stock: React.FC = () => {
               <h2 className="font-bold text-on-surface">Stocktake Reports</h2>
               <div className="flex items-center gap-3">
                 <button
-                  onClick={handleGenerateReport}
-                  disabled={saveReport.isPending}
-                  className="h-8 px-4 bg-primary text-white text-[10px] font-bold label-caps rounded-sm hover:bg-opacity-90 disabled:opacity-50 flex items-center gap-1.5"
+                  onClick={() => { setReportConfig(DEFAULT_REPORT_CONFIG); setShowReportConfig(true); }}
+                  className="h-8 px-4 bg-primary text-white text-[10px] font-bold label-caps rounded-sm hover:bg-opacity-90 flex items-center gap-1.5"
                 >
-                  {saveReport.isPending ? <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Printer className="h-3.5 w-3.5" />}
-                  Generate Report Now
+                  <Printer className="h-3.5 w-3.5" />
+                  Generate Report
                 </button>
                 <button onClick={() => setShowReports(false)} className="p-1 text-outline hover:text-on-surface">
                   <X className="h-4 w-4" />
@@ -723,6 +796,89 @@ export const Stock: React.FC = () => {
                   {importing ? 'Processing...' : 'Run Sales Explosion'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* REPORT CONFIG MODAL */}
+      {showReportConfig && (
+        <div className="fixed inset-0 z-[110] bg-black/40 flex items-center justify-center p-8">
+          <div className="w-full max-w-md bg-surface-container-lowest border border-outline-variant rounded-sm flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant bg-surface">
+              <h2 className="font-bold text-on-surface">Report Options</h2>
+              <button onClick={() => setShowReportConfig(false)} className="p-1 text-outline hover:text-on-surface"><X className="h-4 w-4" /></button>
+            </div>
+
+            <div className="p-6 flex flex-col gap-6">
+
+              {/* Scope */}
+              <div>
+                <label className="label-caps text-outline text-[10px] font-bold block mb-3">Which Ingredients</label>
+                <div className="flex flex-col gap-2">
+                  {([
+                    ['nonzero', 'Items with stock (non-zero levels only)'],
+                    ['menu',    'Menu items only (live dishes + their recipes)'],
+                    ['all',     'All ingredients']
+                  ] as const).map(([val, label]) => (
+                    <label key={val} className="flex items-center gap-3 cursor-pointer text-sm">
+                      <input type="radio" name="scope" checked={reportConfig.scope === val}
+                        onChange={() => setReportConfig(c => ({ ...c, scope: val }))}
+                        className="accent-primary" />
+                      <span className={reportConfig.scope === val ? 'text-on-surface font-semibold' : 'text-on-surface-variant'}>{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Columns */}
+              <div>
+                <label className="label-caps text-outline text-[10px] font-bold block mb-3">Ingredient Data to Include</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    ['stockLevel',   'Stock level'],
+                    ['stockValue',   'Stock value (£)'],
+                    ['category',     'Category'],
+                    ['wastePercent', 'Waste %'],
+                    ['allergens',    'Allergens'],
+                    ['kcal',         'Calories (kcal/100g)'],
+                    ['supplier',     'Preferred supplier'],
+                  ] as const).map(([key, label]) => (
+                    <label key={key} className="flex items-center gap-2 cursor-pointer text-sm">
+                      <input type="checkbox" checked={reportConfig[key] as boolean}
+                        onChange={e => setReportConfig(c => ({ ...c, [key]: e.target.checked }))}
+                        className="accent-primary" />
+                      <span className="text-on-surface-variant">{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Wastage */}
+              <div className="border-t border-outline-variant pt-4">
+                <label className="flex items-center gap-3 cursor-pointer text-sm">
+                  <input type="checkbox" checked={reportConfig.includeWastage}
+                    onChange={e => setReportConfig(c => ({ ...c, includeWastage: e.target.checked }))}
+                    className="accent-primary" />
+                  <span className="text-on-surface">Include wastage summary (last 7 days)</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-outline-variant bg-surface">
+              <button onClick={() => setShowReportConfig(false)}
+                className="h-10 px-4 border border-outline text-xs font-bold label-caps rounded-sm hover:bg-surface-container">
+                Cancel
+              </button>
+              <button
+                onClick={() => handleGenerateReport(reportConfig)}
+                disabled={saveReport.isPending}
+                className="h-10 px-6 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90 disabled:opacity-50 flex items-center gap-2"
+              >
+                {saveReport.isPending
+                  ? <><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />Generating...</>
+                  : 'Generate Report'}
+              </button>
             </div>
           </div>
         </div>
