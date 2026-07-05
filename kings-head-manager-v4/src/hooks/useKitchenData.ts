@@ -7,6 +7,7 @@ import {
   Dish, DishSchema,
   ContainerProfile, ContainerProfileSchema,
   StockMovement, StockMovementSchema,
+  StocktakeReport, StocktakeReportSchema,
   SupplierProduct, SupplierProductSchema,
   Supplier, SupplierSchema
 } from '../types';
@@ -198,6 +199,57 @@ export const useStockMutations = () => {
   });
 
   return { logMovement };
+};
+
+export const useStockMovements = (type?: string) => {
+  return useQuery<StockMovement[]>({
+    queryKey: ['stock_movements', type ?? 'all'],
+    queryFn: async () => {
+      const q = type
+        ? query(collection(db, 'stock_movements'), where('type', '==', type))
+        : collection(db, 'stock_movements');
+      const snap = await getDocs(q as any);
+      const items: StockMovement[] = [];
+      snap.forEach(d => {
+        const raw = { id: d.id, ...(d.data() as object) };
+        const result = StockMovementSchema.safeParse(raw);
+        items.push(result.success ? result.data : raw as StockMovement);
+      });
+      return items.sort((a, b) => b.date.localeCompare(a.date));
+    },
+    staleTime: 60 * 1000
+  });
+};
+
+export const useStocktakeReports = () => {
+  return useQuery<StocktakeReport[]>({
+    queryKey: ['stocktake_reports'],
+    queryFn: async () => {
+      const snap = await getDocs(collection(db, 'stocktake_reports'));
+      const items: StocktakeReport[] = [];
+      snap.forEach(d => {
+        const raw = { id: d.id, ...d.data() };
+        const result = StocktakeReportSchema.safeParse(raw);
+        items.push(result.success ? result.data : raw as StocktakeReport);
+      });
+      return items.sort((a, b) => b.date.localeCompare(a.date));
+    },
+    staleTime: 60 * 1000
+  });
+};
+
+export const useStocktakeMutations = () => {
+  const queryClient = useQueryClient();
+  const saveReport = useMutation({
+    mutationFn: async (report: Omit<StocktakeReport, 'id'>) => {
+      const docRef = doc(collection(db, 'stocktake_reports'));
+      const full = { id: docRef.id, ...report, createdAt: new Date().toISOString() };
+      await setDoc(docRef, full);
+      return full;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['stocktake_reports'] })
+  });
+  return { saveReport };
 };
 
 export const searchSupplierProducts = async (searchTerm: string, supplier: string): Promise<SupplierProduct[]> => {

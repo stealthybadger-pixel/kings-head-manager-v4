@@ -233,6 +233,17 @@ export const SupplierSchema = z.object({
 });
 export type Supplier = z.infer<typeof SupplierSchema>;
 
+export const StocktakeReportSchema = z.object({
+  id: z.string(),
+  date: z.string(),
+  counts: z.record(z.number()),
+  totalValue: z.number(),
+  itemCount: z.number(),
+  menuOnly: z.boolean().optional(),
+  createdAt: z.string().optional()
+});
+export type StocktakeReport = z.infer<typeof StocktakeReportSchema>;
+
 export const SupplierProductSchema = z.object({
   id: z.string(),
   name: z.string(),

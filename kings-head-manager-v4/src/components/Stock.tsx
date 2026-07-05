@@ -1,14 +1,42 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useIngredients, useStockMutations } from '../hooks/useKitchenData';
+import { useIngredients, useRecipes, useDishes, useStockMutations, useStockMovements, useStocktakeReports, useStocktakeMutations } from '../hooks/useKitchenData';
 import { useStore } from '../store/useStore';
-import { Search, Plus, Trash2, ArrowUpRight, Scale, FileText, CheckCircle2, ChevronRight, Check } from 'lucide-react';
-import { Ingredient, StockMovementType, ContainerProfile, Unit } from '../types';
+import { Search, Trash2, Scale, FileText, CheckCircle2, X, Filter, Printer, Mail, ChevronDown, ChevronRight, BookOpen } from 'lucide-react';
+import { Ingredient, Recipe, RecipeItem, StocktakeReport, Unit } from '../types';
+import { calculateIngredientCost } from '../utils/costing';
+
+// Recursively collect all ingredient IDs referenced by a set of recipe items
+function collectIngredientIds(items: RecipeItem[], allRecipes: Recipe[], visited = new Set<string>()): Set<string> {
+  const ids = new Set<string>();
+  for (const item of items ?? []) {
+    if (item.type === 'ingredient' && item.ingredientId) {
+      ids.add(item.ingredientId);
+    } else if (item.type === 'recipe' && item.subRecipeId && !visited.has(item.subRecipeId)) {
+      visited.add(item.subRecipeId);
+      const sub = allRecipes.find(r => r.id === item.subRecipeId);
+      if (sub) {
+        collectIngredientIds(sub.items, allRecipes, visited).forEach(id => ids.add(id));
+      }
+    }
+  }
+  return ids;
+}
+
+function getIngredientUnitCostPer100g(ing: Ingredient): number {
+  const pref = ing.suppliers?.find(s => s.isPreferred) ?? ing.suppliers?.[0];
+  if (!pref) return 0;
+  return calculateIngredientCost(ing, 100, 'g');
+}
 
 export const Stock: React.FC = () => {
   const { data: ingredients = [], isLoading } = useIngredients();
+  const { data: recipes = [] } = useRecipes();
+  const { data: dishes = [] } = useDishes();
   const { logMovement } = useStockMutations();
+  const { data: wasteMovements = [] } = useStockMovements('waste');
+  const { data: stocktakeReports = [] } = useStocktakeReports();
+  const { saveReport } = useStocktakeMutations();
 
-  // Scale states from Zustand
   const scaleConnected = useStore((state) => state.scaleConnected);
   const showToast = useStore((state) => state.showToast);
   const setScaleConnected = useStore((state) => state.setScaleConnected);
@@ -16,67 +44,105 @@ export const Stock: React.FC = () => {
   const setScaleWeight = useStore((state) => state.setScaleWeight);
   const selectedIngredientId = useStore((state) => state.selectedIngredientId);
   const selectIngredient = useStore((state) => state.selectIngredient);
-  
-  // Local dialog triggers
+
   const [showWastePanel, setShowWastePanel] = useState(false);
   const [showStockTake, setShowStockTake] = useState(false);
   const [showEposImport, setShowEposImport] = useState(false);
+  const [showWastageHistory, setShowWastageHistory] = useState(false);
+  const [showReports, setShowReports] = useState(false);
 
-  // Stock On Hand Directory state
+  // Stock on hand directory
   const [stockSearchQuery, setStockSearchQuery] = useState('');
   const [selectedStockCategory, setSelectedStockCategory] = useState('All');
   const [editingCounts, setEditingCounts] = useState<Record<string, string>>({});
 
-  // Waste log state
+  // Waste log entry
   const [wasteIngId, setWasteIngId] = useState('');
   const [wasteQty, setWasteQty] = useState(0);
   const [wasteUnit, setWasteUnit] = useState<Unit>('g');
   const [wasteReason, setWasteReason] = useState('Spoil');
 
-  // Stock take state
+  // Wastage history filters
+  const [wasteDateFrom, setWasteDateFrom] = useState('');
+  const [wasteDateTo, setWasteDateTo] = useState('');
+  const [wasteIngFilter, setWasteIngFilter] = useState('');
+
+  // Sunday stock take
   const [activeLocation, setActiveLocation] = useState('All');
   const [stockCounts, setStockCounts] = useState<Record<string, number>>({});
   const [scaleTareId, setScaleTareId] = useState<string>('none');
+  const [menuOnlyMode, setMenuOnlyMode] = useState(false);
 
-  // EPOS Sales Importer state
+  // EPOS
   const [eposFile, setEposFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
   const [varianceReport, setVarianceReport] = useState<{
-    name: string;
-    projected: number;
-    actual: number;
-    variance: number;
-    unit: string;
-    costLoss: number;
+    name: string; projected: number; actual: number; variance: number; unit: string; costLoss: number;
   }[] | null>(null);
 
-  // Mock container profiles for scale tare demo
-  const containerProfiles: ContainerProfile[] = [
+  const containerProfiles = [
     { id: '10l_tub', name: '10L Green Tub', tareWeight: 450 },
     { id: '4l_tub', name: '4L Square Tub', tareWeight: 220 },
     { id: '2l_bottle', name: '2L Squeeze Bottle', tareWeight: 85 },
     { id: '1l_tub', name: '1L Round Tub', tareWeight: 60 }
   ];
 
-  // Mock Bluetooth scale reading trigger
-  const handleSimulateScaleWeight = () => {
-    if (!scaleConnected) return;
-    // Simulate placing a 10L tub with 2kg of soup on scale (2000g + 450g tare = 2450g)
-    setScaleWeight(2450);
-  };
-
   const activeTare = useMemo(() => {
     if (scaleTareId === 'none') return 0;
     return containerProfiles.find(c => c.id === scaleTareId)?.tareWeight || 0;
   }, [scaleTareId]);
 
-  const netWeightGrams = useMemo(() => {
-    return Math.max(0, scaleWeightGrams - activeTare);
-  }, [scaleWeightGrams, activeTare]);
+  const netWeightGrams = useMemo(() => Math.max(0, scaleWeightGrams - activeTare), [scaleWeightGrams, activeTare]);
 
-  const isSaving = logMovement.isPending;
+  // ── Feature 1: cascade live menu → ingredient IDs ─────────────────────────
+  const menuIngredientIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const dish of dishes.filter(d => (d as any).isLive)) {
+      for (const item of (dish.items ?? [])) {
+        if (item.type === 'ingredient' && item.ingredientId) {
+          ids.add(item.ingredientId);
+        } else if (item.type === 'recipe' && item.subRecipeId) {
+          const recipe = recipes.find(r => r.id === item.subRecipeId);
+          if (recipe) collectIngredientIds(recipe.items, recipes).forEach(id => ids.add(id));
+        }
+      }
+    }
+    return ids;
+  }, [dishes, recipes]);
 
-  // Handle Waste Save
+  // ── Feature 2: wastage history calculations ────────────────────────────────
+  const ingMap = useMemo(() => new Map(ingredients.map(i => [i.id, i])), [ingredients]);
+
+  const filteredWaste = useMemo(() => {
+    return wasteMovements.filter(m => {
+      if (wasteDateFrom && m.date < wasteDateFrom) return false;
+      if (wasteDateTo && m.date > wasteDateTo) return false;
+      if (wasteIngFilter) {
+        const name = ingMap.get(m.ingredientId)?.name?.toLowerCase() ?? '';
+        if (!name.includes(wasteIngFilter.toLowerCase())) return false;
+      }
+      return true;
+    });
+  }, [wasteMovements, wasteDateFrom, wasteDateTo, wasteIngFilter, ingMap]);
+
+  const wasteTotalCost = useMemo(() => {
+    return filteredWaste.reduce((sum, m) => {
+      const ing = ingMap.get(m.ingredientId);
+      if (!ing) return sum;
+      const qty = Math.abs(m.quantity);
+      return sum + calculateIngredientCost(ing, qty, 'g');
+    }, 0);
+  }, [filteredWaste, ingMap]);
+
+  // ── Stocktake helpers ──────────────────────────────────────────────────────
+  const stocktakeIngredients = useMemo(() => {
+    const base = activeLocation === 'All' ? ingredients : ingredients.filter(i => i.category === activeLocation);
+    if (!menuOnlyMode) return base;
+    return base.filter(i => menuIngredientIds.has(i.id));
+  }, [ingredients, activeLocation, menuOnlyMode, menuIngredientIds]);
+
+  const isSaving = logMovement.isPending || saveReport.isPending;
+
   const handleSaveWaste = async () => {
     if (!wasteIngId || wasteQty <= 0) return;
     const ingName = ingredients.find(i => i.id === wasteIngId)?.name || 'Ingredient';
@@ -86,62 +152,145 @@ export const Stock: React.FC = () => {
         type: 'waste',
         quantity: -Math.abs(wasteQty),
         date: new Date().toISOString().slice(0, 10),
-        costValue: 0 // Will compute based on unit price in production
+        costValue: 0,
+        notes: wasteReason
       });
-      showToast(`Recorded waste for ${ingName} (${wasteQty}${wasteUnit}) successfully!`, "success");
+      showToast(`Waste logged: ${ingName} (${wasteQty}${wasteUnit})`, 'success');
       setShowWastePanel(false);
-      setWasteIngId('');
-      setWasteQty(0);
-    } catch(err: any) {
-      console.error(err);
-      showToast(err.message || `Failed to record waste for ${ingName}`, "error");
+      setWasteIngId(''); setWasteQty(0);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to log waste', 'error');
     }
   };
 
-  // Handle Sunday Stock Take Commit
+  // ── Feature 3: commit stocktake + save report ──────────────────────────────
   const handleCommitStockTake = async () => {
     try {
       let adjustmentCount = 0;
-      // Loop through counts and write adjustments to Firestore
+      let totalValue = 0;
+      const counts: Record<string, number> = {};
+
       for (const [ingId, count] of Object.entries(stockCounts)) {
         const ing = ingredients.find(i => i.id === ingId);
-        if (ing) {
-          const delta = count - (ing.stockLevel || 0);
-          if (delta !== 0) {
-            await logMovement.mutateAsync({
-              ingredientId: ingId,
-              type: 'stock_take',
-              quantity: delta,
-              date: new Date().toISOString().slice(0, 10),
-              costValue: 0
-            });
-            adjustmentCount++;
-          }
+        if (!ing) continue;
+        counts[ingId] = count;
+        totalValue += calculateIngredientCost(ing, count, 'g');
+        const delta = count - (ing.stockLevel || 0);
+        if (delta !== 0) {
+          await logMovement.mutateAsync({
+            ingredientId: ingId,
+            type: 'stock_take',
+            quantity: delta,
+            date: new Date().toISOString().slice(0, 10),
+            costValue: 0
+          });
+          adjustmentCount++;
         }
       }
+
+      // Save the report snapshot
+      await saveReport.mutateAsync({
+        date: new Date().toISOString().slice(0, 10),
+        counts,
+        totalValue,
+        itemCount: Object.keys(counts).length,
+        menuOnly: menuOnlyMode
+      });
+
       showToast(
-        adjustmentCount > 0 
-          ? `Stock take committed successfully with ${adjustmentCount} adjustments.` 
-          : "Stock take committed successfully (no changes needed).", 
-        "success"
+        adjustmentCount > 0
+          ? `Stock take committed — ${adjustmentCount} adjustments saved`
+          : 'Stock take committed — no changes needed',
+        'success'
       );
       setShowStockTake(false);
       setStockCounts({});
-    } catch(err: any) {
-      console.error(err);
-      showToast(err.message || "Failed to commit stock take counts", "error");
+    } catch (err: any) {
+      showToast(err.message || 'Failed to commit stock take', 'error');
     }
   };
 
-  // Mock EPOS sales explosion
+  // ── Reports: print + email ─────────────────────────────────────────────────
+  const getReportRecipients = (): string[] => {
+    try { return JSON.parse(localStorage.getItem('reportRecipients') || '[]'); } catch { return []; }
+  };
+
+  const handlePrintReport = (report: StocktakeReport) => {
+    const rows = Object.entries(report.counts).map(([id, count]) => {
+      const ing = ingMap.get(id);
+      return `<tr><td>${ing?.name ?? id}</td><td>${ing?.category ?? ''}</td><td style="text-align:right">${count}</td><td style="text-align:right">£${calculateIngredientCost(ing!, count, 'g').toFixed(2)}</td></tr>`;
+    }).join('');
+
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(`<!DOCTYPE html><html><head><title>Stock Take ${report.date}</title>
+      <style>body{font-family:sans-serif;font-size:12px;padding:20px}h1{font-size:16px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:6px 8px}th{background:#f5f5f5;text-align:left}tfoot td{font-weight:bold}</style>
+      </head><body>
+      <h1>Stock Take — ${report.date}</h1>
+      <p>${report.itemCount} items counted${report.menuOnly ? ' (menu items only)' : ''} · Total value: £${report.totalValue.toFixed(2)}</p>
+      <table><thead><tr><th>Ingredient</th><th>Category</th><th>Count</th><th>Value</th></tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr><td colspan="3">Total</td><td style="text-align:right">£${report.totalValue.toFixed(2)}</td></tr></tfoot>
+      </table></body></html>`);
+    win.document.close();
+    win.print();
+  };
+
+  const handleEmailReport = (report: StocktakeReport) => {
+    const recipients = getReportRecipients();
+    const lines = Object.entries(report.counts)
+      .map(([id, count]) => `  ${ingMap.get(id)?.name ?? id}: ${count}`)
+      .join('\n');
+    const subject = `Stock Take Report — ${report.date}`;
+    const body = `Stock Take: ${report.date}\n${report.itemCount} items · Total value: £${report.totalValue.toFixed(2)}${report.menuOnly ? ' (menu items only)' : ''}\n\n${lines}`;
+    window.location.href = `mailto:${recipients.join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
+
+  const handleSaveSingleAdjustment = async (ing: Ingredient) => {
+    const typedVal = editingCounts[ing.id];
+    if (typedVal === undefined) return;
+    const newCount = parseFloat(typedVal) || 0;
+    const delta = newCount - (ing.stockLevel || 0);
+    if (delta !== 0) {
+      try {
+        await logMovement.mutateAsync({
+          ingredientId: ing.id, type: 'adjustment', quantity: delta,
+          date: new Date().toISOString().slice(0, 10), costValue: 0
+        });
+        showToast(`Adjusted ${ing.name} to ${newCount}`, 'success');
+        setEditingCounts(prev => { const n = { ...prev }; delete n[ing.id]; return n; });
+        selectIngredient(null);
+      } catch (err: any) {
+        showToast(err.message || 'Failed to save adjustment', 'error');
+      }
+    }
+  };
+
+  const filteredStockIngredients = useMemo(() => {
+    return ingredients.filter(ing => {
+      const q = stockSearchQuery.toLowerCase();
+      const matchesSearch = ing.name.toLowerCase().includes(q) || ing.category.toLowerCase().includes(q);
+      if (selectedStockCategory === 'All') return matchesSearch;
+      return matchesSearch && ing.category === selectedStockCategory;
+    });
+  }, [ingredients, stockSearchQuery, selectedStockCategory]);
+
+  useEffect(() => {
+    if (selectedIngredientId) {
+      setStockSearchQuery(''); setSelectedStockCategory('All');
+      setTimeout(() => {
+        document.getElementById(`stock-row-${selectedIngredientId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 150);
+    }
+  }, [selectedIngredientId]);
+
   const handleRunEposImport = () => {
     if (!eposFile) return;
     setImporting(true);
-    
     setTimeout(() => {
       setVarianceReport([
         { name: 'Beef Mince', projected: 4500, actual: 3000, variance: -1500, unit: 'g', costLoss: 13.50 },
-        { name: 'Double Cream', projected: 1200, actual: 1200, variance: 0, unit: 'ml', costLoss: 0.00 },
+        { name: 'Double Cream', projected: 1200, actual: 1200, variance: 0, unit: 'ml', costLoss: 0 },
         { name: 'Maris Piper Potatoes', projected: 25, actual: 15, variance: -10, unit: 'kg', costLoss: 8.10 },
         { name: 'Red Wine', projected: 1500, actual: 1400, variance: -100, unit: 'ml', costLoss: 1.60 }
       ]);
@@ -149,99 +298,44 @@ export const Stock: React.FC = () => {
     }, 1500);
   };
 
-  // Filtered ingredients for the Stock On Hand Directory
-  const filteredStockIngredients = useMemo(() => {
-    return ingredients.filter(ing => {
-      const matchesSearch = ing.name.toLowerCase().includes(stockSearchQuery.toLowerCase()) ||
-                            ing.category.toLowerCase().includes(stockSearchQuery.toLowerCase());
-      if (selectedStockCategory === 'All') return matchesSearch;
-      return matchesSearch && ing.category === selectedStockCategory;
-    });
-  }, [ingredients, stockSearchQuery, selectedStockCategory]);
-
-  // Handle single ingredient stock level quick edit
-  const handleSaveSingleAdjustment = async (ing: Ingredient) => {
-    const typedVal = editingCounts[ing.id];
-    if (typedVal === undefined) return;
-    const newCount = parseFloat(typedVal) || 0;
-    const oldCount = ing.stockLevel || 0;
-    const delta = newCount - oldCount;
-    
-    if (delta !== 0) {
-      try {
-        await logMovement.mutateAsync({
-          ingredientId: ing.id,
-          type: 'adjustment',
-          quantity: delta,
-          date: new Date().toISOString().slice(0, 10),
-          costValue: 0
-        });
-        showToast(`Adjusted ${ing.name} stock level to ${newCount}.`, "success");
-        setEditingCounts(prev => {
-          const next = { ...prev };
-          delete next[ing.id];
-          return next;
-        });
-        // Reset the selection highlight in Zustand
-        selectIngredient(null);
-      } catch (err: any) {
-        showToast(err.message || "Failed to save stock adjustment", "error");
-      }
-    }
-  };
-
-  // Scroll target ingredient from dashboard flag into view and reset filters to show it
-  useEffect(() => {
-    if (selectedIngredientId) {
-      setStockSearchQuery('');
-      setSelectedStockCategory('All');
-      
-      setTimeout(() => {
-        const element = document.getElementById(`stock-row-${selectedIngredientId}`);
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }, 150);
-    }
-  }, [selectedIngredientId]);
-
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center bg-surface-container-lowest">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
     );
   }
 
+  const categories = ['All', 'Dry Store', 'Dairy', 'Meat', 'Fish', 'Vegetable', 'Fruit', 'Frozen', 'Alcohol'];
+
   return (
     <div className="p-8 h-full overflow-y-auto flex flex-col gap-8 bg-surface-container-lowest">
-      
+
       {/* 1. CONTROL BAR */}
       <div className="flex justify-between items-center border-b border-outline-variant pb-4">
         <div>
           <h2 className="headline-sm font-semibold">Stock Ledger & Audits</h2>
           <span className="text-xs text-outline label-caps">EPOS COMPONENT WATERFALL</span>
         </div>
-        
-        <div className="flex gap-4">
-          <button 
-            onClick={() => setShowEposImport(true)}
-            className="h-10 px-4 border border-outline text-xs font-bold label-caps rounded-sm hover:bg-surface-container"
-          >
+        <div className="flex gap-3 flex-wrap justify-end">
+          <button onClick={() => setShowReports(true)}
+            className="h-10 px-4 border border-outline-variant text-xs font-bold label-caps rounded-sm hover:bg-surface-container flex items-center gap-1.5">
+            <BookOpen className="h-4 w-4" /> Reports
+          </button>
+          <button onClick={() => setShowWastageHistory(true)}
+            className="h-10 px-4 border border-outline-variant text-xs font-bold label-caps rounded-sm hover:bg-surface-container flex items-center gap-1.5">
+            <Filter className="h-4 w-4" /> Waste History
+          </button>
+          <button onClick={() => setShowEposImport(true)}
+            className="h-10 px-4 border border-outline text-xs font-bold label-caps rounded-sm hover:bg-surface-container">
             Import EPOS Sales
           </button>
-          
-          <button 
-            onClick={() => setShowWastePanel(true)}
-            className="h-10 px-4 border border-error text-error text-xs font-bold label-caps rounded-sm hover:bg-error-container"
-          >
+          <button onClick={() => setShowWastePanel(true)}
+            className="h-10 px-4 border border-error text-error text-xs font-bold label-caps rounded-sm hover:bg-error-container">
             Log Waste
           </button>
-          
-          <button 
-            onClick={() => setShowStockTake(true)}
-            className="h-10 px-6 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90"
-          >
+          <button onClick={() => setShowStockTake(true)}
+            className="h-10 px-6 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90">
             Sunday Stock Take
           </button>
         </div>
@@ -254,7 +348,6 @@ export const Stock: React.FC = () => {
           <div className="display-lg text-primary data-tabular">£1,840.40</div>
           <span className="text-xs text-secondary mt-1 block">Value of stock currently inside the kitchen</span>
         </div>
-
         <div className="bg-surface border border-outline-variant p-6 rounded-sm">
           <h3 className="label-caps text-outline font-bold mb-4">Recent Wastage (Weekly)</h3>
           <div className="display-lg text-error data-tabular">£23.20</div>
@@ -262,7 +355,7 @@ export const Stock: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. STOCK ON HAND DIRECTORY (QUICK EDIT) */}
+      {/* 3. STOCK ON HAND DIRECTORY */}
       <div className="border border-outline-variant p-6 rounded-sm flex flex-col gap-4 bg-surface-container-lowest">
         <div className="flex justify-between items-center border-b border-outline-variant pb-2 flex-wrap gap-4">
           <div>
@@ -270,108 +363,56 @@ export const Stock: React.FC = () => {
               <CheckCircle2 className="h-4 w-4 text-primary" />
               Stock On Hand Directory
             </h3>
-            <span className="text-[10px] text-outline mt-0.5 block">Review and adjust stock quantities directly. Click dashboard alerts to highlight items.</span>
+            <span className="text-[10px] text-outline mt-0.5 block">Click dashboard alerts to highlight items.</span>
           </div>
-          
-          <div className="flex gap-4 items-center flex-wrap">
-            {/* Search Box */}
+          <div className="flex gap-3 items-center flex-wrap">
             <div className="relative flex items-center bg-surface-container-low border border-outline-variant rounded-sm px-3 py-1">
               <Search className="h-3.5 w-3.5 text-outline mr-2" />
-              <input 
-                type="text" 
-                placeholder="Search stock..." 
-                value={stockSearchQuery}
-                onChange={(e) => setStockSearchQuery(e.target.value)}
-                className="w-40 text-xs bg-transparent outline-none border-none focus:ring-0 p-0"
-              />
+              <input type="text" placeholder="Search stock..." value={stockSearchQuery}
+                onChange={e => setStockSearchQuery(e.target.value)}
+                className="w-40 text-xs bg-transparent outline-none border-none focus:ring-0 p-0" />
             </div>
-
-            {/* Category Filter */}
-            <select
-              value={selectedStockCategory}
-              onChange={(e) => setSelectedStockCategory(e.target.value)}
-              className="px-2 py-1 border border-outline-variant bg-surface-container-low text-xs rounded-sm focus:outline-none"
-            >
-              <option value="All">All Categories</option>
-              <option value="Dry Store">Dry Store</option>
-              <option value="Dairy">Dairy</option>
-              <option value="Meat">Meat</option>
-              <option value="Fish">Fish</option>
-              <option value="Vegetable">Vegetable</option>
-              <option value="Fruit">Fruit</option>
-              <option value="Frozen">Frozen</option>
-              <option value="Alcohol">Alcohol</option>
+            <select value={selectedStockCategory} onChange={e => setSelectedStockCategory(e.target.value)}
+              className="px-2 py-1 border border-outline-variant bg-surface-container-low text-xs rounded-sm focus:outline-none">
+              {categories.map(c => <option key={c}>{c}</option>)}
             </select>
           </div>
         </div>
 
         {filteredStockIngredients.length === 0 ? (
-          <div className="py-8 text-center text-outline text-xs">
-            No ingredients found matching filters.
-          </div>
+          <div className="py-8 text-center text-outline text-xs">No ingredients found.</div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto pr-1">
             {filteredStockIngredients.map((ing, idx) => {
-              const pref = ing.suppliers?.find((s: any) => s.isPreferred) || ing.suppliers?.[0];
+              const pref = ing.suppliers?.find(s => s.isPreferred) || ing.suppliers?.[0];
               const displayUnit = pref?.packUnit || 'g';
-              const displayVal = editingCounts[ing.id] !== undefined 
-                ? editingCounts[ing.id] 
-                : (ing.stockLevel !== undefined && ing.stockLevel !== null ? ing.stockLevel : '');
+              const displayVal = editingCounts[ing.id] !== undefined ? editingCounts[ing.id] : (ing.stockLevel ?? '');
               const hasChanged = editingCounts[ing.id] !== undefined && parseFloat(editingCounts[ing.id]) !== (ing.stockLevel || 0);
               const isHighlighted = selectedIngredientId === ing.id;
-
               return (
-                <div 
-                  key={ing.id}
-                  id={`stock-row-${ing.id}`}
-                  className={`p-4 border rounded-sm flex items-center justify-between transition-all duration-300 ${
-                    isHighlighted 
-                      ? 'border-primary bg-primary/[0.03] ring-1 ring-primary' 
-                      : idx % 2 === 0 
-                        ? 'border-outline-variant bg-transparent' 
-                        : 'border-outline-variant bg-black/[0.0075]'
-                  }`}
-                >
+                <div key={ing.id} id={`stock-row-${ing.id}`}
+                  className={`p-4 border rounded-sm flex items-center justify-between transition-all duration-300 ${isHighlighted ? 'border-primary bg-primary/[0.03] ring-1 ring-primary' : idx % 2 === 0 ? 'border-outline-variant bg-transparent' : 'border-outline-variant bg-black/[0.0075]'}`}>
                   <div className="min-w-0 flex-1 pr-4">
                     <div className="font-semibold text-xs text-on-surface flex items-center gap-2">
                       <span className="truncate">{ing.name}</span>
-                      {isHighlighted && (
-                        <span className="bg-primary text-white text-[9px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wider animate-pulse flex-shrink-0">
-                          Target
-                        </span>
-                      )}
+                      {isHighlighted && <span className="bg-primary text-white text-[9px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wider animate-pulse flex-shrink-0">Target</span>}
                     </div>
                     <div className="text-[10px] text-outline uppercase tracking-wider mt-1">
                       {ing.category} • Current: {ing.stockLevel || 0} {displayUnit}
                     </div>
                   </div>
-
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <input 
-                      type="number"
-                      step="any"
-                      value={displayVal}
-                      onChange={(e) => setEditingCounts(prev => ({ ...prev, [ing.id]: e.target.value }))}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleSaveSingleAdjustment(ing);
-                      }}
-                      className={`w-20 px-2 py-1 border border-outline-variant text-center data-tabular text-xs font-bold bg-surface-container-lowest focus:border-primary ${
-                        hasChanged ? 'border-primary ring-1 ring-primary/20' : ''
-                      }`}
-                    />
-                    <span className="text-xs font-semibold text-on-surface-variant w-8">
-                      {displayUnit}
-                    </span>
+                    <input type="number" step="any" value={displayVal}
+                      onChange={e => setEditingCounts(prev => ({ ...prev, [ing.id]: e.target.value }))}
+                      onKeyDown={e => e.key === 'Enter' && handleSaveSingleAdjustment(ing)}
+                      className={`w-20 px-2 py-1 border border-outline-variant text-center data-tabular text-xs font-bold bg-surface-container-lowest focus:border-primary ${hasChanged ? 'border-primary ring-1 ring-primary/20' : ''}`} />
+                    <span className="text-xs font-semibold text-on-surface-variant w-8">{displayUnit}</span>
                     {hasChanged ? (
-                      <button
-                        onClick={() => handleSaveSingleAdjustment(ing)}
-                        className="h-8 px-3 bg-primary text-white text-[10px] font-bold label-caps rounded-sm hover:bg-opacity-90 transition-colors"
-                      >
+                      <button onClick={() => handleSaveSingleAdjustment(ing)}
+                        className="h-8 px-3 bg-primary text-white text-[10px] font-bold label-caps rounded-sm hover:bg-opacity-90">
                         Save
                       </button>
-                    ) : (
-                      <div className="w-12 h-8"></div>
-                    )}
+                    ) : <div className="w-12 h-8" />}
                   </div>
                 </div>
               );
@@ -380,47 +421,32 @@ export const Stock: React.FC = () => {
         )}
       </div>
 
-      {/* 3. TABLET-FRIENDLY DAILY WASTE LOGGING DRAWER / MODAL */}
+      {/* ── MODALS ─────────────────────────────────────────────────────────── */}
+
+      {/* WASTE LOG */}
       {showWastePanel && (
         <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-8">
-          <div className="w-full max-w-lg bg-surface-container-lowest border border-outline-variant rounded-sm flex flex-col p-6 relative">
-            <h2 className="headline-sm font-semibold border-b border-outline-variant pb-3 mb-4">
-              Daily Wastage Entry
-            </h2>
-            
+          <div className="w-full max-w-lg bg-surface-container-lowest border border-outline-variant rounded-sm flex flex-col p-6">
+            <h2 className="headline-sm font-semibold border-b border-outline-variant pb-3 mb-4">Daily Wastage Entry</h2>
             <div className="flex flex-col gap-6">
               <div>
                 <label className="label-caps text-outline block mb-2">Select Waste Item</label>
-                <select 
-                  value={wasteIngId}
-                  onChange={(e) => setWasteIngId(e.target.value)}
-                  className="w-full px-3 py-3 border border-outline-variant bg-surface-container-lowest text-sm"
-                >
+                <select value={wasteIngId} onChange={e => setWasteIngId(e.target.value)}
+                  className="w-full px-3 py-3 border border-outline-variant bg-surface-container-lowest text-sm">
                   <option value="">-- Choose Ingredient --</option>
-                  {ingredients.map(ing => (
-                    <option key={ing.id} value={ing.id}>{ing.name}</option>
-                  ))}
+                  {ingredients.map(ing => <option key={ing.id} value={ing.id}>{ing.name}</option>)}
                 </select>
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="label-caps text-outline block mb-2">Quantity Wasted</label>
-                  <input 
-                    type="number" 
-                    value={wasteQty || ''}
-                    onChange={(e) => setWasteQty(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-3 border border-outline-variant text-sm data-tabular text-center"
-                    placeholder="0.0"
-                  />
+                  <input type="number" value={wasteQty || ''} onChange={e => setWasteQty(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-3 border border-outline-variant text-sm data-tabular text-center" placeholder="0.0" />
                 </div>
                 <div>
                   <label className="label-caps text-outline block mb-2">Unit</label>
-                  <select 
-                    value={wasteUnit}
-                    onChange={(e) => setWasteUnit(e.target.value as any)}
-                    className="w-full px-3 py-3 border border-outline-variant bg-surface-container-lowest text-sm"
-                  >
+                  <select value={wasteUnit} onChange={e => setWasteUnit(e.target.value as Unit)}
+                    className="w-full px-3 py-3 border border-outline-variant bg-surface-container-lowest text-sm">
                     <option value="g">grams (g)</option>
                     <option value="kg">kilograms (kg)</option>
                     <option value="ml">milliliters (ml)</option>
@@ -429,46 +455,25 @@ export const Stock: React.FC = () => {
                   </select>
                 </div>
               </div>
-
               <div>
                 <label className="label-caps text-outline block mb-2">Waste Reason</label>
                 <div className="grid grid-cols-3 gap-3">
-                  {['Spoil', 'Prep Trim', 'Dropped'].map(reason => (
-                    <button 
-                      key={reason}
-                      onClick={() => setWasteReason(reason)}
-                      className={`h-12 border text-xs font-bold label-caps rounded-sm transition-colors ${
-                        wasteReason === reason 
-                          ? 'bg-primary text-white border-primary' 
-                          : 'border-outline-variant bg-surface hover:bg-surface-container'
-                      }`}
-                    >
-                      {reason}
+                  {['Spoil', 'Prep Trim', 'Dropped'].map(r => (
+                    <button key={r} onClick={() => setWasteReason(r)}
+                      className={`h-12 border text-xs font-bold label-caps rounded-sm transition-colors ${wasteReason === r ? 'bg-primary text-white border-primary' : 'border-outline-variant bg-surface hover:bg-surface-container'}`}>
+                      {r}
                     </button>
                   ))}
                 </div>
               </div>
-
-              <div className="flex justify-end gap-3 border-t border-outline-variant pt-4 mt-2">
-                <button 
-                  onClick={() => setShowWastePanel(false)}
-                  className="h-12 px-6 border border-outline text-xs font-bold label-caps rounded-sm hover:bg-surface-container"
-                >
+              <div className="flex justify-end gap-3 border-t border-outline-variant pt-4">
+                <button onClick={() => setShowWastePanel(false)}
+                  className="h-12 px-6 border border-outline text-xs font-bold label-caps rounded-sm hover:bg-surface-container">
                   Discard [ESC]
                 </button>
-                 <button 
-                  onClick={handleSaveWaste}
-                  disabled={isSaving || !wasteIngId || wasteQty <= 0}
-                  className={`h-12 px-8 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90 flex items-center gap-2 ${isSaving || !wasteIngId || wasteQty <= 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  {isSaving ? (
-                    <>
-                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    'Save Waste'
-                  )}
+                <button onClick={handleSaveWaste} disabled={isSaving || !wasteIngId || wasteQty <= 0}
+                  className="h-12 px-8 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90 disabled:opacity-50 flex items-center gap-2">
+                  {isSaving ? <><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />Saving...</> : 'Save Waste'}
                 </button>
               </div>
             </div>
@@ -476,86 +481,183 @@ export const Stock: React.FC = () => {
         </div>
       )}
 
-      {/* 4. EPOS IMPORTER & VARIANCE MODAL */}
+      {/* FEATURE 2: WASTAGE HISTORY */}
+      {showWastageHistory && (
+        <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-8">
+          <div className="w-full max-w-3xl h-[85vh] bg-surface-container-lowest border border-outline-variant rounded-sm flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant bg-surface flex-shrink-0">
+              <div>
+                <h2 className="font-bold text-on-surface">Wastage History</h2>
+                <span className="text-[10px] text-outline label-caps">{filteredWaste.length} entries · Total cost: <span className="text-error font-bold">£{wasteTotalCost.toFixed(2)}</span></span>
+              </div>
+              <button onClick={() => setShowWastageHistory(false)} className="p-1 text-outline hover:text-on-surface">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Filters */}
+            <div className="px-6 py-3 border-b border-outline-variant bg-surface flex gap-4 flex-wrap items-end flex-shrink-0">
+              <div>
+                <label className="label-caps text-outline text-[9px] block mb-1">From</label>
+                <input type="date" value={wasteDateFrom} onChange={e => setWasteDateFrom(e.target.value)}
+                  className="px-2 py-1.5 border border-outline-variant text-xs rounded-sm bg-surface-container-lowest" />
+              </div>
+              <div>
+                <label className="label-caps text-outline text-[9px] block mb-1">To</label>
+                <input type="date" value={wasteDateTo} onChange={e => setWasteDateTo(e.target.value)}
+                  className="px-2 py-1.5 border border-outline-variant text-xs rounded-sm bg-surface-container-lowest" />
+              </div>
+              <div className="flex-1 min-w-32">
+                <label className="label-caps text-outline text-[9px] block mb-1">Ingredient</label>
+                <input type="text" placeholder="Filter by ingredient..." value={wasteIngFilter} onChange={e => setWasteIngFilter(e.target.value)}
+                  className="w-full px-2 py-1.5 border border-outline-variant text-xs rounded-sm bg-surface-container-lowest" />
+              </div>
+              {(wasteDateFrom || wasteDateTo || wasteIngFilter) && (
+                <button onClick={() => { setWasteDateFrom(''); setWasteDateTo(''); setWasteIngFilter(''); }}
+                  className="h-8 px-3 border border-outline-variant text-xs label-caps font-bold rounded-sm hover:bg-surface-container">
+                  Clear
+                </button>
+              )}
+            </div>
+
+            {/* Table */}
+            <div className="flex-1 overflow-y-auto">
+              {filteredWaste.length === 0 ? (
+                <div className="py-12 text-center text-outline text-xs">No waste entries match the current filters.</div>
+              ) : (
+                <table className="w-full text-xs border-collapse">
+                  <thead className="sticky top-0 bg-surface-container border-b border-outline-variant">
+                    <tr>
+                      <th className="p-3 text-left label-caps text-[10px] text-outline font-bold">Date</th>
+                      <th className="p-3 text-left label-caps text-[10px] text-outline font-bold">Ingredient</th>
+                      <th className="p-3 text-left label-caps text-[10px] text-outline font-bold">Category</th>
+                      <th className="p-3 text-center label-caps text-[10px] text-outline font-bold">Qty (g)</th>
+                      <th className="p-3 text-left label-caps text-[10px] text-outline font-bold">Reason</th>
+                      <th className="p-3 text-right label-caps text-[10px] text-outline font-bold">Est. Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-outline-variant">
+                    {filteredWaste.map(m => {
+                      const ing = ingMap.get(m.ingredientId);
+                      const cost = ing ? calculateIngredientCost(ing, Math.abs(m.quantity), 'g') : 0;
+                      return (
+                        <tr key={m.id} className="hover:bg-surface-container-low">
+                          <td className="p-3 data-tabular text-on-surface">{m.date}</td>
+                          <td className="p-3 font-semibold text-on-surface">{ing?.name ?? m.ingredientId}</td>
+                          <td className="p-3 text-outline">{ing?.category ?? '—'}</td>
+                          <td className="p-3 text-center data-tabular text-on-surface">{Math.abs(m.quantity).toFixed(0)}</td>
+                          <td className="p-3 text-outline">{m.notes ?? '—'}</td>
+                          <td className="p-3 text-right data-tabular font-bold text-error">£{cost.toFixed(2)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot className="sticky bottom-0 bg-surface border-t border-outline-variant">
+                    <tr>
+                      <td colSpan={5} className="p-3 label-caps text-[10px] text-outline font-bold">Total ({filteredWaste.length} entries)</td>
+                      <td className="p-3 text-right data-tabular font-bold text-error">£{wasteTotalCost.toFixed(2)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FEATURE 3: REPORTS */}
+      {showReports && (
+        <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-8">
+          <div className="w-full max-w-2xl h-[80vh] bg-surface-container-lowest border border-outline-variant rounded-sm flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant bg-surface flex-shrink-0">
+              <h2 className="font-bold text-on-surface">Stocktake Reports</h2>
+              <button onClick={() => setShowReports(false)} className="p-1 text-outline hover:text-on-surface">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto divide-y divide-outline-variant">
+              {stocktakeReports.length === 0 ? (
+                <div className="py-12 text-center text-outline text-xs">No reports yet. Commit a Sunday Stock Take to create one.</div>
+              ) : (
+                stocktakeReports.map(report => (
+                  <div key={report.id} className="px-6 py-4 flex items-center justify-between hover:bg-surface-container-low">
+                    <div>
+                      <div className="font-semibold text-sm text-on-surface">{report.date}</div>
+                      <div className="text-[10px] text-outline label-caps mt-0.5">
+                        {report.itemCount} items · £{report.totalValue.toFixed(2)}{report.menuOnly ? ' · Menu items only' : ''}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => handlePrintReport(report)}
+                        title="Print report"
+                        className="h-8 px-3 border border-outline-variant text-xs font-bold label-caps rounded-sm hover:bg-surface-container flex items-center gap-1.5">
+                        <Printer className="h-3.5 w-3.5" /> Print
+                      </button>
+                      <button onClick={() => handleEmailReport(report)}
+                        title="Email report"
+                        className="h-8 px-3 border border-outline-variant text-xs font-bold label-caps rounded-sm hover:bg-surface-container flex items-center gap-1.5">
+                        <Mail className="h-3.5 w-3.5" /> Email
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="px-6 py-3 border-t border-outline-variant bg-surface flex-shrink-0">
+              <p className="text-[10px] text-outline">Email recipients are configured in <span className="font-bold">Help → Settings → Report Recipients</span>.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EPOS IMPORTER */}
       {showEposImport && (
         <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-8">
-          <div className="w-full max-w-3xl bg-surface-container-lowest border border-outline-variant rounded-sm flex flex-col p-6 relative max-h-[90vh]">
+          <div className="w-full max-w-3xl bg-surface-container-lowest border border-outline-variant rounded-sm flex flex-col p-6 max-h-[90vh]">
             <h2 className="headline-sm font-semibold border-b border-outline-variant pb-3 mb-4 flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" />
-              EPOS Sales Importer & Variance Auditor
+              <FileText className="h-5 w-5 text-primary" />EPOS Sales Importer & Variance Auditor
             </h2>
-
             <div className="flex flex-col gap-4 overflow-y-auto pr-1">
               <p className="text-xs text-on-surface-variant leading-relaxed">
-                Drag in your weekly EPOS Sales CSV/Excel export. The system will calculate theoretical ingredient usage from your recipes and compare it against your Sunday stock count.
+                Drop in your weekly EPOS Sales CSV. The system calculates theoretical ingredient usage and compares against your Sunday count.
               </p>
-
-              <div className="border-2 border-dashed border-outline-variant p-6 text-center bg-surface hover:bg-surface-container cursor-pointer transition-colors">
-                <input 
-                  type="file" 
-                  onChange={(e) => setEposFile(e.target.files?.[0] || null)}
-                  className="hidden" 
-                  id="epos-file-input"
-                />
+              <div className="border-2 border-dashed border-outline-variant p-6 text-center bg-surface hover:bg-surface-container cursor-pointer">
+                <input type="file" onChange={e => setEposFile(e.target.files?.[0] || null)} className="hidden" id="epos-file-input" />
                 <label htmlFor="epos-file-input" className="cursor-pointer">
-                  {eposFile ? (
-                    <span className="font-semibold text-sm text-primary">{eposFile.name}</span>
-                  ) : (
-                    <span className="text-xs text-outline label-caps">Select EPOS Sales CSV/Excel</span>
-                  )}
+                  {eposFile ? <span className="font-semibold text-sm text-primary">{eposFile.name}</span>
+                    : <span className="text-xs text-outline label-caps">Select EPOS Sales CSV/Excel</span>}
                 </label>
               </div>
-
               {varianceReport && (
                 <div className="flex flex-col gap-3 mt-2">
                   <h3 className="label-caps font-bold text-xs text-error">Variance Audit Discrepancies</h3>
-                  <div className="border border-outline-variant rounded-sm overflow-hidden bg-surface">
-                    <table className="w-full border-collapse text-left text-xs">
-                      <thead>
-                        <tr className="bg-surface-container border-b border-outline-variant">
-                          <th className="p-3 label-caps text-[10px] text-outline font-bold">Ingredient</th>
-                          <th className="p-3 label-caps text-[10px] text-outline font-bold text-center">Projected</th>
-                          <th className="p-3 label-caps text-[10px] text-outline font-bold text-center">Actual Count</th>
-                          <th className="p-3 label-caps text-[10px] text-outline font-bold text-center">Variance</th>
-                          <th className="p-3 label-caps text-[10px] text-outline font-bold text-right">Cash Loss (£)</th>
+                  <table className="w-full border-collapse text-left text-xs border border-outline-variant rounded-sm overflow-hidden bg-surface">
+                    <thead><tr className="bg-surface-container border-b border-outline-variant">
+                      <th className="p-3 label-caps text-[10px] text-outline font-bold">Ingredient</th>
+                      <th className="p-3 label-caps text-[10px] text-outline font-bold text-center">Projected</th>
+                      <th className="p-3 label-caps text-[10px] text-outline font-bold text-center">Actual</th>
+                      <th className="p-3 label-caps text-[10px] text-outline font-bold text-center">Variance</th>
+                      <th className="p-3 label-caps text-[10px] text-outline font-bold text-right">Cash Loss</th>
+                    </tr></thead>
+                    <tbody className="divide-y divide-outline-variant">
+                      {varianceReport.map((row, i) => (
+                        <tr key={i} className="hover:bg-surface-container-low">
+                          <td className="p-3 font-semibold">{row.name}</td>
+                          <td className="p-3 text-center data-tabular text-secondary">{row.projected} {row.unit}</td>
+                          <td className="p-3 text-center data-tabular font-semibold">{row.actual} {row.unit}</td>
+                          <td className={`p-3 text-center data-tabular font-bold ${row.variance < 0 ? 'text-error' : 'text-primary'}`}>{row.variance} {row.unit}</td>
+                          <td className={`p-3 text-right data-tabular font-bold ${row.costLoss > 0 ? 'text-error' : 'text-secondary'}`}>{row.costLoss > 0 ? `-£${row.costLoss.toFixed(2)}` : '£0.00'}</td>
                         </tr>
-                      </thead>
-                      <tbody className="divide-y divide-outline-variant">
-                        {varianceReport.map((row, i) => (
-                          <tr key={i} className="hover:bg-surface-container-low">
-                            <td className="p-3 font-semibold text-on-surface">{row.name}</td>
-                            <td className="p-3 text-center data-tabular text-secondary">{row.projected} {row.unit}</td>
-                            <td className="p-3 text-center data-tabular text-on-surface font-semibold">{row.actual} {row.unit}</td>
-                            <td className={`p-3 text-center data-tabular font-bold ${row.variance < 0 ? 'text-error' : 'text-primary'}`}>
-                              {row.variance} {row.unit}
-                            </td>
-                            <td className={`p-3 text-right data-tabular font-bold ${row.costLoss > 0 ? 'text-error' : 'text-secondary'}`}>
-                              {row.costLoss > 0 ? `-£${row.costLoss.toFixed(2)}` : '£0.00'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
-
-              <div className="flex justify-end gap-3 border-t border-outline-variant pt-4 mt-2">
-                <button 
-                  onClick={() => {
-                    setShowEposImport(false);
-                    setEposFile(null);
-                    setVarianceReport(null);
-                  }}
-                  className="h-10 px-4 border border-outline text-xs font-bold label-caps rounded-sm hover:bg-surface-container"
-                >
-                  Close
-                </button>
-                <button 
-                  onClick={handleRunEposImport}
-                  disabled={!eposFile || importing}
-                  className="h-10 px-6 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90 disabled:opacity-50"
-                >
+              <div className="flex justify-end gap-3 border-t border-outline-variant pt-4">
+                <button onClick={() => { setShowEposImport(false); setEposFile(null); setVarianceReport(null); }}
+                  className="h-10 px-4 border border-outline text-xs font-bold label-caps rounded-sm hover:bg-surface-container">Close</button>
+                <button onClick={handleRunEposImport} disabled={!eposFile || importing}
+                  className="h-10 px-6 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90 disabled:opacity-50">
                   {importing ? 'Processing...' : 'Run Sales Explosion'}
                 </button>
               </div>
@@ -564,170 +666,112 @@ export const Stock: React.FC = () => {
         </div>
       )}
 
-      {/* 5. SUNDAY STOCK TAKE PANEL (LOCATION SORTED + TARE PROFILE SELECT) */}
+      {/* FEATURE 1: SUNDAY STOCK TAKE */}
       {showStockTake && (
         <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-8">
-          <div className="w-full max-w-4xl h-[90vh] bg-surface-container-lowest border border-outline-variant rounded-sm flex flex-col relative overflow-hidden">
-            {/* Header info */}
+          <div className="w-full max-w-4xl h-[90vh] bg-surface-container-lowest border border-outline-variant rounded-sm flex flex-col overflow-hidden">
             <div className="h-16 border-b border-outline-variant bg-surface flex items-center px-6 justify-between flex-shrink-0">
               <div>
                 <h2 className="headline-sm font-semibold">Sunday Stock Take</h2>
-                <span className="text-xs text-outline label-caps">Scale-Ready count</span>
+                <span className="text-xs text-outline label-caps">
+                  {menuOnlyMode ? `${menuIngredientIds.size} menu-relevant ingredients` : `${ingredients.length} total ingredients`}
+                </span>
               </div>
-              
-              {/* Bluetooth Scale status box */}
               <div className="flex items-center gap-3">
-                <button 
-                  onClick={() => setScaleConnected(!scaleConnected)}
-                  className={`h-9 px-4 text-xs font-bold label-caps rounded-sm flex items-center gap-2 border transition-colors ${
-                    scaleConnected 
-                      ? 'bg-secondary-container border-[#90a8ff] text-primary' 
-                      : 'border-outline text-outline bg-surface hover:bg-surface-container'
-                  }`}
-                >
+                {/* Menu-only toggle */}
+                <button
+                  onClick={() => setMenuOnlyMode(m => !m)}
+                  title={menuOnlyMode ? 'Showing menu items only — click to show all' : 'Click to show only ingredients used in live menu dishes'}
+                  className={`h-9 px-4 text-xs font-bold label-caps rounded-sm flex items-center gap-2 border transition-colors ${menuOnlyMode ? 'bg-primary text-white border-primary' : 'border-outline text-outline bg-surface hover:bg-surface-container'}`}>
+                  {menuOnlyMode ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  {menuOnlyMode ? 'Menu Items Only' : 'All Ingredients'}
+                </button>
+                <button onClick={() => setScaleConnected(!scaleConnected)}
+                  className={`h-9 px-4 text-xs font-bold label-caps rounded-sm flex items-center gap-2 border transition-colors ${scaleConnected ? 'bg-secondary-container border-[#90a8ff] text-primary' : 'border-outline text-outline bg-surface hover:bg-surface-container'}`}>
                   <Scale className="h-4 w-4" />
-                  {scaleConnected ? 'Scale Connected' : 'Link Bluetooth Scale'}
+                  {scaleConnected ? 'Scale Connected' : 'Link Scale'}
                 </button>
                 {scaleConnected && (
-                  <button 
-                    onClick={handleSimulateScaleWeight}
-                    className="h-9 px-3 border border-primary text-primary text-[10px] label-caps font-bold rounded-sm bg-surface hover:bg-surface-container"
-                  >
+                  <button onClick={() => setScaleWeight(2450)}
+                    className="h-9 px-3 border border-primary text-primary text-[10px] label-caps font-bold rounded-sm bg-surface hover:bg-surface-container">
                     Place Tub
                   </button>
                 )}
               </div>
             </div>
 
-            {/* Scale reading ribbon */}
             {scaleConnected && (
               <div className="h-14 bg-surface border-b border-outline-variant flex items-center px-6 justify-between text-xs flex-shrink-0">
                 <div className="flex items-center gap-6">
                   <div>
-                    <span className="text-outline uppercase label-caps text-[9px] mr-2">Tare Container:</span>
-                    <select 
-                      value={scaleTareId}
-                      onChange={(e) => setScaleTareId(e.target.value)}
-                      className="px-2 py-1 border border-outline-variant bg-surface-container-lowest text-xs rounded-sm"
-                    >
+                    <span className="text-outline uppercase label-caps text-[9px] mr-2">Tare:</span>
+                    <select value={scaleTareId} onChange={e => setScaleTareId(e.target.value)}
+                      className="px-2 py-1 border border-outline-variant bg-surface-container-lowest text-xs rounded-sm">
                       <option value="none">None (0g)</option>
-                      {containerProfiles.map(c => (
-                        <option key={c.id} value={c.id}>{c.name} ({c.tareWeight}g)</option>
-                      ))}
+                      {containerProfiles.map(c => <option key={c.id} value={c.id}>{c.name} ({c.tareWeight}g)</option>)}
                     </select>
                   </div>
-                  <div>
-                    <span className="text-outline uppercase label-caps text-[9px] mr-2">Raw Weight:</span>
-                    <span className="data-tabular font-bold text-on-surface">{scaleWeightGrams} g</span>
-                  </div>
-                  <div>
-                    <span className="text-outline uppercase label-caps text-[9px] mr-2">Net Weight:</span>
-                    <span className="data-tabular font-bold text-primary">{netWeightGrams} g</span>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <span className="text-xs text-secondary italic">Place container, choose tare type, and tap ingredient count field.</span>
+                  <div><span className="text-outline uppercase label-caps text-[9px] mr-2">Raw:</span><span className="data-tabular font-bold">{scaleWeightGrams} g</span></div>
+                  <div><span className="text-outline uppercase label-caps text-[9px] mr-2">Net:</span><span className="data-tabular font-bold text-primary">{netWeightGrams} g</span></div>
                 </div>
               </div>
             )}
 
-            {/* Category Navigation Ribbon */}
             <div className="border-b border-outline-variant bg-surface flex items-center px-6 gap-2 flex-shrink-0 overflow-x-auto h-12">
-              {['All', 'Dry Store', 'Dairy', 'Meat', 'Fish', 'Vegetable', 'Fruit', 'Frozen', 'Alcohol'].map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => setActiveLocation(cat)}
-                  className={`h-8 px-4 text-xs font-bold label-caps rounded-sm transition-colors whitespace-nowrap ${
-                    activeLocation === cat
-                      ? 'bg-primary text-white'
-                      : 'text-outline hover:bg-surface-container'
-                  }`}
-                >
+              {categories.map(cat => (
+                <button key={cat} onClick={() => setActiveLocation(cat)}
+                  className={`h-8 px-4 text-xs font-bold label-caps rounded-sm transition-colors whitespace-nowrap ${activeLocation === cat ? 'bg-primary text-white' : 'text-outline hover:bg-surface-container'}`}>
                   {cat}
                 </button>
               ))}
             </div>
 
-            {/* Ingredients List by Category */}
             <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-3">
-              {ingredients
-                .filter(i => activeLocation === 'All' || i.category === activeLocation)
-                .map((ing, idx) => {
-                  const currentVal = stockCounts[ing.id] ?? ing.stockLevel ?? 0;
-                  return (
-                    <div 
-                      key={ing.id} 
-                      className={`flex items-center justify-between p-4 border border-outline-variant rounded-sm transition-colors ${
-                        idx % 2 === 0 ? 'bg-transparent' : 'bg-black/[0.0075]'
-                      }`}
-                    >
-                      <div>
-                        <span className="font-semibold text-sm text-on-surface">{ing.name}</span>
-                        <div className="text-[10px] text-outline uppercase tracking-wider mt-0.5">
-                          Category: {ing.category} • Current Stock: {ing.stockLevel}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        {scaleConnected && (
-                          <button 
-                            onClick={() => {
-                              // Auto-deduct tare and convert to kg/l if needed
-                              setStockCounts(prev => ({
-                                ...prev,
-                                [ing.id]: netWeightGrams
-                              }));
-                            }}
-                            className="h-10 w-10 border border-outline flex items-center justify-center rounded-sm bg-surface hover:bg-surface-container"
-                          >
-                            <Scale className="h-4 w-4" />
-                          </button>
-                        )}
-                        <input 
-                          type="number" 
-                          value={stockCounts[ing.id] !== undefined ? stockCounts[ing.id] : (ing.stockLevel || '')}
-                          onChange={(e) => {
-                            const val = parseFloat(e.target.value) || 0;
-                            setStockCounts(prev => ({ ...prev, [ing.id]: val }));
-                          }}
-                          className="w-28 px-3 py-2 border border-outline-variant text-center data-tabular text-sm font-bold bg-surface-container-lowest"
-                        />
-                      </div>
+              {stocktakeIngredients.length === 0 ? (
+                <div className="py-12 text-center text-outline text-xs">
+                  {menuOnlyMode ? 'No menu-relevant ingredients in this category.' : 'No ingredients in this category.'}
+                </div>
+              ) : stocktakeIngredients.map((ing, idx) => (
+                <div key={ing.id} className={`flex items-center justify-between p-4 border border-outline-variant rounded-sm ${idx % 2 === 0 ? 'bg-transparent' : 'bg-black/[0.0075]'}`}>
+                  <div>
+                    <span className="font-semibold text-sm text-on-surface">{ing.name}</span>
+                    <div className="text-[10px] text-outline uppercase tracking-wider mt-0.5">
+                      {ing.category} • Current: {ing.stockLevel ?? 0}
                     </div>
-                  );
-                })}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {scaleConnected && (
+                      <button onClick={() => setStockCounts(prev => ({ ...prev, [ing.id]: netWeightGrams }))}
+                        className="h-10 w-10 border border-outline flex items-center justify-center rounded-sm bg-surface hover:bg-surface-container">
+                        <Scale className="h-4 w-4" />
+                      </button>
+                    )}
+                    <input type="number" value={stockCounts[ing.id] !== undefined ? stockCounts[ing.id] : (ing.stockLevel || '')}
+                      onChange={e => setStockCounts(prev => ({ ...prev, [ing.id]: parseFloat(e.target.value) || 0 }))}
+                      className="w-28 px-3 py-2 border border-outline-variant text-center data-tabular text-sm font-bold bg-surface-container-lowest" />
+                  </div>
+                </div>
+              ))}
             </div>
 
-            {/* Footer Buttons */}
-            <div className="h-16 border-t border-outline-variant bg-surface flex items-center px-6 justify-end gap-4 flex-shrink-0">
-              <button 
-                onClick={() => {
-                  setShowStockTake(false);
-                  setStockCounts({});
-                }}
-                className="h-10 px-4 border border-outline text-xs font-bold label-caps rounded-sm hover:bg-surface-container"
-              >
-                Cancel
-              </button>
-               <button 
-                onClick={handleCommitStockTake}
-                disabled={isSaving}
-                className={`h-10 px-6 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90 flex items-center gap-2 ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                {isSaving ? (
-                  <>
-                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Committing...
-                  </>
-                ) : (
-                  'Commit Sunday Counts'
-                )}
-              </button>
+            <div className="h-16 border-t border-outline-variant bg-surface flex items-center px-6 justify-between flex-shrink-0">
+              <span className="text-xs text-outline">
+                {Object.keys(stockCounts).length} items counted
+              </span>
+              <div className="flex gap-3">
+                <button onClick={() => { setShowStockTake(false); setStockCounts({}); }}
+                  className="h-10 px-4 border border-outline text-xs font-bold label-caps rounded-sm hover:bg-surface-container">
+                  Cancel
+                </button>
+                <button onClick={handleCommitStockTake} disabled={isSaving}
+                  className="h-10 px-6 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90 disabled:opacity-50 flex items-center gap-2">
+                  {isSaving ? <><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />Committing...</> : 'Commit Sunday Counts'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 };
