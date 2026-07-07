@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useIngredients, useRecipes, useDishes, useStockMutations, useStockMovements, useStocktakeReports, useStocktakeMutations } from '../hooks/useKitchenData';
 import { useStore } from '../store/useStore';
+import { useBleScale, isWebBluetoothSupported } from '../hooks/useBleScale';
 import { Search, Scale, FileText, CheckCircle2, X, Filter, Printer, Mail, ChevronDown, ChevronRight, BookOpen } from 'lucide-react';
 import { Ingredient, Recipe, RecipeItem, StocktakeReport, Unit } from '../types';
 
@@ -68,6 +69,12 @@ export const Stock: React.FC = () => {
   const setScaleWeight = useStore((state) => state.setScaleWeight);
   const selectedIngredientId = useStore((state) => state.selectedIngredientId);
   const selectIngredient = useStore((state) => state.selectIngredient);
+
+  const bleScale = useBleScale({ onWeight: (grams) => setScaleWeight(grams) });
+  useEffect(() => { setScaleConnected(bleScale.connected); }, [bleScale.connected, setScaleConnected]);
+  useEffect(() => {
+    if (bleScale.error) showToast(bleScale.error, 'error');
+  }, [bleScale.error, showToast]);
 
   const [showWastePanel, setShowWastePanel] = useState(false);
   const [showStockTake, setShowStockTake] = useState(false);
@@ -904,16 +911,18 @@ export const Stock: React.FC = () => {
                   {menuOnlyMode ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                   {menuOnlyMode ? 'Menu Items Only' : 'All Ingredients'}
                 </button>
-                <button onClick={() => setScaleConnected(!scaleConnected)}
-                  className={`h-9 px-4 text-xs font-bold label-caps rounded-sm flex items-center gap-2 border transition-colors ${scaleConnected ? 'bg-secondary-container border-[#90a8ff] text-primary' : 'border-outline text-outline bg-surface hover:bg-surface-container'}`}>
-                  <Scale className="h-4 w-4" />
-                  {scaleConnected ? 'Scale Connected' : 'Link Scale'}
-                </button>
-                {scaleConnected && (
-                  <button onClick={() => setScaleWeight(2450)}
-                    className="h-9 px-3 border border-primary text-primary text-[10px] label-caps font-bold rounded-sm bg-surface hover:bg-surface-container">
-                    Place Tub
+                {isWebBluetoothSupported() ? (
+                  <button onClick={() => scaleConnected ? bleScale.disconnect() : bleScale.connect()}
+                    className={`h-9 px-4 text-xs font-bold label-caps rounded-sm flex items-center gap-2 border transition-colors ${scaleConnected ? 'bg-secondary-container border-[#90a8ff] text-primary' : 'border-outline text-outline bg-surface hover:bg-surface-container'}`}>
+                    <Scale className="h-4 w-4" />
+                    {scaleConnected ? 'Scale Connected' : 'Link Scale'}
                   </button>
+                ) : (
+                  <span title="Bluetooth scale linking needs Chrome (Android) or the Bluefy browser (iPhone)"
+                    className="h-9 px-4 text-xs font-bold label-caps rounded-sm flex items-center gap-2 border border-outline-variant text-outline/50 cursor-not-allowed">
+                    <Scale className="h-4 w-4" />
+                    Scale Unavailable
+                  </span>
                 )}
               </div>
             </div>

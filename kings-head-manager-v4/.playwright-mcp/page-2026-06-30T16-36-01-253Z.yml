@@ -1,0 +1,30 @@
+- generic [ref=e3]:
+  - navigation [ref=e4]:
+    - generic [ref=e6]: KH
+    - generic [ref=e7]:
+      - button [ref=e8] [cursor=pointer]:
+        - img [ref=e10]
+      - button [ref=e15] [cursor=pointer]:
+        - img [ref=e16]
+      - button [ref=e21] [cursor=pointer]:
+        - img [ref=e22]
+      - button [ref=e26] [cursor=pointer]:
+        - img [ref=e27]
+      - button [ref=e30] [cursor=pointer]:
+        - img [ref=e31]
+      - button [ref=e33] [cursor=pointer]:
+        - img [ref=e34]
+      - button [ref=e38] [cursor=pointer]:
+        - img [ref=e39]
+      - button [ref=e42] [cursor=pointer]:
+        - img [ref=e43]
+      - button [ref=e53] [cursor=pointer]:
+        - img [ref=e54]
+      - button [ref=e59] [cursor=pointer]:
+        - img [ref=e60]
+      - button [ref=e65] [cursor=pointer]:
+        - img [ref=e66]
+    - generic [ref=e70]: v4
+  - main [ref=e71]:
+    - heading "dashboard" [level=1] [ref=e73]
+    - generic [ref=e78]: Loading Dashboard data...

@@ -1,0 +1,232 @@
+- generic [ref=e3]:
+  - navigation [ref=e4]:
+    - generic [ref=e6]: King's Head v4
+    - generic [ref=e7]:
+      - button "Dashboard" [ref=e79] [cursor=pointer]:
+        - img [ref=e10]
+        - generic [ref=e80]: Dashboard
+      - button "Kitchen" [ref=e81] [cursor=pointer]:
+        - img [ref=e16]
+        - generic [ref=e82]: Kitchen
+        - img [ref=e83]
+      - button "Pantry" [ref=e85] [cursor=pointer]:
+        - img [ref=e22]
+        - generic [ref=e86]: Pantry
+      - button "Supplier Catalogue" [ref=e87] [cursor=pointer]:
+        - img [ref=e27]
+        - generic [ref=e88]: Supplier Catalogue
+      - button "Recipes" [ref=e89] [cursor=pointer]:
+        - img [ref=e31]
+        - generic [ref=e90]: Recipes
+      - button "Dishes" [ref=e91] [cursor=pointer]:
+        - img [ref=e34]
+        - generic [ref=e92]: Dishes
+      - button "Front of House" [active] [ref=e93] [cursor=pointer]:
+        - img [ref=e39]
+        - generic [ref=e94]: Front of House
+      - button "Stock" [ref=e95] [cursor=pointer]:
+        - img [ref=e43]
+        - generic [ref=e96]: Stock
+      - button "Invoices" [ref=e97] [cursor=pointer]:
+        - img [ref=e54]
+        - generic [ref=e98]: Invoices
+      - button "Suppliers" [ref=e99] [cursor=pointer]:
+        - img [ref=e60]
+        - generic [ref=e100]: Suppliers
+      - button "Help" [ref=e101] [cursor=pointer]:
+        - img [ref=e66]
+        - generic [ref=e102]: Help
+    - generic [ref=e70]: Version 4.0.0
+  - main [ref=e71]:
+    - heading "foh" [level=1] [ref=e627]
+    - generic [ref=e628]:
+      - generic [ref=e630]:
+        - heading "Front of House" [level=1] [ref=e631]
+        - paragraph [ref=e632]: 37 live dishes
+      - generic [ref=e633]:
+        - generic [ref=e634]:
+          - paragraph [ref=e635]: "Toggle to grey out:"
+          - generic [ref=e636]:
+            - generic [ref=e637]: ● Starter
+            - generic [ref=e638]: ● Main
+            - generic [ref=e639]: ● Side
+            - generic [ref=e640]: ● Dessert
+            - generic [ref=e641]: ● Drink
+            - generic [ref=e642]: ● Other
+        - generic [ref=e643]:
+          - button "🥛 Milk" [ref=e644] [cursor=pointer]:
+            - generic [ref=e645]: 🥛
+            - text: Milk
+          - button "🥚 Eggs" [ref=e646] [cursor=pointer]:
+            - generic [ref=e647]: 🥚
+            - text: Eggs
+          - button "🐟 Fish" [ref=e648] [cursor=pointer]:
+            - generic [ref=e649]: 🐟
+            - text: Fish
+          - button "🦐 Crustaceans" [ref=e650] [cursor=pointer]:
+            - generic [ref=e651]: 🦐
+            - text: Crustaceans
+          - button "🦪 Molluscs" [ref=e652] [cursor=pointer]:
+            - generic [ref=e653]: 🦪
+            - text: Molluscs
+          - button "🥜 Peanuts" [ref=e654] [cursor=pointer]:
+            - generic [ref=e655]: 🥜
+            - text: Peanuts
+          - button "🌰 Nuts" [ref=e656] [cursor=pointer]:
+            - generic [ref=e657]: 🌰
+            - text: Nuts
+          - button "⚬ Sesame" [ref=e658] [cursor=pointer]:
+            - generic [ref=e659]: ⚬
+            - text: Sesame
+          - button "🫘 Soya" [ref=e660] [cursor=pointer]:
+            - generic [ref=e661]: 🫘
+            - text: Soya
+          - button "🌾 Gluten" [ref=e662] [cursor=pointer]:
+            - generic [ref=e663]: 🌾
+            - text: Gluten
+          - button "🌿 Celery" [ref=e664] [cursor=pointer]:
+            - generic [ref=e665]: 🌿
+            - text: Celery
+          - button "🟡 Mustard" [ref=e666] [cursor=pointer]:
+            - generic [ref=e667]: 🟡
+            - text: Mustard
+          - button "🍷 Sulphites" [ref=e668] [cursor=pointer]:
+            - generic [ref=e669]: 🍷
+            - text: Sulphites
+          - button "💛 Lupin" [ref=e670] [cursor=pointer]:
+            - generic [ref=e671]: 💛
+            - text: Lupin
+      - generic [ref=e673]:
+        - generic [ref=e674]:
+          - paragraph [ref=e675]: 10oz Rump Steak
+          - paragraph [ref=e677]: £30.00
+        - generic [ref=e678]:
+          - paragraph [ref=e679]: 10oz Sirloin Steak
+          - paragraph [ref=e681]: £28.95
+        - generic [ref=e682]:
+          - paragraph [ref=e683]: 12 Hour Slow Roasted Pork Belly
+          - paragraph [ref=e685]: £18.95
+        - generic [ref=e686]:
+          - paragraph [ref=e687]: 12OZ CHATEAUBRIAND
+          - paragraph [ref=e689]: £0.00
+        - generic [ref=e690]:
+          - paragraph [ref=e691]: 16oz Fillet Steak
+          - paragraph [ref=e693]: £0.00
+        - generic [ref=e694]:
+          - paragraph [ref=e695]: 30oz Tomahawk Steak
+          - paragraph [ref=e697]: £84.95
+        - generic [ref=e698]:
+          - paragraph [ref=e699]: 4oz Fillet Steak
+          - paragraph [ref=e701]: £20.95
+        - generic [ref=e702]:
+          - paragraph [ref=e703]: 8oz Fillet Steak
+          - paragraph [ref=e705]: £39.95
+        - generic [ref=e706]:
+          - paragraph [ref=e707]: 8oz Rib Eye Steak
+          - paragraph [ref=e709]: £28.95
+        - generic [ref=e710]:
+          - paragraph [ref=e711]: Anchovy Butter
+          - paragraph [ref=e713]: £3.00
+        - generic [ref=e714]:
+          - paragraph [ref=e715]: Apple Tarte Tatin
+          - paragraph [ref=e717]: £0.00
+        - generic [ref=e718]:
+          - generic [ref=e720]: 3A
+          - paragraph [ref=e721]: BEER BATTERED FISH & CHIPS
+          - generic [ref=e722]:
+            - paragraph [ref=e723]: £18.95
+            - generic [ref=e724]:
+              - generic "Fish" [ref=e725]: 🐟
+              - generic "Wheat (Gluten)" [ref=e726]: 🌾
+        - generic [ref=e727]:
+          - paragraph [ref=e728]: Biscoff & White Chocolate Cheesecake
+          - paragraph [ref=e730]: £9.95
+        - generic [ref=e731]:
+          - paragraph [ref=e732]: Blue Cheese Sauce
+          - paragraph [ref=e734]: £3.00
+        - generic [ref=e735]:
+          - paragraph [ref=e736]: Burgundy Butter
+          - paragraph [ref=e738]: £3.00
+        - generic [ref=e739]:
+          - paragraph [ref=e740]: Carnivores Sharing Board
+          - paragraph [ref=e742]: £42.95
+        - generic [ref=e743]:
+          - paragraph [ref=e744]: Daily Home-baked Bread
+          - paragraph [ref=e746]: £4.95
+        - generic [ref=e747]:
+          - paragraph [ref=e748]: Double Smashed Burger
+          - paragraph [ref=e750]: £18.95
+        - generic [ref=e751]:
+          - generic [ref=e753]: 3A
+          - paragraph [ref=e754]: Fried Chilli & Garlic Halloumi Burger
+          - generic [ref=e755]:
+            - paragraph [ref=e756]: £17.95
+            - generic [ref=e757]:
+              - generic "Milk" [ref=e758]: 🥛
+              - generic "Wheat (Gluten)" [ref=e759]: 🌾
+        - generic [ref=e760]:
+          - paragraph [ref=e761]: Garlic Butter
+          - paragraph [ref=e763]: £3.00
+        - generic [ref=e764]:
+          - paragraph [ref=e765]: Garlic Mash Potato
+          - paragraph [ref=e767]: £5.95
+        - generic [ref=e768]:
+          - paragraph [ref=e769]: Home-made Soup of the Day
+          - paragraph [ref=e771]: £8.95
+        - generic [ref=e772]:
+          - paragraph [ref=e773]: Honey & Coconut Jelly
+          - paragraph [ref=e775]: £9.95
+        - generic [ref=e776]:
+          - paragraph [ref=e777]: Horseradish Butter
+          - paragraph [ref=e779]: £3.00
+        - generic [ref=e780]:
+          - paragraph [ref=e781]: Kings Head 100% Beef Burger
+          - paragraph [ref=e783]: £18.95
+        - generic [ref=e784]:
+          - paragraph [ref=e785]: Kings Head Cheese Board
+          - paragraph [ref=e787]: £10.25
+        - generic [ref=e788]:
+          - paragraph [ref=e789]: Mac & Cheese
+          - paragraph [ref=e791]: £5.95
+        - generic [ref=e792]:
+          - generic [ref=e794]: 1A
+          - paragraph [ref=e795]: Main
+          - paragraph [ref=e796]: Marinated Cauliflower Salad Bowl
+          - generic [ref=e797]:
+            - paragraph [ref=e798]: £16.95
+            - generic "Nuts" [ref=e800]: 🌰
+        - generic [ref=e801]:
+          - paragraph [ref=e802]: Mixed Olives
+          - paragraph [ref=e804]: £7.49
+        - generic [ref=e805]:
+          - paragraph [ref=e806]: Mushroom Sauce
+          - paragraph [ref=e808]: £3.00
+        - generic [ref=e809]:
+          - paragraph [ref=e810]: Mustard Butter
+          - paragraph [ref=e812]: £3.00
+        - generic [ref=e813]:
+          - generic [ref=e815]: 1A
+          - paragraph [ref=e816]: Pan-fried Chicken Burger
+          - generic [ref=e817]:
+            - paragraph [ref=e818]: £0.33
+            - generic "Wheat (Gluten)" [ref=e820]: 🌾
+        - generic [ref=e821]:
+          - generic [ref=e823]: 2A
+          - paragraph [ref=e824]: Peas À La Française
+          - generic [ref=e825]:
+            - paragraph [ref=e826]: £5.95
+            - generic [ref=e827]:
+              - generic "Milk" [ref=e828]: 🥛
+              - generic "Sulphites" [ref=e829]: 🍷
+        - generic [ref=e830]:
+          - paragraph [ref=e831]: Peppercorn Sauce
+          - paragraph [ref=e833]: £3.00
+        - generic [ref=e834]:
+          - paragraph [ref=e835]: Seafood Platter
+          - paragraph [ref=e837]: £42.95
+        - generic [ref=e838]:
+          - paragraph [ref=e839]: Selection of Ice-Creams & Sorbets
+          - paragraph [ref=e841]: £7.25
+        - generic [ref=e842]:
+          - paragraph [ref=e843]: Skin On Triple Cooked Chips
+          - paragraph [ref=e845]: £5.95

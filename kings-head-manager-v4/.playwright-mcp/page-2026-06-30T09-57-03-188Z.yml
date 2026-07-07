@@ -1,0 +1,2187 @@
+- generic [ref=e3]:
+  - navigation [ref=e4]:
+    - generic [ref=e6]: KH
+    - generic [ref=e7]:
+      - button [ref=e8] [cursor=pointer]:
+        - img [ref=e10]
+      - button [ref=e15] [cursor=pointer]:
+        - img [ref=e16]
+      - button [ref=e20] [cursor=pointer]:
+        - img [ref=e21]
+      - button [ref=e24] [cursor=pointer]:
+        - img [ref=e25]
+      - button [ref=e27] [cursor=pointer]:
+        - img [ref=e28]
+      - button [ref=e31] [cursor=pointer]:
+        - img [ref=e32]
+      - button [ref=e42] [cursor=pointer]:
+        - img [ref=e43]
+      - button [ref=e48] [cursor=pointer]:
+        - img [ref=e49]
+      - button [ref=e54] [cursor=pointer]:
+        - img [ref=e55]
+    - generic [ref=e59]: v4
+  - main [ref=e60]:
+    - heading "kitchen" [level=1] [ref=e69]
+    - generic [ref=e70]:
+      - generic [ref=e71]:
+        - generic [ref=e72]:
+          - generic [ref=e73]:
+            - generic [ref=e74]: Kitchen Library
+            - generic [ref=e75]:
+              - button "Scan" [ref=e76] [cursor=pointer]:
+                - img [ref=e77]
+                - text: Scan
+              - button [ref=e80] [cursor=pointer]:
+                - img [ref=e81]
+          - generic [ref=e82]:
+            - img [ref=e83]
+            - textbox "Search recipes..." [ref=e86]
+        - generic [ref=e87]:
+          - generic [ref=e88] [cursor=pointer]:
+            - generic [ref=e89]:
+              - generic [ref=e90]: BASIC SALAD DRESSING
+              - generic [ref=e91]:
+                - generic [ref=e92]: "Batch: 4.5773 l"
+                - generic [ref=e93]: •
+                - generic "Not linked to any menu dishes" [ref=e94]: Unused in menu
+            - generic [ref=e95]: £15.17
+          - generic [ref=e96] [cursor=pointer]:
+            - generic [ref=e97]:
+              - generic [ref=e98]: Hot water crust pastry
+              - generic [ref=e99]:
+                - generic [ref=e100]: "Batch: 430.5 g"
+                - generic [ref=e101]: •
+                - generic "Not linked to any menu dishes" [ref=e102]: Unused in menu
+            - generic [ref=e103]: £1.28
+          - generic [ref=e104] [cursor=pointer]:
+            - generic [ref=e105]:
+              - generic [ref=e106]: APPLE SORBET
+              - generic [ref=e107]:
+                - generic [ref=e108]: "Batch: 1900 g"
+                - generic [ref=e109]: •
+                - generic "Not linked to any menu dishes" [ref=e110]: Unused in menu
+            - generic [ref=e111]: £1.89
+          - generic [ref=e112] [cursor=pointer]:
+            - generic [ref=e113]:
+              - generic [ref=e114]: Apple Crumble Mix
+              - generic [ref=e115]:
+                - generic [ref=e116]: "Batch: 1067 g"
+                - generic [ref=e117]: •
+                - generic "Not linked to any menu dishes" [ref=e118]: Unused in menu
+            - generic [ref=e119]: £2.45
+          - generic [ref=e120] [cursor=pointer]:
+            - generic [ref=e121]:
+              - generic [ref=e122]: Garlic butter
+              - generic [ref=e123]:
+                - generic [ref=e124]: "Batch: 1.36 kg"
+                - generic [ref=e125]: •
+                - generic "Not linked to any menu dishes" [ref=e126]: Unused in menu
+            - generic [ref=e127]: £4.97
+          - generic [ref=e128] [cursor=pointer]:
+            - generic [ref=e129]:
+              - generic [ref=e130]: Seafood salad dressing
+              - generic [ref=e131]:
+                - generic [ref=e132]: "Batch: 100.5 g"
+                - generic [ref=e133]: •
+                - generic "Not linked to any menu dishes" [ref=e134]: Unused in menu
+            - generic [ref=e135]: £1.01
+          - generic [ref=e136] [cursor=pointer]:
+            - generic [ref=e137]:
+              - generic [ref=e138]: Neeps
+              - generic [ref=e139]:
+                - generic [ref=e140]: "Batch: 18.79 kg"
+                - generic [ref=e141]: •
+                - generic "Not linked to any menu dishes" [ref=e142]: Unused in menu
+            - generic [ref=e143]: £23.68
+          - generic [ref=e144] [cursor=pointer]:
+            - generic [ref=e145]:
+              - generic [ref=e146]: Bois bourdoin sauce
+              - generic [ref=e147]:
+                - generic [ref=e148]: "Batch: 420.5 g"
+                - generic [ref=e149]: •
+                - generic "Not linked to any menu dishes" [ref=e150]: Unused in menu
+            - generic [ref=e151]: £3.24
+          - generic [ref=e152] [cursor=pointer]:
+            - generic [ref=e153]:
+              - generic [ref=e154]: Salt caramel
+              - generic [ref=e155]:
+                - generic [ref=e156]: "Batch: 295 g"
+                - generic [ref=e157]: •
+                - generic "Not linked to any menu dishes" [ref=e158]: Unused in menu
+            - generic [ref=e159]: £0.26
+          - generic [ref=e160] [cursor=pointer]:
+            - generic [ref=e161]:
+              - generic [ref=e162]: RIATA ESPUMA
+              - generic [ref=e163]:
+                - generic [ref=e164]: "Batch: 582.5 g"
+                - generic [ref=e165]: •
+                - generic "Not linked to any menu dishes" [ref=e166]: Unused in menu
+            - generic [ref=e167]: £1.79
+          - generic [ref=e168] [cursor=pointer]:
+            - generic [ref=e169]:
+              - generic [ref=e170]: Milk Gelato
+              - generic [ref=e171]:
+                - generic [ref=e172]: "Batch: 1.2 kg"
+                - generic [ref=e173]: •
+                - generic "Not linked to any menu dishes" [ref=e174]: Unused in menu
+            - generic [ref=e175]: £3.06
+          - generic [ref=e176] [cursor=pointer]:
+            - generic [ref=e177]:
+              - generic [ref=e178]: VENISON MARINADE
+              - generic [ref=e179]:
+                - generic [ref=e180]: "Batch: 1812 g"
+                - generic [ref=e181]: •
+                - generic "Not linked to any menu dishes" [ref=e182]: Unused in menu
+            - generic [ref=e183]: £3.92
+          - generic [ref=e184] [cursor=pointer]:
+            - generic [ref=e185]:
+              - generic [ref=e186]: POTATO FONDANT LIQUOR
+              - generic [ref=e187]:
+                - generic [ref=e188]: "Batch: 299.75 g"
+                - generic [ref=e189]: •
+                - generic "Not linked to any menu dishes" [ref=e190]: Unused in menu
+            - generic [ref=e191]: £3.39
+          - generic [ref=e192] [cursor=pointer]:
+            - generic [ref=e193]:
+              - generic [ref=e194]: Mayonnaise
+              - generic [ref=e195]:
+                - generic [ref=e196]: "Batch: 394 ml"
+                - generic [ref=e197]: •
+                - generic "Not linked to any menu dishes" [ref=e198]: Unused in menu
+            - generic [ref=e199]: £1.56
+          - generic [ref=e200] [cursor=pointer]:
+            - generic [ref=e201]:
+              - generic [ref=e202]: DARK CHOCOLATE FUDGE
+              - generic [ref=e203]:
+                - generic [ref=e204]: "Batch: 2.94 kg"
+                - generic [ref=e205]: •
+                - generic "Not linked to any menu dishes" [ref=e206]: Unused in menu
+            - generic [ref=e207]: £16.93
+          - generic [ref=e208] [cursor=pointer]:
+            - generic [ref=e209]:
+              - generic [ref=e210]: Mango salsa
+              - generic [ref=e211]:
+                - generic [ref=e212]: "Batch: 728.725 g"
+                - generic [ref=e213]: •
+                - generic "Not linked to any menu dishes" [ref=e214]: Unused in menu
+            - generic [ref=e215]: £4.71
+          - generic [ref=e216] [cursor=pointer]:
+            - generic [ref=e217]:
+              - generic [ref=e218]: Curried Sauce
+              - generic [ref=e219]:
+                - generic [ref=e220]: "Batch: 142.35 g"
+                - generic [ref=e221]: •
+                - generic "Not linked to any menu dishes" [ref=e222]: Unused in menu
+            - generic [ref=e223]: £1.34
+          - generic [ref=e224] [cursor=pointer]:
+            - generic [ref=e225]:
+              - generic [ref=e226]: Vegan greek salad
+              - generic [ref=e227]:
+                - generic [ref=e228]: "Batch: 2.1162 kg"
+                - generic [ref=e229]: •
+                - generic "Not linked to any menu dishes" [ref=e230]: Unused in menu
+            - generic [ref=e231]: £7.96
+          - generic [ref=e232] [cursor=pointer]:
+            - generic [ref=e233]:
+              - generic [ref=e234]: PICKLED QUAIL EGG LIQUOR
+              - generic [ref=e235]:
+                - generic [ref=e236]: "Batch: 971.3 ml"
+                - generic [ref=e237]: •
+                - generic "Not linked to any menu dishes" [ref=e238]: Unused in menu
+            - generic [ref=e239]: £2.62
+          - generic [ref=e240] [cursor=pointer]:
+            - generic [ref=e241]:
+              - generic [ref=e242]: Peanut butter mousse
+              - generic [ref=e243]:
+                - generic [ref=e244]: "Batch: 0.55 l"
+                - generic [ref=e245]: •
+                - generic "Not linked to any menu dishes" [ref=e246]: Unused in menu
+            - generic [ref=e247]: £2.74
+          - generic [ref=e248] [cursor=pointer]:
+            - generic [ref=e249]:
+              - generic [ref=e250]: RHUBARB GEL
+              - generic [ref=e251]:
+                - generic [ref=e252]: "Batch: 838 ml"
+                - generic [ref=e253]: •
+                - generic "Not linked to any menu dishes" [ref=e254]: Unused in menu
+            - generic [ref=e255]: £5.82
+          - generic [ref=e256] [cursor=pointer]:
+            - generic [ref=e257]:
+              - generic [ref=e258]: MOUSSE
+              - generic [ref=e259]:
+                - generic [ref=e260]: "Batch: 1725.575 g"
+                - generic [ref=e261]: •
+                - generic "Not linked to any menu dishes" [ref=e262]: Unused in menu
+            - generic [ref=e263]: £13.55
+          - generic [ref=e264] [cursor=pointer]:
+            - generic [ref=e265]:
+              - generic [ref=e266]: SOUGH DOUGH
+              - generic [ref=e267]:
+                - generic [ref=e268]: "Batch: 1.02 kg"
+                - generic [ref=e269]: •
+                - generic "Not linked to any menu dishes" [ref=e270]: Unused in menu
+            - generic [ref=e271]: £0.76
+          - generic [ref=e272] [cursor=pointer]:
+            - generic [ref=e273]:
+              - generic [ref=e274]: STARTER DOUGH
+              - generic [ref=e275]:
+                - generic [ref=e276]: "Batch: 720 g"
+                - generic [ref=e277]: •
+                - generic "Not linked to any menu dishes" [ref=e278]: Unused in menu
+            - generic [ref=e279]: £1.28
+          - generic [ref=e280] [cursor=pointer]:
+            - generic [ref=e281]:
+              - generic [ref=e282]: BROCOLLI PUREE
+              - generic [ref=e283]:
+                - generic [ref=e284]: "Batch: 1.232 kg"
+                - generic [ref=e285]: •
+                - generic "Not linked to any menu dishes" [ref=e286]: Unused in menu
+            - generic [ref=e287]: £5.38
+          - generic [ref=e288] [cursor=pointer]:
+            - generic [ref=e289]:
+              - generic [ref=e290]: fish batter
+              - generic [ref=e291]:
+                - generic [ref=e292]: "Batch: 2 kg"
+                - generic [ref=e293]: •
+                - 'generic "Used in: • Fried Chilli & Garlic Halloumi Burger • BEER BATTERED FISH & CHIPS" [ref=e294]': "Used in: 2 dishes"
+            - generic [ref=e295]: £0.69
+          - generic [ref=e296] [cursor=pointer]:
+            - generic [ref=e297]:
+              - generic [ref=e298]: SWEET PASTE
+              - generic [ref=e299]:
+                - generic [ref=e300]: "Batch: 2.7 kg"
+                - generic [ref=e301]: •
+                - generic "Not linked to any menu dishes" [ref=e302]: Unused in menu
+            - generic [ref=e303]: £8.61
+          - generic [ref=e304] [cursor=pointer]:
+            - generic [ref=e305]:
+              - generic [ref=e306]: CELERIAC PUREE
+              - generic [ref=e307]:
+                - generic [ref=e308]: "Batch: 1.6273 kg"
+                - generic [ref=e309]: •
+                - generic "Not linked to any menu dishes" [ref=e310]: Unused in menu
+            - generic [ref=e311]: £6.45
+          - generic [ref=e312] [cursor=pointer]:
+            - generic [ref=e313]:
+              - generic [ref=e314]: Basic muffins
+              - generic [ref=e315]:
+                - generic [ref=e316]: "Batch: 1420 g"
+                - generic [ref=e317]: •
+                - generic "Not linked to any menu dishes" [ref=e318]: Unused in menu
+            - generic [ref=e319]: £2.24
+          - generic [ref=e320] [cursor=pointer]:
+            - generic [ref=e321]:
+              - generic [ref=e322]: PASSIONFRUIT GLAZE
+              - generic [ref=e323]:
+                - generic [ref=e324]: "Batch: 250 ml"
+                - generic [ref=e325]: •
+                - generic "Not linked to any menu dishes" [ref=e326]: Unused in menu
+            - generic [ref=e327]: £2.23
+          - generic [ref=e328] [cursor=pointer]:
+            - generic [ref=e329]:
+              - generic [ref=e330]: Hasselback potatoes
+              - generic [ref=e331]:
+                - generic [ref=e332]: "Batch: 2.43 kg"
+                - generic [ref=e333]: •
+                - 'generic "Used in: • Roasted Hasselback Potatoes" [ref=e334]': "Used in: 1 dish"
+            - generic [ref=e335]: £5.00
+          - generic [ref=e336] [cursor=pointer]:
+            - generic [ref=e337]:
+              - generic [ref=e338]: CHILLI SPICED PUY LENTILS
+              - generic [ref=e339]:
+                - generic [ref=e340]: "Batch: 250.61 g"
+                - generic [ref=e341]: •
+                - generic "Not linked to any menu dishes" [ref=e342]: Unused in menu
+            - generic [ref=e343]: £0.88
+          - generic [ref=e344] [cursor=pointer]:
+            - generic [ref=e345]:
+              - generic [ref=e346]: BEEF SHIN MARINADE COOKING LIQUOR
+              - generic [ref=e347]:
+                - generic [ref=e348]: "Batch: 2.5808 kg"
+                - generic [ref=e349]: •
+                - generic "Not linked to any menu dishes" [ref=e350]: Unused in menu
+            - generic [ref=e351]: £4.49
+          - generic [ref=e352] [cursor=pointer]:
+            - generic [ref=e353]:
+              - generic [ref=e354]: ROASTED SHALLOT BREAD DOUGH
+              - generic [ref=e355]:
+                - generic [ref=e356]: "Batch: 731 g"
+                - generic [ref=e357]: •
+                - generic "Not linked to any menu dishes" [ref=e358]: Unused in menu
+            - generic [ref=e359]: £0.72
+          - generic [ref=e360] [cursor=pointer]:
+            - generic [ref=e361]:
+              - generic [ref=e362]: WATERCRESS PUREE
+              - generic [ref=e363]:
+                - generic [ref=e364]: "Batch: 517.8 ml"
+                - generic [ref=e365]: •
+                - generic "Not linked to any menu dishes" [ref=e366]: Unused in menu
+            - generic [ref=e367]: £9.24
+          - generic [ref=e368] [cursor=pointer]:
+            - generic [ref=e369]:
+              - generic [ref=e370]: COOKING LIQUOR
+              - generic [ref=e371]:
+                - generic [ref=e372]: "Batch: 342.5 g"
+                - generic [ref=e373]: •
+                - generic "Not linked to any menu dishes" [ref=e374]: Unused in menu
+            - generic [ref=e375]: £3.08
+          - generic [ref=e376] [cursor=pointer]:
+            - generic [ref=e377]:
+              - generic [ref=e378]: PICCALILLI
+              - generic [ref=e379]:
+                - generic [ref=e380]: "Batch: 1247 g"
+                - generic [ref=e381]: •
+                - generic "Not linked to any menu dishes" [ref=e382]: Unused in menu
+            - generic [ref=e383]: £15.59
+          - generic [ref=e384] [cursor=pointer]:
+            - generic [ref=e385]:
+              - generic [ref=e386]: RED WINE MARINADEGEL
+              - generic [ref=e387]:
+                - generic [ref=e388]: "Batch: 2703 g"
+                - generic [ref=e389]: •
+                - generic "Not linked to any menu dishes" [ref=e390]: Unused in menu
+            - generic [ref=e391]: £6.86
+          - generic [ref=e392] [cursor=pointer]:
+            - generic [ref=e393]:
+              - generic [ref=e394]: CUMIN BREAD DOUGH
+              - generic [ref=e395]:
+                - generic [ref=e396]: "Batch: 667 g"
+                - generic [ref=e397]: •
+                - generic "Not linked to any menu dishes" [ref=e398]: Unused in menu
+            - generic [ref=e399]: £1.14
+          - generic [ref=e400] [cursor=pointer]:
+            - generic [ref=e401]:
+              - generic [ref=e402]: WHITE BREAD DOUGH
+              - generic [ref=e403]:
+                - generic [ref=e404]: "Batch: 642 g"
+                - generic [ref=e405]: •
+                - generic "Not linked to any menu dishes" [ref=e406]: Unused in menu
+            - generic [ref=e407]: £0.55
+          - generic [ref=e408] [cursor=pointer]:
+            - generic [ref=e409]:
+              - generic [ref=e410]: Bois Bourdain Sauce
+              - generic [ref=e411]:
+                - generic [ref=e412]: "Batch: 420.5 g"
+                - generic [ref=e413]: •
+                - generic "Not linked to any menu dishes" [ref=e414]: Unused in menu
+            - generic [ref=e415]: £3.24
+          - generic [ref=e416] [cursor=pointer]:
+            - generic [ref=e417]:
+              - generic [ref=e418]: SODA BREAD
+              - generic [ref=e419]:
+                - generic [ref=e420]: "Batch: 365 g"
+                - generic [ref=e421]: •
+                - generic "Not linked to any menu dishes" [ref=e422]: Unused in menu
+            - generic [ref=e423]: £0.38
+          - generic [ref=e424] [cursor=pointer]:
+            - generic [ref=e425]:
+              - generic [ref=e426]: COCONUT AND POPPYSEED SPONGE
+              - generic [ref=e427]:
+                - generic [ref=e428]: "Batch: 2.55 kg"
+                - generic [ref=e429]: •
+                - generic "Not linked to any menu dishes" [ref=e430]: Unused in menu
+            - generic [ref=e431]: £9.47
+          - generic [ref=e432] [cursor=pointer]:
+            - generic [ref=e433]:
+              - generic [ref=e434]: GRANOLA
+              - generic [ref=e435]:
+                - generic [ref=e436]: "Batch: 699.5 g"
+                - generic [ref=e437]: •
+                - generic "Not linked to any menu dishes" [ref=e438]: Unused in menu
+            - generic [ref=e439]: £2.12
+          - generic [ref=e440] [cursor=pointer]:
+            - generic [ref=e441]:
+              - generic [ref=e442]: Cranachan
+              - generic [ref=e443]:
+                - generic [ref=e444]: "Batch: 748 ml"
+                - generic [ref=e445]: •
+                - generic "Not linked to any menu dishes" [ref=e446]: Unused in menu
+            - generic [ref=e447]: £8.18
+          - generic [ref=e448] [cursor=pointer]:
+            - generic [ref=e449]:
+              - generic [ref=e450]: AIR DRY PROSCUTIO
+              - generic [ref=e451]:
+                - generic [ref=e452]: "Batch: 10 kg"
+                - generic [ref=e453]: •
+                - generic "Not linked to any menu dishes" [ref=e454]: Unused in menu
+            - generic [ref=e455]: £10.77
+          - generic [ref=e456] [cursor=pointer]:
+            - generic [ref=e457]:
+              - generic [ref=e458]: FISH PICKLE
+              - generic [ref=e459]:
+                - generic [ref=e460]: "Batch: 1305 ml"
+                - generic [ref=e461]: •
+                - generic "Not linked to any menu dishes" [ref=e462]: Unused in menu
+            - generic [ref=e463]: £7.71
+          - generic [ref=e464] [cursor=pointer]:
+            - generic [ref=e465]:
+              - generic [ref=e466]: MUSTARD SEED PICKLING LIQUOR
+              - generic [ref=e467]:
+                - generic [ref=e468]: "Batch: 1485 ml"
+                - generic [ref=e469]: •
+                - generic "Not linked to any menu dishes" [ref=e470]: Unused in menu
+            - generic [ref=e471]: £1.13
+          - generic [ref=e472] [cursor=pointer]:
+            - generic [ref=e473]:
+              - generic [ref=e474]: CLAFOUTIS BATTER
+              - generic [ref=e475]:
+                - generic [ref=e476]: "Batch: 572 ml"
+                - generic [ref=e477]: •
+                - generic "Not linked to any menu dishes" [ref=e478]: Unused in menu
+            - generic [ref=e479]: £5.51
+          - generic [ref=e480] [cursor=pointer]:
+            - generic [ref=e481]:
+              - generic [ref=e482]: CITRUS DUCK GLAZE
+              - generic [ref=e483]:
+                - generic [ref=e484]: "Batch: 2.0845 l"
+                - generic [ref=e485]: •
+                - generic "Not linked to any menu dishes" [ref=e486]: Unused in menu
+            - generic [ref=e487]: £19.61
+          - generic [ref=e488] [cursor=pointer]:
+            - generic [ref=e489]:
+              - generic [ref=e490]: Chilli flour
+              - generic [ref=e491]:
+                - generic [ref=e492]: "Batch: 4.4 kg"
+                - generic [ref=e493]: •
+                - generic "Not linked to any menu dishes" [ref=e494]: Unused in menu
+            - generic [ref=e495]: £18.60
+          - generic [ref=e496] [cursor=pointer]:
+            - generic [ref=e497]:
+              - generic [ref=e498]: Burger buns
+              - generic [ref=e499]:
+                - generic [ref=e500]: "Batch: 12 ea"
+                - generic [ref=e501]: •
+                - 'generic "Used in: • Pan-fried Chicken Burger" [ref=e502]': "Used in: 1 dish"
+            - generic [ref=e503]: £1.15
+          - generic [ref=e504] [cursor=pointer]:
+            - generic [ref=e505]:
+              - generic [ref=e506]: TRUFFLE MAYONNAISE
+              - generic [ref=e507]:
+                - generic [ref=e508]: "Batch: 533 g"
+                - generic [ref=e509]: •
+                - generic "Not linked to any menu dishes" [ref=e510]: Unused in menu
+            - generic [ref=e511]: £6.67
+          - generic [ref=e512] [cursor=pointer]:
+            - generic [ref=e513]:
+              - generic [ref=e514]: GINGER PARKIN CAKE
+              - generic [ref=e515]:
+                - generic [ref=e516]: "Batch: 3.731 kg"
+                - generic [ref=e517]: •
+                - generic "Not linked to any menu dishes" [ref=e518]: Unused in menu
+            - generic [ref=e519]: £14.02
+          - generic [ref=e520] [cursor=pointer]:
+            - generic [ref=e521]:
+              - generic [ref=e522]: CHICKEN AND WILD MUSHROOM MOUSSE
+              - generic [ref=e523]:
+                - generic [ref=e524]: "Batch: 1164.86 g"
+                - generic [ref=e525]: •
+                - generic "Not linked to any menu dishes" [ref=e526]: Unused in menu
+            - generic [ref=e527]: £23.66
+          - generic [ref=e528] [cursor=pointer]:
+            - generic [ref=e529]:
+              - generic [ref=e530]: CHOCOLATE MIRRORGLAZE
+              - generic [ref=e531]:
+                - generic [ref=e532]: "Batch: 280 g"
+                - generic [ref=e533]: •
+                - generic "Not linked to any menu dishes" [ref=e534]: Unused in menu
+            - generic [ref=e535]: £959.55
+          - generic [ref=e536] [cursor=pointer]:
+            - generic [ref=e537]:
+              - generic [ref=e538]: CARROT REMOULADE
+              - generic [ref=e539]:
+                - generic [ref=e540]: "Batch: 10 ml"
+                - generic [ref=e541]: •
+                - generic "Not linked to any menu dishes" [ref=e542]: Unused in menu
+            - generic [ref=e543]: £0.05
+          - generic [ref=e544] [cursor=pointer]:
+            - generic [ref=e545]:
+              - generic [ref=e546]: CHOCOLATE FONDANT
+              - generic [ref=e547]:
+                - generic [ref=e548]: "Batch: 3.9 kg"
+                - generic [ref=e549]: •
+                - generic "Not linked to any menu dishes" [ref=e550]: Unused in menu
+            - generic [ref=e551]: £42.80
+          - generic [ref=e552] [cursor=pointer]:
+            - generic [ref=e553]:
+              - generic [ref=e554]: Breard 2024
+              - generic [ref=e555]:
+                - generic [ref=e556]: "Batch: 3.37 kg"
+                - generic [ref=e557]: •
+                - generic "Not linked to any menu dishes" [ref=e558]: Unused in menu
+            - generic [ref=e559]: £2.75
+          - generic [ref=e560] [cursor=pointer]:
+            - generic [ref=e561]:
+              - generic [ref=e562]: Pork cheek liquor
+              - generic [ref=e563]:
+                - generic [ref=e564]: "Batch: 521.15 g"
+                - generic [ref=e565]: •
+                - generic "Not linked to any menu dishes" [ref=e566]: Unused in menu
+            - generic [ref=e567]: £4.05
+          - generic [ref=e568] [cursor=pointer]:
+            - generic [ref=e569]:
+              - generic [ref=e570]: LEMON GEL
+              - generic [ref=e571]:
+                - generic [ref=e572]: "Batch: 170 ml"
+                - generic [ref=e573]: •
+                - generic "Not linked to any menu dishes" [ref=e574]: Unused in menu
+            - generic [ref=e575]: £3.85
+          - generic [ref=e576] [cursor=pointer]:
+            - generic [ref=e577]:
+              - generic [ref=e578]: MADELINES
+              - generic [ref=e579]:
+                - generic [ref=e580]: "Batch: 303.75 g"
+                - generic [ref=e581]: •
+                - generic "Not linked to any menu dishes" [ref=e582]: Unused in menu
+            - generic [ref=e583]: £1.63
+          - generic [ref=e584] [cursor=pointer]:
+            - generic [ref=e585]:
+              - generic [ref=e586]: COURGETTE PUREE
+              - generic [ref=e587]:
+                - generic [ref=e588]: "Batch: 180 g"
+                - generic [ref=e589]: •
+                - generic "Not linked to any menu dishes" [ref=e590]: Unused in menu
+            - generic [ref=e591]: £1.40
+          - generic [ref=e592] [cursor=pointer]:
+            - generic [ref=e593]:
+              - generic [ref=e594]: Yorkie batter
+              - generic [ref=e595]:
+                - generic [ref=e596]: "Batch: 4.5 kg"
+                - generic [ref=e597]: •
+                - generic "Not linked to any menu dishes" [ref=e598]: Unused in menu
+            - generic [ref=e599]: £27.91
+          - generic [ref=e600] [cursor=pointer]:
+            - generic [ref=e601]:
+              - generic [ref=e602]: POTATO AND CELERIAC ESPUMA
+              - generic [ref=e603]:
+                - generic [ref=e604]: "Batch: 302.75 g"
+                - generic [ref=e605]: •
+                - generic "Not linked to any menu dishes" [ref=e606]: Unused in menu
+            - generic [ref=e607]: £0.90
+          - generic [ref=e608] [cursor=pointer]:
+            - generic [ref=e609]:
+              - generic [ref=e610]: CRACKED BLACK PEPPER AND SEA SALT BREAD DOUGH.
+              - generic [ref=e611]:
+                - generic [ref=e612]: "Batch: 662.75 g"
+                - generic [ref=e613]: •
+                - generic "Not linked to any menu dishes" [ref=e614]: Unused in menu
+            - generic [ref=e615]: £1.06
+          - generic [ref=e616] [cursor=pointer]:
+            - generic [ref=e617]:
+              - generic [ref=e618]: LAMB BRAISING LIQUOR
+              - generic [ref=e619]:
+                - generic [ref=e620]: "Batch: 785.25 g"
+                - generic [ref=e621]: •
+                - generic "Not linked to any menu dishes" [ref=e622]: Unused in menu
+            - generic [ref=e623]: £1.48
+          - generic [ref=e624] [cursor=pointer]:
+            - generic [ref=e625]:
+              - generic [ref=e626]: Salsa
+              - generic [ref=e627]:
+                - generic [ref=e628]: "Batch: 188.9 g"
+                - generic [ref=e629]: •
+                - generic "Not linked to any menu dishes" [ref=e630]: Unused in menu
+            - generic [ref=e631]: £0.47
+          - generic [ref=e632] [cursor=pointer]:
+            - generic [ref=e633]:
+              - generic [ref=e634]: Court bouillon
+              - generic [ref=e635]:
+                - generic [ref=e636]: "Batch: 106.25 ml"
+                - generic [ref=e637]: •
+                - generic "Not linked to any menu dishes" [ref=e638]: Unused in menu
+            - generic [ref=e639]: £0.23
+          - generic [ref=e640] [cursor=pointer]:
+            - generic [ref=e641]:
+              - generic [ref=e642]: Toffee sauce
+              - generic [ref=e643]:
+                - generic [ref=e644]: "Batch: 875 ml"
+                - generic [ref=e645]: •
+                - generic "Not linked to any menu dishes" [ref=e646]: Unused in menu
+            - generic [ref=e647]: £3.34
+          - generic [ref=e648] [cursor=pointer]:
+            - generic [ref=e649]:
+              - generic [ref=e650]: BASIC SORBET BASE
+              - generic [ref=e651]:
+                - generic [ref=e652]: "Batch: 1.88 kg"
+                - generic [ref=e653]: •
+                - generic "Not linked to any menu dishes" [ref=e654]: Unused in menu
+            - generic [ref=e655]: £6.96
+          - generic [ref=e656] [cursor=pointer]:
+            - generic [ref=e657]:
+              - generic [ref=e658]: COCONUT FOAM
+              - generic [ref=e659]:
+                - generic [ref=e660]: "Batch: 316 g"
+                - generic [ref=e661]: •
+                - generic "Not linked to any menu dishes" [ref=e662]: Unused in menu
+            - generic [ref=e663]: £6.95
+          - generic [ref=e664] [cursor=pointer]:
+            - generic [ref=e665]:
+              - generic [ref=e666]: Celeriac and Bramley apple soup
+              - generic [ref=e667]:
+                - generic [ref=e668]: "Batch: 1.8015 l"
+                - generic [ref=e669]: •
+                - generic "Not linked to any menu dishes" [ref=e670]: Unused in menu
+            - generic [ref=e671]: £32.28
+          - generic [ref=e672] [cursor=pointer]:
+            - generic [ref=e673]:
+              - generic [ref=e674]: WHITE BEAN CASSOULET
+              - generic [ref=e675]:
+                - generic [ref=e676]: "Batch: 297.6875 g"
+                - generic [ref=e677]: •
+                - generic "Not linked to any menu dishes" [ref=e678]: Unused in menu
+            - generic [ref=e679]: £4.28
+          - generic [ref=e680] [cursor=pointer]:
+            - generic [ref=e681]:
+              - generic [ref=e682]: COCONUT JELLY
+              - generic [ref=e683]:
+                - generic [ref=e684]: "Batch: 0.9 kg"
+                - generic [ref=e685]: •
+                - generic "Not linked to any menu dishes" [ref=e686]: Unused in menu
+            - generic [ref=e687]: £8.66
+          - generic [ref=e688] [cursor=pointer]:
+            - generic [ref=e689]:
+              - generic [ref=e690]: ROASTED RED PEPPER BREAD DOUGH
+              - generic [ref=e691]:
+                - generic [ref=e692]: "Batch: 683.5 g"
+                - generic [ref=e693]: •
+                - generic "Not linked to any menu dishes" [ref=e694]: Unused in menu
+            - generic [ref=e695]: £0.77
+          - generic [ref=e696] [cursor=pointer]:
+            - generic [ref=e697]:
+              - generic [ref=e698]: Spiced nuts
+              - generic [ref=e699]:
+                - generic [ref=e700]: "Batch: 384.9 g"
+                - generic [ref=e701]: •
+                - generic "Not linked to any menu dishes" [ref=e702]: Unused in menu
+            - generic [ref=e703]: £4.00
+          - generic [ref=e704] [cursor=pointer]:
+            - generic [ref=e705]:
+              - generic [ref=e706]: CUMBERLAND SAUCE
+              - generic [ref=e707]:
+                - generic [ref=e708]: "Batch: 247.2 ml"
+                - generic [ref=e709]: •
+                - generic "Not linked to any menu dishes" [ref=e710]: Unused in menu
+            - generic [ref=e711]: £1.91
+          - generic [ref=e712] [cursor=pointer]:
+            - generic [ref=e713]:
+              - generic [ref=e714]: FRANGIPAGNE TART MIX
+              - generic [ref=e715]:
+                - generic [ref=e716]: "Batch: 1.53 kg"
+                - generic [ref=e717]: •
+                - generic "Not linked to any menu dishes" [ref=e718]: Unused in menu
+            - generic [ref=e719]: £12.84
+          - generic [ref=e720] [cursor=pointer]:
+            - generic [ref=e721]:
+              - generic [ref=e722]: CHESNUT PUREE CREAM
+              - generic [ref=e723]:
+                - generic [ref=e724]: "Batch: 1 ea"
+                - generic [ref=e725]: •
+                - generic "Not linked to any menu dishes" [ref=e726]: Unused in menu
+            - generic [ref=e727]: £17.54
+          - generic [ref=e728] [cursor=pointer]:
+            - generic [ref=e729]:
+              - generic [ref=e730]: Brown chicken stock
+              - generic [ref=e731]:
+                - generic [ref=e732]: "Batch: 5 l"
+                - generic [ref=e733]: •
+                - generic "Not linked to any menu dishes" [ref=e734]: Unused in menu
+            - generic [ref=e735]: £80.40
+          - generic [ref=e736] [cursor=pointer]:
+            - generic [ref=e737]:
+              - generic [ref=e738]: WHITE CHOCOLATE FUDGE
+              - generic [ref=e739]:
+                - generic [ref=e740]: "Batch: 705 g"
+                - generic [ref=e741]: •
+                - generic "Not linked to any menu dishes" [ref=e742]: Unused in menu
+            - generic [ref=e743]: £7.76
+          - generic [ref=e744] [cursor=pointer]:
+            - generic [ref=e745]:
+              - generic [ref=e746]: WHIPPED GOATS CHEESE MOUSSE
+              - generic [ref=e747]:
+                - generic [ref=e748]: "Batch: 1.591 kg"
+                - generic [ref=e749]: •
+                - generic "Not linked to any menu dishes" [ref=e750]: Unused in menu
+            - generic [ref=e751]: £14.51
+          - generic [ref=e752] [cursor=pointer]:
+            - generic [ref=e753]:
+              - generic [ref=e754]: PICKLED CUCUMBER GEL
+              - generic [ref=e755]:
+                - generic [ref=e756]: "Batch: 1070 g"
+                - generic [ref=e757]: •
+                - generic "Not linked to any menu dishes" [ref=e758]: Unused in menu
+            - generic [ref=e759]: £3.51
+          - generic [ref=e760] [cursor=pointer]:
+            - generic [ref=e761]:
+              - generic [ref=e762]: BEETROOT GEL
+              - generic [ref=e763]:
+                - generic [ref=e764]: "Batch: 381 ml"
+                - generic [ref=e765]: •
+                - generic "Not linked to any menu dishes" [ref=e766]: Unused in menu
+            - generic [ref=e767]: £2.66
+          - generic [ref=e768] [cursor=pointer]:
+            - generic [ref=e769]:
+              - generic [ref=e770]: PICKLED WILD MUSHROOMS
+              - generic [ref=e771]:
+                - generic [ref=e772]: "Batch: 1 kg"
+                - generic [ref=e773]: •
+                - generic "Not linked to any menu dishes" [ref=e774]: Unused in menu
+            - generic [ref=e775]: £0.02
+          - generic [ref=e776] [cursor=pointer]:
+            - generic [ref=e777]:
+              - generic [ref=e778]: BRAISED CHICKEN AND TARRAGON TERRINE
+              - generic [ref=e779]:
+                - generic [ref=e780]: "Batch: 0.5175 kg"
+                - generic [ref=e781]: •
+                - generic "Not linked to any menu dishes" [ref=e782]: Unused in menu
+            - generic [ref=e783]: £16.17
+          - generic [ref=e784] [cursor=pointer]:
+            - generic [ref=e785]:
+              - generic [ref=e786]: PORK BELLY BACON
+              - generic [ref=e787]:
+                - generic [ref=e788]: "Batch: 1.07 kg"
+                - generic [ref=e789]: •
+                - generic "Not linked to any menu dishes" [ref=e790]: Unused in menu
+            - generic [ref=e791]: £6.74
+          - generic [ref=e792] [cursor=pointer]:
+            - generic [ref=e793]:
+              - generic [ref=e794]: Scotch Egg
+              - generic [ref=e795]:
+                - generic [ref=e796]: "Batch: 497.5 g"
+                - generic [ref=e797]: •
+                - generic "Not linked to any menu dishes" [ref=e798]: Unused in menu
+            - generic [ref=e799]: £13.03
+          - generic [ref=e800] [cursor=pointer]:
+            - generic [ref=e801]:
+              - generic [ref=e802]: HOT CROSS BUNS
+              - generic [ref=e803]:
+                - generic [ref=e804]: "Batch: 5.971 kg"
+                - generic [ref=e805]: •
+                - generic "Not linked to any menu dishes" [ref=e806]: Unused in menu
+            - generic [ref=e807]: £11.58
+          - generic [ref=e808] [cursor=pointer]:
+            - generic [ref=e809]:
+              - generic [ref=e810]: ORANGE ZEST
+              - generic [ref=e811]:
+                - generic [ref=e812]: "Batch: 60 g"
+                - generic [ref=e813]: •
+                - generic "Not linked to any menu dishes" [ref=e814]: Unused in menu
+            - generic [ref=e815]: £0.56
+          - generic [ref=e816] [cursor=pointer]:
+            - generic [ref=e817]:
+              - generic [ref=e818]: REDUCTION
+              - generic [ref=e819]:
+                - generic [ref=e820]: "Batch: 737.75 g"
+                - generic [ref=e821]: •
+                - generic "Not linked to any menu dishes" [ref=e822]: Unused in menu
+            - generic [ref=e823]: £2.75
+          - generic [ref=e824] [cursor=pointer]:
+            - generic [ref=e825]:
+              - generic [ref=e826]: SPONGE BASE
+              - generic [ref=e827]:
+                - generic [ref=e828]: "Batch: 360 g"
+                - generic [ref=e829]: •
+                - generic "Not linked to any menu dishes" [ref=e830]: Unused in menu
+            - generic [ref=e831]: £1813.94
+          - generic [ref=e832] [cursor=pointer]:
+            - generic [ref=e833]:
+              - generic [ref=e834]: PANNA COTTA
+              - generic [ref=e835]:
+                - generic [ref=e836]: "Batch: 1.67 l"
+                - generic [ref=e837]: •
+                - generic "Not linked to any menu dishes" [ref=e838]: Unused in menu
+            - generic [ref=e839]: £11.85
+          - generic [ref=e840] [cursor=pointer]:
+            - generic [ref=e841]:
+              - generic [ref=e842]: YEASTED CAULIFLOWER PUREE
+              - generic [ref=e843]:
+                - generic [ref=e844]: "Batch: 0.86 kg"
+                - generic [ref=e845]: •
+                - generic "Not linked to any menu dishes" [ref=e846]: Unused in menu
+            - generic [ref=e847]: £22.11
+          - generic [ref=e848] [cursor=pointer]:
+            - generic [ref=e849]:
+              - generic [ref=e850]: ANGLAISECUSTARD
+              - generic [ref=e851]:
+                - generic [ref=e852]: "Batch: 2.84 kg"
+                - generic [ref=e853]: •
+                - generic "Not linked to any menu dishes" [ref=e854]: Unused in menu
+            - generic [ref=e855]: £15.49
+          - generic [ref=e856] [cursor=pointer]:
+            - generic [ref=e857]:
+              - generic [ref=e858]: CARAWAY BREAD DOUGH
+              - generic [ref=e859]:
+                - generic [ref=e860]: "Batch: 667 g"
+                - generic [ref=e861]: •
+                - generic "Not linked to any menu dishes" [ref=e862]: Unused in menu
+            - generic [ref=e863]: £0.80
+          - generic [ref=e864] [cursor=pointer]:
+            - generic [ref=e865]:
+              - generic [ref=e866]: Butterscotch Sauce
+              - generic [ref=e867]:
+                - generic [ref=e868]: "Batch: 800 g"
+                - generic [ref=e869]: •
+                - generic "Not linked to any menu dishes" [ref=e870]: Unused in menu
+            - generic [ref=e871]: £3.65
+          - generic [ref=e872] [cursor=pointer]:
+            - generic [ref=e873]:
+              - generic [ref=e874]: GREEN HERB SAUCE
+              - generic [ref=e875]:
+                - generic [ref=e876]: "Batch: 134.125 g"
+                - generic [ref=e877]: •
+                - generic "Not linked to any menu dishes" [ref=e878]: Unused in menu
+            - generic [ref=e879]: £2.13
+          - generic [ref=e880] [cursor=pointer]:
+            - generic [ref=e881]:
+              - generic [ref=e882]: Slaw
+              - generic [ref=e883]:
+                - generic [ref=e884]: "Batch: 369 g"
+                - generic [ref=e885]: •
+                - generic "Not linked to any menu dishes" [ref=e886]: Unused in menu
+            - generic [ref=e887]: £2.25
+          - generic [ref=e888] [cursor=pointer]:
+            - generic [ref=e889]:
+              - generic [ref=e890]: GNOCCHI DOUGH
+              - generic [ref=e891]:
+                - generic [ref=e892]: "Batch: 777.4 g"
+                - generic [ref=e893]: •
+                - generic "Not linked to any menu dishes" [ref=e894]: Unused in menu
+            - generic [ref=e895]: £0.75
+          - generic [ref=e896] [cursor=pointer]:
+            - generic [ref=e897]:
+              - generic [ref=e898]: MACKEREL TARTARE
+              - generic [ref=e899]:
+                - generic [ref=e900]: "Batch: 8.25 ml"
+                - generic [ref=e901]: •
+                - generic "Not linked to any menu dishes" [ref=e902]: Unused in menu
+            - generic [ref=e903]: £0.13
+          - generic [ref=e904] [cursor=pointer]:
+            - generic [ref=e905]:
+              - generic [ref=e906]: CUCUMBER CONSUMME.
+              - generic [ref=e907]:
+                - generic [ref=e908]: "Batch: 126.9875 g"
+                - generic [ref=e909]: •
+                - generic "Not linked to any menu dishes" [ref=e910]: Unused in menu
+            - generic [ref=e911]: £19.90
+          - generic [ref=e912] [cursor=pointer]:
+            - generic [ref=e913]:
+              - generic [ref=e914]: Maple Glazed Nuts
+              - generic [ref=e915]:
+                - generic [ref=e916]: "Batch: 2110 g"
+                - generic [ref=e917]: •
+                - 'generic "Used in: • Roasted Cajun & Soy Peanuts" [ref=e918]': "Used in: 1 dish"
+            - generic [ref=e919]: £10.51
+          - generic [ref=e920] [cursor=pointer]:
+            - generic [ref=e921]:
+              - generic [ref=e922]: BAY LEAF ICE CREAM
+              - generic [ref=e923]:
+                - generic [ref=e924]: "Batch: 1.962 l"
+                - generic [ref=e925]: •
+                - generic "Not linked to any menu dishes" [ref=e926]: Unused in menu
+            - generic [ref=e927]: £8.75
+          - generic [ref=e928] [cursor=pointer]:
+            - generic [ref=e929]:
+              - generic [ref=e930]: PUMPKIN AND POPPY SEED BREAD DOUGH
+              - generic [ref=e931]:
+                - generic [ref=e932]: "Batch: 673.5 g"
+                - generic [ref=e933]: •
+                - generic "Not linked to any menu dishes" [ref=e934]: Unused in menu
+            - generic [ref=e935]: £1.07
+          - generic [ref=e936] [cursor=pointer]:
+            - generic [ref=e937]:
+              - generic [ref=e938]: AVOCADO MAYONNAISE
+              - generic [ref=e939]:
+                - generic [ref=e940]: "Batch: 593.25 g"
+                - generic [ref=e941]: •
+                - generic "Not linked to any menu dishes" [ref=e942]: Unused in menu
+            - generic [ref=e943]: £7.10
+          - generic [ref=e944] [cursor=pointer]:
+            - generic [ref=e945]:
+              - generic [ref=e946]: Coffee Cre╠Çme Brulee
+              - generic [ref=e947]:
+                - generic [ref=e948]: "Batch: 1.12 kg"
+                - generic [ref=e949]: •
+                - generic "Not linked to any menu dishes" [ref=e950]: Unused in menu
+            - generic [ref=e951]: £6.27
+          - generic [ref=e952] [cursor=pointer]:
+            - generic [ref=e953]:
+              - generic [ref=e954]: BROWNIE
+              - generic [ref=e955]:
+                - generic [ref=e956]: "Batch: 3.105 kg"
+                - generic [ref=e957]: •
+                - generic "Not linked to any menu dishes" [ref=e958]: Unused in menu
+            - generic [ref=e959]: £3223.61
+          - generic [ref=e960] [cursor=pointer]:
+            - generic [ref=e961]:
+              - generic [ref=e962]: BANANA MOUSSE
+              - generic [ref=e963]:
+                - generic [ref=e964]: "Batch: 2810 g"
+                - generic [ref=e965]: •
+                - generic "Not linked to any menu dishes" [ref=e966]: Unused in menu
+            - generic [ref=e967]: £14.00
+          - generic [ref=e968] [cursor=pointer]:
+            - generic [ref=e969]:
+              - generic [ref=e970]: Popcorn Cockles
+              - generic [ref=e971]:
+                - generic [ref=e972]: "Batch: 1.05 kg"
+                - generic [ref=e973]: •
+                - generic "Not linked to any menu dishes" [ref=e974]: Unused in menu
+            - generic [ref=e975]: £1.94
+          - generic [ref=e976] [cursor=pointer]:
+            - generic [ref=e977]:
+              - generic [ref=e978]: ORANGE SYRUP
+              - generic [ref=e979]:
+                - generic [ref=e980]: "Batch: 489 ml"
+                - generic [ref=e981]: •
+                - generic "Not linked to any menu dishes" [ref=e982]: Unused in menu
+            - generic [ref=e983]: £7.28
+          - generic [ref=e984] [cursor=pointer]:
+            - generic [ref=e985]:
+              - generic [ref=e986]: CUCUMBER PICKLING LIQUOR
+              - generic [ref=e987]:
+                - generic [ref=e988]: "Batch: 1056.15 ml"
+                - generic [ref=e989]: •
+                - generic "Not linked to any menu dishes" [ref=e990]: Unused in menu
+            - generic [ref=e991]: £2.33
+          - generic [ref=e992] [cursor=pointer]:
+            - generic [ref=e993]:
+              - generic [ref=e994]: LEMON AND THYME BREAD DOUGH
+              - generic [ref=e995]:
+                - generic [ref=e996]: "Batch: 643.5 g"
+                - generic [ref=e997]: •
+                - generic "Not linked to any menu dishes" [ref=e998]: Unused in menu
+            - generic [ref=e999]: £0.61
+          - generic [ref=e1000] [cursor=pointer]:
+            - generic [ref=e1001]:
+              - generic [ref=e1002]: HONEY NUTS 2024
+              - generic [ref=e1003]:
+                - generic [ref=e1004]: "Batch: 1.7 kg"
+                - generic [ref=e1005]: •
+                - generic "Not linked to any menu dishes" [ref=e1006]: Unused in menu
+            - generic [ref=e1007]: £6.87
+          - generic [ref=e1008] [cursor=pointer]:
+            - generic [ref=e1009]:
+              - generic [ref=e1010]: SALTED CHOCOLATE TRUFFLES
+              - generic [ref=e1011]:
+                - generic [ref=e1012]: "Batch: 1065 g"
+                - generic [ref=e1013]: •
+                - generic "Not linked to any menu dishes" [ref=e1014]: Unused in menu
+            - generic [ref=e1015]: £14.24
+          - generic [ref=e1016] [cursor=pointer]:
+            - generic [ref=e1017]:
+              - generic [ref=e1018]: English dressing
+              - generic [ref=e1019]:
+                - generic [ref=e1020]: "Batch: 565 ml"
+                - generic [ref=e1021]: •
+                - generic "Not linked to any menu dishes" [ref=e1022]: Unused in menu
+            - generic [ref=e1023]: £2.12
+          - generic [ref=e1024] [cursor=pointer]:
+            - generic [ref=e1025]:
+              - generic [ref=e1026]: DILL SAUCE
+              - generic [ref=e1027]:
+                - generic [ref=e1028]: "Batch: 902.425 ml"
+                - generic [ref=e1029]: •
+                - generic "Not linked to any menu dishes" [ref=e1030]: Unused in menu
+            - generic [ref=e1031]: £4.81
+          - generic [ref=e1032] [cursor=pointer]:
+            - generic [ref=e1033]:
+              - generic [ref=e1034]: Gluten free brioche
+              - generic [ref=e1035]:
+                - generic [ref=e1036]: "Batch: 1480 g"
+                - generic [ref=e1037]: •
+                - generic "Not linked to any menu dishes" [ref=e1038]: Unused in menu
+            - generic [ref=e1039]: £6.29
+          - generic [ref=e1040] [cursor=pointer]:
+            - generic [ref=e1041]:
+              - generic [ref=e1042]: LEMON SORBET
+              - generic [ref=e1043]:
+                - generic [ref=e1044]: "Batch: 609.5 g"
+                - generic [ref=e1045]: •
+                - generic "Not linked to any menu dishes" [ref=e1046]: Unused in menu
+            - generic [ref=e1047]: £3.60
+          - generic [ref=e1048] [cursor=pointer]:
+            - generic [ref=e1049]:
+              - generic [ref=e1050]: CURE
+              - generic [ref=e1051]:
+                - generic [ref=e1052]: "Batch: 12 kg"
+                - generic [ref=e1053]: •
+                - generic "Not linked to any menu dishes" [ref=e1054]: Unused in menu
+            - generic [ref=e1055]: £0.00
+          - generic [ref=e1056] [cursor=pointer]:
+            - generic [ref=e1057]:
+              - generic [ref=e1058]: PARMESAN FOAM
+              - generic [ref=e1059]:
+                - generic [ref=e1060]: "Batch: 930 ml"
+                - generic [ref=e1061]: •
+                - generic "Not linked to any menu dishes" [ref=e1062]: Unused in menu
+            - generic [ref=e1063]: £4.43
+          - generic [ref=e1064] [cursor=pointer]:
+            - generic [ref=e1065]:
+              - generic [ref=e1066]: Short bread
+              - generic [ref=e1067]:
+                - generic [ref=e1068]: "Batch: 670 g"
+                - generic [ref=e1069]: •
+                - generic "Not linked to any menu dishes" [ref=e1070]: Unused in menu
+            - generic [ref=e1071]: £2.34
+          - generic [ref=e1072] [cursor=pointer]:
+            - generic [ref=e1073]:
+              - generic [ref=e1074]: PICKLED BEETROOT DISCS
+              - generic [ref=e1075]:
+                - generic [ref=e1076]: "Batch: 1.72 kg"
+                - generic [ref=e1077]: •
+                - generic "Not linked to any menu dishes" [ref=e1078]: Unused in menu
+            - generic [ref=e1079]: £5.14
+          - generic [ref=e1080] [cursor=pointer]:
+            - generic [ref=e1081]:
+              - generic [ref=e1082]: BEETROOT SLAW
+              - generic [ref=e1083]:
+                - generic [ref=e1084]: "Batch: 0.808 kg"
+                - generic [ref=e1085]: •
+                - generic "Not linked to any menu dishes" [ref=e1086]: Unused in menu
+            - generic [ref=e1087]: £1.49
+          - generic [ref=e1088] [cursor=pointer]:
+            - generic [ref=e1089]:
+              - generic [ref=e1090]: Mini Doughnuts
+              - generic [ref=e1091]:
+                - generic [ref=e1092]: "Batch: 810 g"
+                - generic [ref=e1093]: •
+                - generic "Not linked to any menu dishes" [ref=e1094]: Unused in menu
+            - generic [ref=e1095]: £5.86
+          - generic [ref=e1096] [cursor=pointer]:
+            - generic [ref=e1097]:
+              - generic [ref=e1098]: LEMON AND DILL BREAD DOUGH
+              - generic [ref=e1099]:
+                - generic [ref=e1100]: "Batch: 700.25 g"
+                - generic [ref=e1101]: •
+                - generic "Not linked to any menu dishes" [ref=e1102]: Unused in menu
+            - generic [ref=e1103]: £1.52
+          - generic [ref=e1104] [cursor=pointer]:
+            - generic [ref=e1105]:
+              - generic [ref=e1106]: ORANGE GEL
+              - generic [ref=e1107]:
+                - generic [ref=e1108]: "Batch: 280 ml"
+                - generic [ref=e1109]: •
+                - generic "Not linked to any menu dishes" [ref=e1110]: Unused in menu
+            - generic [ref=e1111]: £2.14
+          - generic [ref=e1112] [cursor=pointer]:
+            - generic [ref=e1113]:
+              - generic [ref=e1114]: WATERMELON MOUSSE
+              - generic [ref=e1115]:
+                - generic [ref=e1116]: "Batch: 2.427 kg"
+                - generic [ref=e1117]: •
+                - generic "Not linked to any menu dishes" [ref=e1118]: Unused in menu
+            - generic [ref=e1119]: £7.23
+          - generic [ref=e1120] [cursor=pointer]:
+            - generic [ref=e1121]:
+              - generic [ref=e1122]: Ratatouille
+              - generic [ref=e1123]:
+                - generic [ref=e1124]: "Batch: 1.885 kg"
+                - generic [ref=e1125]: •
+                - generic "Not linked to any menu dishes" [ref=e1126]: Unused in menu
+            - generic [ref=e1127]: £5.14
+          - generic [ref=e1128] [cursor=pointer]:
+            - generic [ref=e1129]:
+              - generic [ref=e1130]: HONEYCOMB
+              - generic [ref=e1131]:
+                - generic [ref=e1132]: "Batch: 435 g"
+                - generic [ref=e1133]: •
+                - generic "Not linked to any menu dishes" [ref=e1134]: Unused in menu
+            - generic [ref=e1135]: £1.13
+          - generic [ref=e1136] [cursor=pointer]:
+            - generic [ref=e1137]:
+              - generic [ref=e1138]: Cake
+              - generic [ref=e1139]:
+                - generic [ref=e1140]: "Batch: 960 g"
+                - generic [ref=e1141]: •
+                - generic "Not linked to any menu dishes" [ref=e1142]: Unused in menu
+            - generic [ref=e1143]: £3.81
+          - generic [ref=e1144] [cursor=pointer]:
+            - generic [ref=e1145]:
+              - generic [ref=e1146]: BOUNTY BAR
+              - generic [ref=e1147]:
+                - generic [ref=e1148]: "Batch: 1 kg"
+                - generic [ref=e1149]: •
+                - generic "Not linked to any menu dishes" [ref=e1150]: Unused in menu
+            - generic [ref=e1151]: £10.44
+          - generic [ref=e1152] [cursor=pointer]:
+            - generic [ref=e1153]:
+              - generic [ref=e1154]: Red wine sauce
+              - generic [ref=e1155]:
+                - generic [ref=e1156]: "Batch: 2.3795 l"
+                - generic [ref=e1157]: •
+                - generic "Not linked to any menu dishes" [ref=e1158]: Unused in menu
+            - generic [ref=e1159]: £56.85
+          - generic [ref=e1160] [cursor=pointer]:
+            - generic [ref=e1161]:
+              - generic [ref=e1162]: Blackberry BBQ sauce
+              - generic [ref=e1163]:
+                - generic [ref=e1164]: "Batch: 809.825 g"
+                - generic [ref=e1165]: •
+                - generic "Not linked to any menu dishes" [ref=e1166]: Unused in menu
+            - generic [ref=e1167]: £4.38
+          - generic [ref=e1168] [cursor=pointer]:
+            - generic [ref=e1169]:
+              - generic [ref=e1170]: BROWN SUGAR PARFAIT
+              - generic [ref=e1171]:
+                - generic [ref=e1172]: "Batch: 2.56 kg"
+                - generic [ref=e1173]: •
+                - generic "Not linked to any menu dishes" [ref=e1174]: Unused in menu
+            - generic [ref=e1175]: £13.34
+          - generic [ref=e1176] [cursor=pointer]:
+            - generic [ref=e1177]:
+              - generic [ref=e1178]: MACAROONS
+              - generic [ref=e1179]:
+                - generic [ref=e1180]: "Batch: 450 g"
+                - generic [ref=e1181]: •
+                - generic "Not linked to any menu dishes" [ref=e1182]: Unused in menu
+            - generic [ref=e1183]: £2.08
+          - generic [ref=e1184] [cursor=pointer]:
+            - generic [ref=e1185]:
+              - generic [ref=e1186]: Curry dressing
+              - generic [ref=e1187]:
+                - generic [ref=e1188]: "Batch: 249.075 ml"
+                - generic [ref=e1189]: •
+                - generic "Not linked to any menu dishes" [ref=e1190]: Unused in menu
+            - generic [ref=e1191]: £1.49
+          - generic [ref=e1192] [cursor=pointer]:
+            - generic [ref=e1193]:
+              - generic [ref=e1194]: TOMATO FONDUE
+              - generic [ref=e1195]:
+                - generic [ref=e1196]: "Batch: 1.5405 kg"
+                - generic [ref=e1197]: •
+                - generic "Not linked to any menu dishes" [ref=e1198]: Unused in menu
+            - generic [ref=e1199]: £9.27
+          - generic [ref=e1200] [cursor=pointer]:
+            - generic [ref=e1201]:
+              - generic [ref=e1202]: PEA PUREESOUP
+              - generic [ref=e1203]:
+                - generic [ref=e1204]: "Batch: 692.55 ml"
+                - generic [ref=e1205]: •
+                - generic "Not linked to any menu dishes" [ref=e1206]: Unused in menu
+            - generic [ref=e1207]: £7.02
+          - generic [ref=e1208] [cursor=pointer]:
+            - generic [ref=e1209]:
+              - generic [ref=e1210]: Chilli Vinegar
+              - generic [ref=e1211]:
+                - generic [ref=e1212]: "Batch: 375 ml"
+                - generic [ref=e1213]: •
+                - generic "Not linked to any menu dishes" [ref=e1214]: Unused in menu
+            - generic [ref=e1215]: £0.54
+          - generic [ref=e1216] [cursor=pointer]:
+            - generic [ref=e1217]:
+              - generic [ref=e1218]: TOMATO TERRINE
+              - generic [ref=e1219]:
+                - generic [ref=e1220]: "Batch: 1.3862 kg"
+                - generic [ref=e1221]: •
+                - generic "Not linked to any menu dishes" [ref=e1222]: Unused in menu
+            - generic [ref=e1223]: £3.27
+          - generic [ref=e1224] [cursor=pointer]:
+            - generic [ref=e1225]:
+              - generic [ref=e1226]: YOGHURT ICE CREAM
+              - generic [ref=e1227]:
+                - generic [ref=e1228]: "Batch: 601.5 g"
+                - generic [ref=e1229]: •
+                - generic "Not linked to any menu dishes" [ref=e1230]: Unused in menu
+            - generic [ref=e1231]: £3.74
+          - generic [ref=e1232] [cursor=pointer]:
+            - generic [ref=e1233]:
+              - generic [ref=e1234]: SALT CRUST
+              - generic [ref=e1235]:
+                - generic [ref=e1236]: "Batch: 1.1042 kg"
+                - generic [ref=e1237]: •
+                - generic "Not linked to any menu dishes" [ref=e1238]: Unused in menu
+            - generic [ref=e1239]: £3.61
+          - generic [ref=e1240] [cursor=pointer]:
+            - generic [ref=e1241]:
+              - generic [ref=e1242]: Tartar sauce
+              - generic [ref=e1243]:
+                - generic [ref=e1244]: "Batch: 1.412 kg"
+                - generic [ref=e1245]: •
+                - 'generic "Used in: • BEER BATTERED FISH & CHIPS" [ref=e1246]': "Used in: 1 dish"
+            - generic [ref=e1247]: £4.42
+          - generic [ref=e1248] [cursor=pointer]:
+            - generic [ref=e1249]:
+              - generic [ref=e1250]: CRAB MIX
+              - generic [ref=e1251]:
+                - generic [ref=e1252]: "Batch: 684.4625 g"
+                - generic [ref=e1253]: •
+                - generic "Not linked to any menu dishes" [ref=e1254]: Unused in menu
+            - generic [ref=e1255]: £30.50
+          - generic [ref=e1256] [cursor=pointer]:
+            - generic [ref=e1257]:
+              - generic [ref=e1258]: Mash potato
+              - generic [ref=e1259]:
+                - generic [ref=e1260]: "Batch: 8.75 kg"
+                - generic [ref=e1261]: •
+                - generic "Not linked to any menu dishes" [ref=e1262]: Unused in menu
+            - generic [ref=e1263]: £12.25
+          - generic [ref=e1264] [cursor=pointer]:
+            - generic [ref=e1265]:
+              - generic [ref=e1266]: FENNEL CRACKERS.
+              - generic [ref=e1267]:
+                - generic [ref=e1268]: "Batch: 379.4 g"
+                - generic [ref=e1269]: •
+                - generic "Not linked to any menu dishes" [ref=e1270]: Unused in menu
+            - generic [ref=e1271]: £0.64
+          - generic [ref=e1272] [cursor=pointer]:
+            - generic [ref=e1273]:
+              - generic [ref=e1274]: BEETROOT PUREE
+              - generic [ref=e1275]:
+                - generic [ref=e1276]: "Batch: 3.24 kg"
+                - generic [ref=e1277]: •
+                - generic "Not linked to any menu dishes" [ref=e1278]: Unused in menu
+            - generic [ref=e1279]: £6.42
+          - generic [ref=e1280] [cursor=pointer]:
+            - generic [ref=e1281]:
+              - generic [ref=e1282]: FENNEL AND TARRAGON PICKLING LIQUOR
+              - generic [ref=e1283]:
+                - generic [ref=e1284]: "Batch: 999.625 ml"
+                - generic [ref=e1285]: •
+                - generic "Not linked to any menu dishes" [ref=e1286]: Unused in menu
+            - generic [ref=e1287]: £2.03
+          - generic [ref=e1288] [cursor=pointer]:
+            - generic [ref=e1289]:
+              - generic [ref=e1290]: BOIS BOUDRAN SAUCE
+              - generic [ref=e1291]:
+                - generic [ref=e1292]: "Batch: 1.1533 kg"
+                - generic [ref=e1293]: •
+                - generic "Not linked to any menu dishes" [ref=e1294]: Unused in menu
+            - generic [ref=e1295]: £7.49
+          - generic [ref=e1296] [cursor=pointer]:
+            - generic [ref=e1297]:
+              - generic [ref=e1298]: Fajita saute╠ü
+              - generic [ref=e1299]:
+                - generic [ref=e1300]: "Batch: 1.2621 kg"
+                - generic [ref=e1301]: •
+                - generic "Not linked to any menu dishes" [ref=e1302]: Unused in menu
+            - generic [ref=e1303]: £4.90
+          - generic [ref=e1304] [cursor=pointer]:
+            - generic [ref=e1305]:
+              - generic [ref=e1306]: Garlic mayo
+              - generic [ref=e1307]:
+                - generic [ref=e1308]: "Batch: 2.1175 kg"
+                - generic [ref=e1309]: •
+                - generic "Not linked to any menu dishes" [ref=e1310]: Unused in menu
+            - generic [ref=e1311]: £4.45
+          - generic [ref=e1312] [cursor=pointer]:
+            - generic [ref=e1313]:
+              - generic [ref=e1314]: Vegan bacon mix
+              - generic [ref=e1315]:
+                - generic [ref=e1316]: "Batch: 110 ml"
+                - generic [ref=e1317]: •
+                - generic "Not linked to any menu dishes" [ref=e1318]: Unused in menu
+            - generic [ref=e1319]: £0.91
+          - generic [ref=e1320] [cursor=pointer]:
+            - generic [ref=e1321]:
+              - generic [ref=e1322]: Chocolate Hotpot
+              - generic [ref=e1323]:
+                - generic [ref=e1324]: "Batch: 2.2 kg"
+                - generic [ref=e1325]: •
+                - generic "Not linked to any menu dishes" [ref=e1326]: Unused in menu
+            - generic [ref=e1327]: £18.75
+          - generic [ref=e1328] [cursor=pointer]:
+            - generic [ref=e1329]:
+              - generic [ref=e1330]: Salmon gravalax
+              - generic [ref=e1331]:
+                - generic [ref=e1332]: "Batch: 1.125 kg"
+                - generic [ref=e1333]: •
+                - generic "Not linked to any menu dishes" [ref=e1334]: Unused in menu
+            - generic [ref=e1335]: £9.72
+          - generic [ref=e1336] [cursor=pointer]:
+            - generic [ref=e1337]:
+              - generic [ref=e1338]: Fish flour
+              - generic [ref=e1339]:
+                - generic [ref=e1340]: "Batch: 2.3309 kg"
+                - generic [ref=e1341]: •
+                - generic "Not linked to any menu dishes" [ref=e1342]: Unused in menu
+            - generic [ref=e1343]: £13.40
+          - generic [ref=e1344] [cursor=pointer]:
+            - generic [ref=e1345]:
+              - generic [ref=e1346]: Horseradish dressing
+              - generic [ref=e1347]:
+                - generic [ref=e1348]: "Batch: 332.5 ml"
+                - generic [ref=e1349]: •
+                - generic "Not linked to any menu dishes" [ref=e1350]: Unused in menu
+            - generic [ref=e1351]: £121.09
+          - generic [ref=e1352] [cursor=pointer]:
+            - generic [ref=e1353]:
+              - generic [ref=e1354]: FENNEL CRACKERS
+              - generic [ref=e1355]:
+                - generic [ref=e1356]: "Batch: 249.4 g"
+                - generic [ref=e1357]: •
+                - generic "Not linked to any menu dishes" [ref=e1358]: Unused in menu
+            - generic [ref=e1359]: £0.61
+          - generic [ref=e1360] [cursor=pointer]:
+            - generic [ref=e1361]:
+              - generic [ref=e1362]: old fashioned pork pie
+              - generic [ref=e1363]:
+                - generic [ref=e1364]: "Batch: 410 g"
+                - generic [ref=e1365]: •
+                - generic "Not linked to any menu dishes" [ref=e1366]: Unused in menu
+            - generic [ref=e1367]: £10.10
+          - generic [ref=e1368] [cursor=pointer]:
+            - generic [ref=e1369]:
+              - generic [ref=e1370]: DARK CHOCOLATE AND BRANDY SORBET
+              - generic [ref=e1371]:
+                - generic [ref=e1372]: "Batch: 1310 g"
+                - generic [ref=e1373]: •
+                - generic "Not linked to any menu dishes" [ref=e1374]: Unused in menu
+            - generic [ref=e1375]: £8.41
+          - generic [ref=e1376] [cursor=pointer]:
+            - generic [ref=e1377]:
+              - generic [ref=e1378]: Vegan sour cream
+              - generic [ref=e1379]:
+                - generic [ref=e1380]: "Batch: 151.6375 g"
+                - generic [ref=e1381]: •
+                - generic "Not linked to any menu dishes" [ref=e1382]: Unused in menu
+            - generic [ref=e1383]: £1.73
+          - generic [ref=e1384] [cursor=pointer]:
+            - generic [ref=e1385]:
+              - generic [ref=e1386]: ORANGE, CARDAMON AND BAY LEAF CARAMEL
+              - generic [ref=e1387]:
+                - generic [ref=e1388]: "Batch: 824 g"
+                - generic [ref=e1389]: •
+                - generic "Not linked to any menu dishes" [ref=e1390]: Unused in menu
+            - generic [ref=e1391]: £4.41
+          - generic [ref=e1392] [cursor=pointer]:
+            - generic [ref=e1393]:
+              - generic [ref=e1394]: TEST
+              - generic [ref=e1395]:
+                - generic [ref=e1396]: "Batch: 0.921 kg"
+                - generic [ref=e1397]: •
+                - generic "Not linked to any menu dishes" [ref=e1398]: Unused in menu
+            - generic [ref=e1399]: £7.21
+          - generic [ref=e1400] [cursor=pointer]:
+            - generic [ref=e1401]:
+              - generic [ref=e1402]: Crumble
+              - generic [ref=e1403]:
+                - generic [ref=e1404]: "Batch: 1 kg"
+                - generic [ref=e1405]: •
+                - generic "Not linked to any menu dishes" [ref=e1406]: Unused in menu
+            - generic [ref=e1407]: £2.13
+          - generic [ref=e1408] [cursor=pointer]:
+            - generic [ref=e1409]:
+              - generic [ref=e1410]: CELERIAC REMOULADE
+              - generic [ref=e1411]:
+                - generic [ref=e1412]: "Batch: 605 g"
+                - generic [ref=e1413]: •
+                - generic "Not linked to any menu dishes" [ref=e1414]: Unused in menu
+            - generic [ref=e1415]: £2.14
+          - generic [ref=e1416] [cursor=pointer]:
+            - generic [ref=e1417]:
+              - generic [ref=e1418]: BRESOLA.
+              - generic [ref=e1419]:
+                - generic [ref=e1420]: "Batch: 1.7871 l"
+                - generic [ref=e1421]: •
+                - generic "Not linked to any menu dishes" [ref=e1422]: Unused in menu
+            - generic [ref=e1423]: £4.74
+          - generic [ref=e1424] [cursor=pointer]:
+            - generic [ref=e1425]:
+              - generic [ref=e1426]: Sweet ginger sauce
+              - generic [ref=e1427]:
+                - generic [ref=e1428]: "Batch: 258.6 ml"
+                - generic [ref=e1429]: •
+                - generic "Not linked to any menu dishes" [ref=e1430]: Unused in menu
+            - generic [ref=e1431]: £0.61
+          - generic [ref=e1432] [cursor=pointer]:
+            - generic [ref=e1433]:
+              - generic [ref=e1434]: APPLE CHUTNEY
+              - generic [ref=e1435]:
+                - generic [ref=e1436]: "Batch: 2.1882 kg"
+                - generic [ref=e1437]: •
+                - generic "Not linked to any menu dishes" [ref=e1438]: Unused in menu
+            - generic [ref=e1439]: £14.70
+          - generic [ref=e1440] [cursor=pointer]:
+            - generic [ref=e1441]:
+              - generic [ref=e1442]: CARROT PICKLING LIQUOR
+              - generic [ref=e1443]:
+                - generic [ref=e1444]: "Batch: 1027.45 ml"
+                - generic [ref=e1445]: •
+                - generic "Not linked to any menu dishes" [ref=e1446]: Unused in menu
+            - generic [ref=e1447]: £3.40
+          - generic [ref=e1448] [cursor=pointer]:
+            - generic [ref=e1449]:
+              - generic [ref=e1450]: BLACKCURRANT SORBET
+              - generic [ref=e1451]:
+                - generic [ref=e1452]: "Batch: 1.75 kg"
+                - generic [ref=e1453]: •
+                - generic "Not linked to any menu dishes" [ref=e1454]: Unused in menu
+            - generic [ref=e1455]: £8.52
+          - generic [ref=e1456] [cursor=pointer]:
+            - generic [ref=e1457]:
+              - generic [ref=e1458]: CARROT GEL
+              - generic [ref=e1459]:
+                - generic [ref=e1460]: "Batch: 410 ml"
+                - generic [ref=e1461]: •
+                - generic "Not linked to any menu dishes" [ref=e1462]: Unused in menu
+            - generic [ref=e1463]: £2.06
+          - generic [ref=e1464] [cursor=pointer]:
+            - generic [ref=e1465]:
+              - generic [ref=e1466]: Pasta dough
+              - generic [ref=e1467]:
+                - generic [ref=e1468]: "Batch: 333 g"
+                - generic [ref=e1469]: •
+                - generic "Not linked to any menu dishes" [ref=e1470]: Unused in menu
+            - generic [ref=e1471]: £1.48
+          - generic [ref=e1472] [cursor=pointer]:
+            - generic [ref=e1473]:
+              - generic [ref=e1474]: Rice pudding
+              - generic [ref=e1475]:
+                - generic [ref=e1476]: "Batch: 4 l"
+                - generic [ref=e1477]: •
+                - generic "Not linked to any menu dishes" [ref=e1478]: Unused in menu
+            - generic [ref=e1479]: £6.39
+          - generic [ref=e1480] [cursor=pointer]:
+            - generic [ref=e1481]:
+              - generic [ref=e1482]: Beetroot Salmon gravalax
+              - generic [ref=e1483]:
+                - generic [ref=e1484]: "Batch: 1.65 kg"
+                - generic [ref=e1485]: •
+                - 'generic "Used in: • Beetroot Salmon Gravlax" [ref=e1486]': "Used in: 1 dish"
+            - generic [ref=e1487]: £10.30
+          - generic [ref=e1488] [cursor=pointer]:
+            - generic [ref=e1489]:
+              - generic [ref=e1490]: mushroom bourguignon
+              - generic [ref=e1491]:
+                - generic [ref=e1492]: "Batch: 3.2685 kg"
+                - generic [ref=e1493]: •
+                - generic "Not linked to any menu dishes" [ref=e1494]: Unused in menu
+            - generic [ref=e1495]: £10.02
+          - generic [ref=e1496] [cursor=pointer]:
+            - generic [ref=e1497]:
+              - generic [ref=e1498]: PERNOD GRAPESRAISINS
+              - generic [ref=e1499]:
+                - generic [ref=e1500]: "Batch: 487.7 ml"
+                - generic [ref=e1501]: •
+                - generic "Not linked to any menu dishes" [ref=e1502]: Unused in menu
+            - generic [ref=e1503]: £10.23
+          - generic [ref=e1504] [cursor=pointer]:
+            - generic [ref=e1505]:
+              - generic [ref=e1506]: PONZU SAUCE
+              - generic [ref=e1507]:
+                - generic [ref=e1508]: "Batch: 2816.125 g"
+                - generic [ref=e1509]: •
+                - generic "Not linked to any menu dishes" [ref=e1510]: Unused in menu
+            - generic [ref=e1511]: £20.73
+          - generic [ref=e1512] [cursor=pointer]:
+            - generic [ref=e1513]:
+              - generic [ref=e1514]: Rarebit
+              - generic [ref=e1515]:
+                - generic [ref=e1516]: "Batch: 1.0382 kg"
+                - generic [ref=e1517]: •
+                - generic "Not linked to any menu dishes" [ref=e1518]: Unused in menu
+            - generic [ref=e1519]: £7.78
+          - generic [ref=e1520] [cursor=pointer]:
+            - generic [ref=e1521]:
+              - generic [ref=e1522]: Prawn toast mix
+              - generic [ref=e1523]:
+                - generic [ref=e1524]: "Batch: 475.3 g"
+                - generic [ref=e1525]: •
+                - generic "Not linked to any menu dishes" [ref=e1526]: Unused in menu
+            - generic [ref=e1527]: £3.95
+          - generic [ref=e1528] [cursor=pointer]:
+            - generic [ref=e1529]:
+              - generic [ref=e1530]: BEETROOT PICKLING LIQUOR
+              - generic [ref=e1531]:
+                - generic [ref=e1532]: "Batch: 422.75 ml"
+                - generic [ref=e1533]: •
+                - generic "Not linked to any menu dishes" [ref=e1534]: Unused in menu
+            - generic [ref=e1535]: £0.88
+          - generic [ref=e1536] [cursor=pointer]:
+            - generic [ref=e1537]:
+              - generic [ref=e1538]: LEMON PARFAIT
+              - generic [ref=e1539]:
+                - generic [ref=e1540]: "Batch: 225 g"
+                - generic [ref=e1541]: •
+                - generic "Not linked to any menu dishes" [ref=e1542]: Unused in menu
+            - generic [ref=e1543]: £1.76
+          - generic [ref=e1544] [cursor=pointer]:
+            - generic [ref=e1545]:
+              - generic [ref=e1546]: OREO CHEESECAKE
+              - generic [ref=e1547]:
+                - generic [ref=e1548]: "Batch: 1.945 kg"
+                - generic [ref=e1549]: •
+                - generic "Not linked to any menu dishes" [ref=e1550]: Unused in menu
+            - generic [ref=e1551]: £17.98
+          - generic [ref=e1552] [cursor=pointer]:
+            - generic [ref=e1553]:
+              - generic [ref=e1554]: WILD MUSHROOM PUREE
+              - generic [ref=e1555]:
+                - generic [ref=e1556]: "Batch: 813.55 g"
+                - generic [ref=e1557]: •
+                - generic "Not linked to any menu dishes" [ref=e1558]: Unused in menu
+            - generic [ref=e1559]: £7.61
+          - generic [ref=e1560] [cursor=pointer]:
+            - generic [ref=e1561]:
+              - generic [ref=e1562]: Buffalo cauliflower marinate
+              - generic [ref=e1563]:
+                - generic [ref=e1564]: "Batch: 426.375 ml"
+                - generic [ref=e1565]: •
+                - generic "Not linked to any menu dishes" [ref=e1566]: Unused in menu
+            - generic [ref=e1567]: £1.41
+          - generic [ref=e1568] [cursor=pointer]:
+            - generic [ref=e1569]:
+              - generic [ref=e1570]: WHITE CHOCOLATE CHEESECAKE
+              - generic [ref=e1571]:
+                - generic [ref=e1572]: "Batch: 1.76 kg"
+                - generic [ref=e1573]: •
+                - generic "Not linked to any menu dishes" [ref=e1574]: Unused in menu
+            - generic [ref=e1575]: £16.30
+          - generic [ref=e1576] [cursor=pointer]:
+            - generic [ref=e1577]:
+              - generic [ref=e1578]: CITRUS SALMON CURE
+              - generic [ref=e1579]:
+                - generic [ref=e1580]: "Batch: 2.06 kg"
+                - generic [ref=e1581]: •
+                - generic "Not linked to any menu dishes" [ref=e1582]: Unused in menu
+            - generic [ref=e1583]: £18.55
+          - generic [ref=e1584] [cursor=pointer]:
+            - generic [ref=e1585]:
+              - generic [ref=e1586]: A LA GREQUE
+              - generic [ref=e1587]:
+                - generic [ref=e1588]: "Batch: 2.2142 l"
+                - generic [ref=e1589]: •
+                - generic "Not linked to any menu dishes" [ref=e1590]: Unused in menu
+            - generic [ref=e1591]: £17.16
+          - generic [ref=e1592] [cursor=pointer]:
+            - generic [ref=e1593]:
+              - generic [ref=e1594]: Chocolate Fudge
+              - generic [ref=e1595]:
+                - generic [ref=e1596]: "Batch: 2.61 kg"
+                - generic [ref=e1597]: •
+                - generic "Not linked to any menu dishes" [ref=e1598]: Unused in menu
+            - generic [ref=e1599]: £10.68
+          - generic [ref=e1600] [cursor=pointer]:
+            - generic [ref=e1601]:
+              - generic [ref=e1602]: ORANGE CURD
+              - generic [ref=e1603]:
+                - generic [ref=e1604]: "Batch: 809.6 g"
+                - generic [ref=e1605]: •
+                - generic "Not linked to any menu dishes" [ref=e1606]: Unused in menu
+            - generic [ref=e1607]: £6.39
+          - generic [ref=e1608] [cursor=pointer]:
+            - generic [ref=e1609]:
+              - generic [ref=e1610]: Biltong
+              - generic [ref=e1611]:
+                - generic [ref=e1612]: "Batch: 2.0333 kg"
+                - generic [ref=e1613]: •
+                - generic "Not linked to any menu dishes" [ref=e1614]: Unused in menu
+            - generic [ref=e1615]: £40.22
+          - generic [ref=e1616] [cursor=pointer]:
+            - generic [ref=e1617]:
+              - generic [ref=e1618]: LEMON POSSET
+              - generic [ref=e1619]:
+                - generic [ref=e1620]: "Batch: 2.25 l"
+                - generic [ref=e1621]: •
+                - generic "Not linked to any menu dishes" [ref=e1622]: Unused in menu
+            - generic [ref=e1623]: £11.10
+          - generic [ref=e1624] [cursor=pointer]:
+            - generic [ref=e1625]:
+              - generic [ref=e1626]: Sausage roll
+              - generic [ref=e1627]:
+                - generic [ref=e1628]: "Batch: 1.7325 kg"
+                - generic [ref=e1629]: •
+                - generic "Not linked to any menu dishes" [ref=e1630]: Unused in menu
+            - generic [ref=e1631]: £16.36
+          - generic [ref=e1632] [cursor=pointer]:
+            - generic [ref=e1633]:
+              - generic [ref=e1634]: BEEF CHEEK MARINADE COOKING LIQUOR
+              - generic [ref=e1635]:
+                - generic [ref=e1636]: "Batch: 2.55 kg"
+                - generic [ref=e1637]: •
+                - generic "Not linked to any menu dishes" [ref=e1638]: Unused in menu
+            - generic [ref=e1639]: £4.81
+          - generic [ref=e1640] [cursor=pointer]:
+            - generic [ref=e1641]:
+              - generic [ref=e1642]: Sage dressing
+              - generic [ref=e1643]:
+                - generic [ref=e1644]: "Batch: 602.45 ml"
+                - generic [ref=e1645]: •
+                - generic "Not linked to any menu dishes" [ref=e1646]: Unused in menu
+            - generic [ref=e1647]: £2.82
+          - generic [ref=e1648] [cursor=pointer]:
+            - generic [ref=e1649]:
+              - generic [ref=e1650]: CHRISTMAS PUDDING
+              - generic [ref=e1651]:
+                - generic [ref=e1652]: "Batch: 27.49 kg"
+                - generic [ref=e1653]: •
+                - generic "Not linked to any menu dishes" [ref=e1654]: Unused in menu
+            - generic [ref=e1655]: £325.58
+          - generic [ref=e1656] [cursor=pointer]:
+            - generic [ref=e1657]:
+              - generic [ref=e1658]: REDUCED STOCK
+              - generic [ref=e1659]:
+                - generic [ref=e1660]: "Batch: 2.4592 l"
+                - generic [ref=e1661]: •
+                - 'generic "Used in: • Peas À La Française" [ref=e1662]': "Used in: 1 dish"
+            - generic [ref=e1663]: £4.55
+          - generic [ref=e1664] [cursor=pointer]:
+            - generic [ref=e1665]:
+              - generic [ref=e1666]: Beignets
+              - generic [ref=e1667]:
+                - generic [ref=e1668]: "Batch: 1.848 kg"
+                - generic [ref=e1669]: •
+                - generic "Not linked to any menu dishes" [ref=e1670]: Unused in menu
+            - generic [ref=e1671]: £2.48
+          - generic [ref=e1672] [cursor=pointer]:
+            - generic [ref=e1673]:
+              - generic [ref=e1674]: Smoked garlic vinaigrette
+              - generic [ref=e1675]:
+                - generic [ref=e1676]: "Batch: 404.5 ml"
+                - generic [ref=e1677]: •
+                - generic "Not linked to any menu dishes" [ref=e1678]: Unused in menu
+            - generic [ref=e1679]: £2.01
+          - generic [ref=e1680] [cursor=pointer]:
+            - generic [ref=e1681]:
+              - generic [ref=e1682]: TREACLE TART
+              - generic [ref=e1683]:
+                - generic [ref=e1684]: "Batch: 1.258 kg"
+                - generic [ref=e1685]: •
+                - generic "Not linked to any menu dishes" [ref=e1686]: Unused in menu
+            - generic [ref=e1687]: £4.58
+          - generic [ref=e1688] [cursor=pointer]:
+            - generic [ref=e1689]:
+              - generic [ref=e1690]: Chocolate sauce
+              - generic [ref=e1691]:
+                - generic [ref=e1692]: "Batch: 560 g"
+                - generic [ref=e1693]: •
+                - generic "Not linked to any menu dishes" [ref=e1694]: Unused in menu
+            - generic [ref=e1695]: £1281.34
+          - generic [ref=e1696] [cursor=pointer]:
+            - generic [ref=e1697]:
+              - generic [ref=e1698]: Ragout
+              - generic [ref=e1699]:
+                - generic [ref=e1700]: "Batch: 815.05 g"
+                - generic [ref=e1701]: •
+                - generic "Not linked to any menu dishes" [ref=e1702]: Unused in menu
+            - generic [ref=e1703]: £15.80
+          - generic [ref=e1704] [cursor=pointer]:
+            - generic [ref=e1705]:
+              - generic [ref=e1706]: CHOCOLATE TRUFFLES
+              - generic [ref=e1707]:
+                - generic [ref=e1708]: "Batch: 750 g"
+                - generic [ref=e1709]: •
+                - generic "Not linked to any menu dishes" [ref=e1710]: Unused in menu
+            - generic [ref=e1711]: £9.95
+          - generic [ref=e1712] [cursor=pointer]:
+            - generic [ref=e1713]:
+              - generic [ref=e1714]: WATERMELON JELLY
+              - generic [ref=e1715]:
+                - generic [ref=e1716]: "Batch: 0.2 kg"
+                - generic [ref=e1717]: •
+                - generic "Not linked to any menu dishes" [ref=e1718]: Unused in menu
+            - generic [ref=e1719]: £6.32
+          - generic [ref=e1720] [cursor=pointer]:
+            - generic [ref=e1721]:
+              - generic [ref=e1722]: TARRAGON AND SHALLOT SALAD DRESSING
+              - generic [ref=e1723]:
+                - generic [ref=e1724]: "Batch: 4671.55 g"
+                - generic [ref=e1725]: •
+                - generic "Not linked to any menu dishes" [ref=e1726]: Unused in menu
+            - generic [ref=e1727]: £16.41
+          - generic [ref=e1728] [cursor=pointer]:
+            - generic [ref=e1729]:
+              - generic [ref=e1730]: Salt and pepper flour
+              - generic [ref=e1731]:
+                - generic [ref=e1732]: "Batch: 4.183 kg"
+                - generic [ref=e1733]: •
+                - generic "Not linked to any menu dishes" [ref=e1734]: Unused in menu
+            - generic [ref=e1735]: £16.50
+          - generic [ref=e1736] [cursor=pointer]:
+            - generic [ref=e1737]:
+              - generic [ref=e1738]: VINEGAR REDUCTION
+              - generic [ref=e1739]:
+                - generic [ref=e1740]: "Batch: 1.0285 l"
+                - generic [ref=e1741]: •
+                - generic "Not linked to any menu dishes" [ref=e1742]: Unused in menu
+            - generic [ref=e1743]: £4.55
+          - generic [ref=e1744] [cursor=pointer]:
+            - generic [ref=e1745]:
+              - generic [ref=e1746]: CARAMEL BANANAS
+              - generic [ref=e1747]:
+                - generic [ref=e1748]: "Batch: 626 g"
+                - generic [ref=e1749]: •
+                - generic "Not linked to any menu dishes" [ref=e1750]: Unused in menu
+            - generic [ref=e1751]: £6.81
+          - generic [ref=e1752] [cursor=pointer]:
+            - generic [ref=e1753]:
+              - generic [ref=e1754]: BRAISED RED CABBAGE
+              - generic [ref=e1755]:
+                - generic [ref=e1756]: "Batch: 2.373 kg"
+                - generic [ref=e1757]: •
+                - generic "Not linked to any menu dishes" [ref=e1758]: Unused in menu
+            - generic [ref=e1759]: £10.90
+          - generic [ref=e1760] [cursor=pointer]:
+            - generic [ref=e1761]:
+              - generic [ref=e1762]: CRUMBLE TOPPING
+              - generic [ref=e1763]:
+                - generic [ref=e1764]: "Batch: 1.04 kg"
+                - generic [ref=e1765]: •
+                - generic "Not linked to any menu dishes" [ref=e1766]: Unused in menu
+            - generic [ref=e1767]: £4.06
+          - generic [ref=e1768] [cursor=pointer]:
+            - generic [ref=e1769]:
+              - generic [ref=e1770]: CORN STOCK
+              - generic [ref=e1771]:
+                - generic [ref=e1772]: "Batch: 4.9192 kg"
+                - generic [ref=e1773]: •
+                - generic "Not linked to any menu dishes" [ref=e1774]: Unused in menu
+            - generic [ref=e1775]: £25.84
+          - generic [ref=e1776] [cursor=pointer]:
+            - generic [ref=e1777]:
+              - generic [ref=e1778]: APPLE AND ROASTED FENNEL SLAW
+              - generic [ref=e1779]:
+                - generic [ref=e1780]: "Batch: 184.125 g"
+                - generic [ref=e1781]: •
+                - generic "Not linked to any menu dishes" [ref=e1782]: Unused in menu
+            - generic [ref=e1783]: £1.91
+          - generic [ref=e1784] [cursor=pointer]:
+            - generic [ref=e1785]:
+              - generic [ref=e1786]: BRINE
+              - generic [ref=e1787]:
+                - generic [ref=e1788]: "Batch: 1.016 kg"
+                - generic [ref=e1789]: •
+                - generic "Not linked to any menu dishes" [ref=e1790]: Unused in menu
+            - generic [ref=e1791]: £2.22
+          - generic [ref=e1792] [cursor=pointer]:
+            - generic [ref=e1793]:
+              - generic [ref=e1794]: Caesar dressing
+              - generic [ref=e1795]:
+                - generic [ref=e1796]: "Batch: 619 g"
+                - generic [ref=e1797]: •
+                - generic "Not linked to any menu dishes" [ref=e1798]: Unused in menu
+            - generic [ref=e1799]: £5.07
+          - generic [ref=e1800] [cursor=pointer]:
+            - generic [ref=e1801]:
+              - generic [ref=e1802]: BABY GEM LETTUCE GEL
+              - generic [ref=e1803]:
+                - generic [ref=e1804]: "Batch: 1.85 ea"
+                - generic [ref=e1805]: •
+                - generic "Not linked to any menu dishes" [ref=e1806]: Unused in menu
+            - generic [ref=e1807]: £1.07
+          - generic [ref=e1808] [cursor=pointer]:
+            - generic [ref=e1809]:
+              - generic [ref=e1810]: DUCK DRESSING
+              - generic [ref=e1811]:
+                - generic [ref=e1812]: "Batch: 274 g"
+                - generic [ref=e1813]: •
+                - generic "Not linked to any menu dishes" [ref=e1814]: Unused in menu
+            - generic [ref=e1815]: £1.37
+          - generic [ref=e1816] [cursor=pointer]:
+            - generic [ref=e1817]:
+              - generic [ref=e1818]: WHITE BEAN SAUCE
+              - generic [ref=e1819]:
+                - generic [ref=e1820]: "Batch: 2218.3 ml"
+                - generic [ref=e1821]: •
+                - generic "Not linked to any menu dishes" [ref=e1822]: Unused in menu
+            - generic [ref=e1823]: £43.28
+          - generic [ref=e1824] [cursor=pointer]:
+            - generic [ref=e1825]:
+              - generic [ref=e1826]: CAULIFLOWER PUREE
+              - generic [ref=e1827]:
+                - generic [ref=e1828]: "Batch: 1.4026 kg"
+                - generic [ref=e1829]: •
+                - generic "Not linked to any menu dishes" [ref=e1830]: Unused in menu
+            - generic [ref=e1831]: £43.07
+          - generic [ref=e1832] [cursor=pointer]:
+            - generic [ref=e1833]:
+              - generic [ref=e1834]: GYPSY TART FILLING
+              - generic [ref=e1835]:
+                - generic [ref=e1836]: "Batch: 780 ml"
+                - generic [ref=e1837]: •
+                - generic "Not linked to any menu dishes" [ref=e1838]: Unused in menu
+            - generic [ref=e1839]: £3.21
+          - generic [ref=e1840] [cursor=pointer]:
+            - generic [ref=e1841]:
+              - generic [ref=e1842]: Bacon Salt
+              - generic [ref=e1843]:
+                - generic [ref=e1844]: "Batch: 800 g"
+                - generic [ref=e1845]: •
+                - generic "Not linked to any menu dishes" [ref=e1846]: Unused in menu
+            - generic [ref=e1847]: £2.74
+          - generic [ref=e1848] [cursor=pointer]:
+            - generic [ref=e1849]:
+              - generic [ref=e1850]: SPOTTED DOG SODA BREAD
+              - generic [ref=e1851]:
+                - generic [ref=e1852]: "Batch: 1371 g"
+                - generic [ref=e1853]: •
+                - generic "Not linked to any menu dishes" [ref=e1854]: Unused in menu
+            - generic [ref=e1855]: £3.02
+          - generic [ref=e1856] [cursor=pointer]:
+            - generic [ref=e1857]:
+              - generic [ref=e1858]: Curried Powder
+              - generic [ref=e1859]:
+                - generic [ref=e1860]: "Batch: 181.05 ml"
+                - generic [ref=e1861]: •
+                - generic "Not linked to any menu dishes" [ref=e1862]: Unused in menu
+            - generic [ref=e1863]: £4.07
+          - generic [ref=e1864] [cursor=pointer]:
+            - generic [ref=e1865]:
+              - generic [ref=e1866]: Pasta egg free
+              - generic [ref=e1867]:
+                - generic [ref=e1868]: "Batch: 1.2352 kg"
+                - generic [ref=e1869]: •
+                - generic "Not linked to any menu dishes" [ref=e1870]: Unused in menu
+            - generic [ref=e1871]: £0.89
+          - generic [ref=e1872] [cursor=pointer]:
+            - generic [ref=e1873]:
+              - generic [ref=e1874]: ITALIAN MERINGUE
+              - generic [ref=e1875]:
+                - generic [ref=e1876]: "Batch: 500 g"
+                - generic [ref=e1877]: •
+                - generic "Not linked to any menu dishes" [ref=e1878]: Unused in menu
+            - generic [ref=e1879]: £1.26
+          - generic [ref=e1880] [cursor=pointer]:
+            - generic [ref=e1881]:
+              - generic [ref=e1882]: Cre╠Çme Anglaise
+              - generic [ref=e1883]:
+                - generic [ref=e1884]: "Batch: 1.92 l"
+                - generic [ref=e1885]: •
+                - generic "Not linked to any menu dishes" [ref=e1886]: Unused in menu
+            - generic [ref=e1887]: £9.86
+          - generic [ref=e1888] [cursor=pointer]:
+            - generic [ref=e1889]:
+              - generic [ref=e1890]: TUILLE MIX
+              - generic [ref=e1891]:
+                - generic [ref=e1892]: "Batch: 15.75 kg"
+                - generic [ref=e1893]: •
+                - generic "Not linked to any menu dishes" [ref=e1894]: Unused in menu
+            - generic [ref=e1895]: £77.60
+          - generic [ref=e1896] [cursor=pointer]:
+            - generic [ref=e1897]:
+              - generic [ref=e1898]: HAND ROLLED NOODLES
+              - generic [ref=e1899]:
+                - generic [ref=e1900]: "Batch: 375 g"
+                - generic [ref=e1901]: •
+                - generic "Not linked to any menu dishes" [ref=e1902]: Unused in menu
+            - generic [ref=e1903]: £0.17
+          - generic [ref=e1904] [cursor=pointer]:
+            - generic [ref=e1905]:
+              - generic [ref=e1906]: SWEETCORN PUREE
+              - generic [ref=e1907]:
+                - generic [ref=e1908]: "Batch: 500 g"
+                - generic [ref=e1909]: •
+                - generic "Not linked to any menu dishes" [ref=e1910]: Unused in menu
+            - generic [ref=e1911]: £1.25
+          - generic [ref=e1912] [cursor=pointer]:
+            - generic [ref=e1913]:
+              - generic [ref=e1914]: RED PEPPER PUREE
+              - generic [ref=e1915]:
+                - generic [ref=e1916]: "Batch: 41.5 g"
+                - generic [ref=e1917]: •
+                - generic "Not linked to any menu dishes" [ref=e1918]: Unused in menu
+            - generic [ref=e1919]: £0.66
+          - generic [ref=e1920] [cursor=pointer]:
+            - generic [ref=e1921]:
+              - generic [ref=e1922]: BUTTERNUT SQUASH AND PUMPKIN PUREESOUP
+              - generic [ref=e1923]:
+                - generic [ref=e1924]: "Batch: 5.1765 kg"
+                - generic [ref=e1925]: •
+                - generic "Not linked to any menu dishes" [ref=e1926]: Unused in menu
+            - generic [ref=e1927]: £35.14
+          - generic [ref=e1928] [cursor=pointer]:
+            - generic [ref=e1929]:
+              - generic [ref=e1930]: FISH BUTTER
+              - generic [ref=e1931]:
+                - generic [ref=e1932]: "Batch: 583.54 g"
+                - generic [ref=e1933]: •
+                - generic "Not linked to any menu dishes" [ref=e1934]: Unused in menu
+            - generic [ref=e1935]: £5.43
+          - generic [ref=e1936] [cursor=pointer]:
+            - generic [ref=e1937]:
+              - generic [ref=e1938]: CARROT PUREE
+              - generic [ref=e1939]:
+                - generic [ref=e1940]: "Batch: 1.9217 kg"
+                - generic [ref=e1941]: •
+                - generic "Not linked to any menu dishes" [ref=e1942]: Unused in menu
+            - generic [ref=e1943]: £28.48
+          - generic [ref=e1944] [cursor=pointer]:
+            - generic [ref=e1945]:
+              - generic [ref=e1946]: PARFAIT
+              - generic [ref=e1947]:
+                - generic [ref=e1948]: "Batch: 2.8 kg"
+                - generic [ref=e1949]: •
+                - generic "Not linked to any menu dishes" [ref=e1950]: Unused in menu
+            - generic [ref=e1951]: £23.60
+          - generic [ref=e1952] [cursor=pointer]:
+            - generic [ref=e1953]:
+              - generic [ref=e1954]: MUSHROOM DEXULLE
+              - generic [ref=e1955]:
+                - generic [ref=e1956]: "Batch: 515 ml"
+                - generic [ref=e1957]: •
+                - generic "Not linked to any menu dishes" [ref=e1958]: Unused in menu
+            - generic [ref=e1959]: £2.02
+          - generic [ref=e1960] [cursor=pointer]:
+            - generic [ref=e1961]:
+              - generic [ref=e1962]: Blue cheese sauce
+              - generic [ref=e1963]:
+                - generic [ref=e1964]: "Batch: 8.407 l"
+                - generic [ref=e1965]: •
+                - generic "Not linked to any menu dishes" [ref=e1966]: Unused in menu
+            - generic [ref=e1967]: £19.53
+          - generic [ref=e1968] [cursor=pointer]:
+            - generic [ref=e1969]:
+              - generic [ref=e1970]: BBQ jackfruit
+              - generic [ref=e1971]:
+                - generic [ref=e1972]: "Batch: 235 g"
+                - generic [ref=e1973]: •
+                - generic "Not linked to any menu dishes" [ref=e1974]: Unused in menu
+            - generic [ref=e1975]: £0.64
+          - generic [ref=e1976] [cursor=pointer]:
+            - generic [ref=e1977]:
+              - generic [ref=e1978]: MULLED WINE
+              - generic [ref=e1979]:
+                - generic [ref=e1980]: "Batch: 0.373 kg"
+                - generic [ref=e1981]: •
+                - generic "Not linked to any menu dishes" [ref=e1982]: Unused in menu
+            - generic [ref=e1983]: £2.87
+          - generic [ref=e1984] [cursor=pointer]:
+            - generic [ref=e1985]:
+              - generic [ref=e1986]: Homemade Crisps
+              - generic [ref=e1987]:
+                - generic [ref=e1988]: "Batch: 121.5 g"
+                - generic [ref=e1989]: •
+                - generic "Not linked to any menu dishes" [ref=e1990]: Unused in menu
+            - generic [ref=e1991]: £0.10
+          - generic [ref=e1992] [cursor=pointer]:
+            - generic [ref=e1993]:
+              - generic [ref=e1994]: SALMON AND CRAB FISH CAKE
+              - generic [ref=e1995]:
+                - generic [ref=e1996]: "Batch: 2620.7125 g"
+                - generic [ref=e1997]: •
+                - generic "Not linked to any menu dishes" [ref=e1998]: Unused in menu
+            - generic [ref=e1999]: £45.21
+          - generic [ref=e2000] [cursor=pointer]:
+            - generic [ref=e2001]:
+              - generic [ref=e2002]: CRACKED BLACK PEPPER AND SEA SALT BREAD DOUGH
+              - generic [ref=e2003]:
+                - generic [ref=e2004]: "Batch: 662.75 g"
+                - generic [ref=e2005]: •
+                - generic "Not linked to any menu dishes" [ref=e2006]: Unused in menu
+            - generic [ref=e2007]: £1.06
+          - generic [ref=e2008] [cursor=pointer]:
+            - generic [ref=e2009]:
+              - generic [ref=e2010]: Chips
+              - generic [ref=e2011]:
+                - generic [ref=e2012]: "Batch: 8.1 kg"
+                - generic [ref=e2013]: •
+                - 'generic "Used in: • Fried Chilli & Garlic Halloumi Burger • BEER BATTERED FISH & CHIPS • Cheesy Chips • 10oz Rump Steak" [ref=e2014]': "Used in: 4 dishes"
+            - generic [ref=e2015]: £6.90
+          - generic [ref=e2016] [cursor=pointer]:
+            - generic [ref=e2017]:
+              - generic [ref=e2018]: Banana Mousse - Vegan
+              - generic [ref=e2019]:
+                - generic [ref=e2020]: "Batch: 3.035 kg"
+                - generic [ref=e2021]: •
+                - generic "Not linked to any menu dishes" [ref=e2022]: Unused in menu
+            - generic [ref=e2023]: £8.42
+          - generic [ref=e2024] [cursor=pointer]:
+            - generic [ref=e2025]:
+              - generic [ref=e2026]: Marinated chicken
+              - generic [ref=e2027]:
+                - generic [ref=e2028]: "Batch: 95.9 ml"
+                - generic [ref=e2029]: •
+                - generic "Not linked to any menu dishes" [ref=e2030]: Unused in menu
+            - generic [ref=e2031]: £0.49
+          - generic [ref=e2032] [cursor=pointer]:
+            - generic [ref=e2033]:
+              - generic [ref=e2034]: PICKLED KOHLRABI
+              - generic [ref=e2035]:
+                - generic [ref=e2036]: "Batch: 530 ml"
+                - generic [ref=e2037]: •
+                - generic "Not linked to any menu dishes" [ref=e2038]: Unused in menu
+            - generic [ref=e2039]: £46.72
+          - generic [ref=e2040] [cursor=pointer]:
+            - generic [ref=e2041]:
+              - generic [ref=e2042]: CHICKEN MOUSSE
+              - generic [ref=e2043]:
+                - generic [ref=e2044]: "Batch: 1156.66 g"
+                - generic [ref=e2045]: •
+                - generic "Not linked to any menu dishes" [ref=e2046]: Unused in menu
+            - generic [ref=e2047]: £23.66
+          - generic [ref=e2048] [cursor=pointer]:
+            - generic [ref=e2049]:
+              - generic [ref=e2050]: PORK BELLY BRAISING LIQUOR
+              - generic [ref=e2051]:
+                - generic [ref=e2052]: "Batch: 6791.325 g"
+                - generic [ref=e2053]: •
+                - generic "Not linked to any menu dishes" [ref=e2054]: Unused in menu
+            - generic [ref=e2055]: £175.62
+          - generic [ref=e2056] [cursor=pointer]:
+            - generic [ref=e2057]:
+              - generic [ref=e2058]: BLACK PEPPER VINEGAR REDUCTION
+              - generic [ref=e2059]:
+                - generic [ref=e2060]: "Batch: 2.2504 l"
+                - generic [ref=e2061]: •
+                - generic "Not linked to any menu dishes" [ref=e2062]: Unused in menu
+            - generic [ref=e2063]: £6.72
+          - generic [ref=e2064] [cursor=pointer]:
+            - generic [ref=e2065]:
+              - generic [ref=e2066]: Pickle mix
+              - generic [ref=e2067]:
+                - generic [ref=e2068]: "Batch: 1.5522 l"
+                - generic [ref=e2069]: •
+                - generic "Not linked to any menu dishes" [ref=e2070]: Unused in menu
+            - generic [ref=e2071]: £2.47
+          - generic [ref=e2072] [cursor=pointer]:
+            - generic [ref=e2073]:
+              - generic [ref=e2074]: PISTACHIO SPONGE
+              - generic [ref=e2075]:
+                - generic [ref=e2076]: "Batch: 2.25 kg"
+                - generic [ref=e2077]: •
+                - generic "Not linked to any menu dishes" [ref=e2078]: Unused in menu
+            - generic [ref=e2079]: £22.10
+          - generic [ref=e2080] [cursor=pointer]:
+            - generic [ref=e2081]:
+              - generic [ref=e2082]: Chorizo and Apple Sausage Roll
+              - generic [ref=e2083]:
+                - generic [ref=e2084]: "Batch: 1 kg"
+                - generic [ref=e2085]: •
+                - generic "Not linked to any menu dishes" [ref=e2086]: Unused in menu
+            - generic [ref=e2087]: £6.29
+          - generic [ref=e2088] [cursor=pointer]:
+            - generic [ref=e2089]:
+              - generic [ref=e2090]: RED CABBAGE PICKLING LIQUOR
+              - generic [ref=e2091]:
+                - generic [ref=e2092]: "Batch: 571.4 ml"
+                - generic [ref=e2093]: •
+                - generic "Not linked to any menu dishes" [ref=e2094]: Unused in menu
+            - generic [ref=e2095]: £1.87
+          - generic [ref=e2096] [cursor=pointer]:
+            - generic [ref=e2097]:
+              - generic [ref=e2098]: Vegetable stock
+              - generic [ref=e2099]:
+                - generic [ref=e2100]: "Batch: 8.9 ml"
+                - generic [ref=e2101]: •
+                - generic "Not linked to any menu dishes" [ref=e2102]: Unused in menu
+            - generic [ref=e2103]: £0.52
+          - generic [ref=e2104] [cursor=pointer]:
+            - generic [ref=e2105]:
+              - generic [ref=e2106]: SPICE MIX
+              - generic [ref=e2107]:
+                - generic [ref=e2108]: "Batch: 137.65 g"
+                - generic [ref=e2109]: •
+                - generic "Not linked to any menu dishes" [ref=e2110]: Unused in menu
+            - generic [ref=e2111]: £3.56
+          - generic [ref=e2112] [cursor=pointer]:
+            - generic [ref=e2113]:
+              - generic [ref=e2114]: SOUR DOUGH CULTURE
+              - generic [ref=e2115]:
+                - generic [ref=e2116]: "Batch: 150 g"
+                - generic [ref=e2117]: •
+                - generic "Not linked to any menu dishes" [ref=e2118]: Unused in menu
+            - generic [ref=e2119]: £0.23
+          - generic [ref=e2120] [cursor=pointer]:
+            - generic [ref=e2121]:
+              - generic [ref=e2122]: BEETROOT SALAD DRESSING
+              - generic [ref=e2123]:
+                - generic [ref=e2124]: "Batch: 4.4519 l"
+                - generic [ref=e2125]: •
+                - generic "Not linked to any menu dishes" [ref=e2126]: Unused in menu
+            - generic [ref=e2127]: £14.51
+          - generic [ref=e2128] [cursor=pointer]:
+            - generic [ref=e2129]:
+              - generic [ref=e2130]: PARSNIP PUREE
+              - generic [ref=e2131]:
+                - generic [ref=e2132]: "Batch: 531.55 ml"
+                - generic [ref=e2133]: •
+                - generic "Not linked to any menu dishes" [ref=e2134]: Unused in menu
+            - generic [ref=e2135]: £3.07
+          - generic [ref=e2136] [cursor=pointer]:
+            - generic [ref=e2137]:
+              - generic [ref=e2138]: Ice-cream base
+              - generic [ref=e2139]:
+                - generic [ref=e2140]: "Batch: 6.1 kg"
+                - generic [ref=e2141]: •
+                - generic "Not linked to any menu dishes" [ref=e2142]: Unused in menu
+            - generic [ref=e2143]: £9.54
+          - generic [ref=e2144] [cursor=pointer]:
+            - generic [ref=e2145]:
+              - generic [ref=e2146]: BREAD DOUGH
+              - generic [ref=e2147]:
+                - generic [ref=e2148]: "Batch: 2.3878 kg"
+                - generic [ref=e2149]: •
+                - generic "Not linked to any menu dishes" [ref=e2150]: Unused in menu
+            - generic [ref=e2151]: £2.89
+          - generic [ref=e2152] [cursor=pointer]:
+            - generic [ref=e2153]:
+              - generic [ref=e2154]: Croissants
+              - generic [ref=e2155]:
+                - generic [ref=e2156]: "Batch: 1.278 kg"
+                - generic [ref=e2157]: •
+                - generic "Not linked to any menu dishes" [ref=e2158]: Unused in menu
+            - generic [ref=e2159]: £2.94
+          - generic [ref=e2160] [cursor=pointer]:
+            - generic [ref=e2161]:
+              - generic [ref=e2162]: SHORTBREAD
+              - generic [ref=e2163]:
+                - generic [ref=e2164]: "Batch: 484.5 g"
+                - generic [ref=e2165]: •
+                - generic "Not linked to any menu dishes" [ref=e2166]: Unused in menu
+            - generic [ref=e2167]: £1.70
+          - generic [ref=e2168] [cursor=pointer]:
+            - generic [ref=e2169]:
+              - generic [ref=e2170]: Vanilla foam
+              - generic [ref=e2171]:
+                - generic [ref=e2172]: "Batch: 273 ml"
+                - generic [ref=e2173]: •
+                - generic "Not linked to any menu dishes" [ref=e2174]: Unused in menu
+            - generic [ref=e2175]: £6.11
+          - generic [ref=e2176] [cursor=pointer]:
+            - generic [ref=e2177]:
+              - generic [ref=e2178]: SALT MERINGUE
+              - generic [ref=e2179]:
+                - generic [ref=e2180]: "Batch: 1.425 kg"
+                - generic [ref=e2181]: •
+                - generic "Not linked to any menu dishes" [ref=e2182]: Unused in menu
+            - generic [ref=e2183]: £2.23
+          - generic [ref=e2184] [cursor=pointer]:
+            - generic [ref=e2185]:
+              - generic [ref=e2186]: SALT CARAMEL SAUCE
+              - generic [ref=e2187]:
+                - generic [ref=e2188]: "Batch: 830 g"
+                - generic [ref=e2189]: •
+                - generic "Not linked to any menu dishes" [ref=e2190]: Unused in menu
+            - generic [ref=e2191]: £3.01
+          - generic [ref=e2192] [cursor=pointer]:
+            - generic [ref=e2193]:
+              - generic [ref=e2194]: BASIC PICKLING LIQUOR
+              - generic [ref=e2195]:
+                - generic [ref=e2196]: "Batch: 420.5 ml"
+                - generic [ref=e2197]: •
+                - generic "Not linked to any menu dishes" [ref=e2198]: Unused in menu
+            - generic [ref=e2199]: £4.06
+          - generic [ref=e2200] [cursor=pointer]:
+            - generic [ref=e2201]:
+              - generic [ref=e2202]: Herb butter
+              - generic [ref=e2203]:
+                - generic [ref=e2204]: "Batch: 54.375 g"
+                - generic [ref=e2205]: •
+                - generic "Not linked to any menu dishes" [ref=e2206]: Unused in menu
+            - generic [ref=e2207]: £0.54
+          - generic [ref=e2208] [cursor=pointer]:
+            - generic [ref=e2209]:
+              - generic [ref=e2210]: VANILLA ICE CREAM BASE
+              - generic [ref=e2211]:
+                - generic [ref=e2212]: "Batch: 3.6 l"
+                - generic [ref=e2213]: •
+                - generic "Not linked to any menu dishes" [ref=e2214]: Unused in menu
+            - generic [ref=e2215]: £20.68
+          - generic [ref=e2216] [cursor=pointer]:
+            - generic [ref=e2217]:
+              - generic [ref=e2218]: Imam bayildi
+              - generic [ref=e2219]:
+                - generic [ref=e2220]: "Batch: 440.9 ml"
+                - generic [ref=e2221]: •
+                - generic "Not linked to any menu dishes" [ref=e2222]: Unused in menu
+            - generic [ref=e2223]: £3.22
+          - generic [ref=e2224] [cursor=pointer]:
+            - generic [ref=e2225]:
+              - generic [ref=e2226]: CHOUX PASTE
+              - generic [ref=e2227]:
+                - generic [ref=e2228]: "Batch: 1.5 kg"
+                - generic [ref=e2229]: •
+                - generic "Not linked to any menu dishes" [ref=e2230]: Unused in menu
+            - generic [ref=e2231]: £14.05
+      - generic [ref=e2233]:
+        - img [ref=e2234]
+        - generic [ref=e2238]: Select a recipe to view formulation

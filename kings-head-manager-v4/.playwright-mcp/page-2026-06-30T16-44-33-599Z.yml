@@ -1,0 +1,468 @@
+- generic [ref=e3]:
+  - navigation [ref=e4]:
+    - generic [ref=e6]: King's Head v4
+    - generic [ref=e7]:
+      - button "Dashboard" [ref=e79] [cursor=pointer]:
+        - img [ref=e10]
+        - generic [ref=e80]: Dashboard
+      - button "Kitchen" [active] [ref=e81] [cursor=pointer]:
+        - img [ref=e16]
+        - generic [ref=e82]: Kitchen
+        - img [ref=e83]
+      - button "Pantry" [ref=e85] [cursor=pointer]:
+        - img [ref=e22]
+        - generic [ref=e86]: Pantry
+      - button "Supplier Catalogue" [ref=e87] [cursor=pointer]:
+        - img [ref=e27]
+        - generic [ref=e88]: Supplier Catalogue
+      - button "Recipes" [ref=e89] [cursor=pointer]:
+        - img [ref=e31]
+        - generic [ref=e90]: Recipes
+      - button "Dishes" [ref=e91] [cursor=pointer]:
+        - img [ref=e34]
+        - generic [ref=e92]: Dishes
+      - button "Front of House" [ref=e93] [cursor=pointer]:
+        - img [ref=e39]
+        - generic [ref=e94]: Front of House
+      - button "Stock" [ref=e95] [cursor=pointer]:
+        - img [ref=e43]
+        - generic [ref=e96]: Stock
+      - button "Invoices" [ref=e97] [cursor=pointer]:
+        - img [ref=e54]
+        - generic [ref=e98]: Invoices
+      - button "Suppliers" [ref=e99] [cursor=pointer]:
+        - img [ref=e60]
+        - generic [ref=e100]: Suppliers
+      - button "Help" [ref=e101] [cursor=pointer]:
+        - img [ref=e66]
+        - generic [ref=e102]: Help
+    - generic [ref=e70]: Version 4.0.0
+  - main [ref=e71]:
+    - heading "dashboard" [level=1] [ref=e73]
+    - generic [ref=e75]:
+      - generic [ref=e76]:
+        - generic [ref=e77] [cursor=pointer]:
+          - generic [ref=e103]:
+            - generic [ref=e104]: Master Pantry
+            - img [ref=e105]
+          - generic [ref=e109]: "392"
+          - generic [ref=e110]:
+            - img [ref=e111]
+            - generic [ref=e114]: 94% Audited & Verified
+        - generic [ref=e115] [cursor=pointer]:
+          - generic [ref=e116]:
+            - generic [ref=e117]: Formulations (Recipes)
+            - img [ref=e118]
+          - generic [ref=e122]: "269"
+          - generic [ref=e123]:
+            - img [ref=e124]
+            - generic [ref=e127]: Active Prep Base
+        - generic [ref=e128] [cursor=pointer]:
+          - generic [ref=e129]:
+            - generic [ref=e130]: Menu Dishes (GP%)
+            - img [ref=e131]
+          - generic [ref=e134]: "73"
+          - generic [ref=e136]: 72% Target GP
+      - generic [ref=e137]:
+        - generic [ref=e138]:
+          - generic [ref=e139]:
+            - generic [ref=e140]:
+              - heading "Catalog Freshness" [level=3] [ref=e141]:
+                - img [ref=e142]
+                - text: Catalog Freshness
+              - generic [ref=e145]: 4 stale
+            - generic [ref=e146]:
+              - generic [ref=e147]:
+                - generic [ref=e148]: Urban
+                - generic [ref=e149]:
+                  - generic [ref=e150]: 3,889 products
+                  - generic [ref=e151]: 118d ago
+              - generic [ref=e152]:
+                - generic [ref=e153]: David Catt
+                - generic [ref=e154]:
+                  - generic [ref=e155]: 3,281 products
+                  - generic [ref=e156]: 117d ago
+              - generic [ref=e157]:
+                - generic [ref=e158]: Crouch
+                - generic [ref=e159]:
+                  - generic [ref=e160]: 16 products
+                  - generic [ref=e161]: 116d ago
+              - generic [ref=e162]:
+                - generic [ref=e163]: Cranbrook
+                - generic [ref=e164]:
+                  - generic [ref=e165]: 13 products
+                  - generic [ref=e166]: 116d ago
+              - generic [ref=e167]:
+                - generic [ref=e168]: Booker
+                - generic [ref=e169]:
+                  - generic [ref=e170]: 4,998 products
+                  - generic [ref=e171]: Today
+          - generic [ref=e172]:
+            - heading "Database Health & Integrity" [level=3] [ref=e173]
+            - generic [ref=e174]:
+              - generic [ref=e175]:
+                - generic [ref=e176]: "Incomplete Stubs:"
+                - generic [ref=e177]: 0 items
+              - generic [ref=e178]:
+                - generic [ref=e179]: "Preferred Supplier Setup:"
+                - generic [ref=e180]: 391 / 392
+              - generic [ref=e181]:
+                - generic [ref=e182]: "Calorie Data Completeness:"
+                - generic [ref=e183]: 307 / 392 items
+          - generic [ref=e184]:
+            - heading "Smart Stock Flags" [level=3] [ref=e186]:
+              - img [ref=e187]
+              - text: Smart Stock Flags
+            - generic [ref=e189]:
+              - img [ref=e191]
+              - generic [ref=e193]:
+                - generic [ref=e194]: All holdings verified
+                - generic [ref=e195]: No statistical outliers or negative stock levels detected in your pantry.
+          - generic [ref=e196]:
+            - generic [ref=e197]:
+              - heading "Pricing Health" [level=3] [ref=e198]:
+                - img [ref=e199]
+                - text: Pricing Health
+              - generic [ref=e201]: 16 Issues
+            - generic [ref=e202]:
+              - generic [ref=e203]:
+                - generic "Click to fix \"xanthan gum\" in Pantry" [ref=e204] [cursor=pointer]:
+                  - img [ref=e206]
+                  - generic [ref=e208]:
+                    - generic [ref=e209]:
+                      - generic [ref=e210]: xanthan gum
+                      - generic [ref=e211]: Price outlier
+                    - paragraph [ref=e212]: £44.78/kg vs category median £6.98/kg — possible unit error.
+                - button "Dismiss this alert" [ref=e213] [cursor=pointer]:
+                  - img [ref=e214]
+              - generic [ref=e217]:
+                - generic "Click to fix \"Agar-agar\" in Pantry" [ref=e218] [cursor=pointer]:
+                  - img [ref=e220]
+                  - generic [ref=e222]:
+                    - generic [ref=e223]:
+                      - generic [ref=e224]: Agar-agar
+                      - generic [ref=e225]: Price outlier
+                    - paragraph [ref=e226]: £67.50/kg vs category median £6.98/kg — possible unit error.
+                - button "Dismiss this alert" [ref=e227] [cursor=pointer]:
+                  - img [ref=e228]
+              - generic [ref=e231]:
+                - generic "Click to fix \"Baking - Sosa\" in Pantry" [ref=e232] [cursor=pointer]:
+                  - img [ref=e234]
+                  - generic [ref=e236]:
+                    - generic [ref=e237]:
+                      - generic [ref=e238]: Baking - Sosa
+                      - generic [ref=e239]: Price outlier
+                    - paragraph [ref=e240]: £57.77/kg vs category median £6.98/kg — possible unit error.
+                - button "Dismiss this alert" [ref=e241] [cursor=pointer]:
+                  - img [ref=e242]
+              - generic [ref=e245]:
+                - generic "Click to fix \"Cocoa Butter - Mycryo 'callebaut'\" in Pantry" [ref=e246] [cursor=pointer]:
+                  - img [ref=e248]
+                  - generic [ref=e250]:
+                    - generic [ref=e251]:
+                      - generic [ref=e252]: Cocoa Butter - Mycryo 'callebaut'
+                      - generic [ref=e253]: Price outlier
+                    - paragraph [ref=e254]: £57.58/kg vs category median £6.35/kg — possible unit error.
+                - button "Dismiss this alert" [ref=e255] [cursor=pointer]:
+                  - img [ref=e256]
+              - generic [ref=e259]:
+                - generic "Click to fix \"Coriander - Cress\" in Pantry" [ref=e260] [cursor=pointer]:
+                  - img [ref=e262]
+                  - generic [ref=e264]:
+                    - generic [ref=e265]:
+                      - generic [ref=e266]: Coriander - Cress
+                      - generic [ref=e267]: Price outlier
+                    - paragraph [ref=e268]: £73.00/kg vs category median £3.04/kg — possible unit error.
+                - button "Dismiss this alert" [ref=e269] [cursor=pointer]:
+                  - img [ref=e270]
+              - generic [ref=e273]:
+                - generic "Click to fix \"Mustard Powder\" in Pantry" [ref=e274] [cursor=pointer]:
+                  - img [ref=e276]
+                  - generic [ref=e278]:
+                    - generic [ref=e279]:
+                      - generic [ref=e280]: Mustard Powder
+                      - generic [ref=e281]: Price outlier
+                    - paragraph [ref=e282]: £48.57/kg vs category median £6.98/kg — possible unit error.
+                - button "Dismiss this alert" [ref=e283] [cursor=pointer]:
+                  - img [ref=e284]
+              - generic [ref=e287]:
+                - generic "Click to fix \"Olives - Mixed\" in Pantry" [ref=e288] [cursor=pointer]:
+                  - img [ref=e290]
+                  - generic [ref=e292]:
+                    - generic [ref=e293]:
+                      - generic [ref=e294]: Olives - Mixed
+                      - generic [ref=e295]: Price outlier
+                    - paragraph [ref=e296]: £11.59/kg vs category median £1.70/kg — possible unit error.
+                - button "Dismiss this alert" [ref=e297] [cursor=pointer]:
+                  - img [ref=e298]
+              - generic [ref=e301]:
+                - generic "Click to fix \"Pistachio Paste\" in Pantry" [ref=e302] [cursor=pointer]:
+                  - img [ref=e304]
+                  - generic [ref=e306]:
+                    - generic [ref=e307]:
+                      - generic [ref=e308]: Pistachio Paste
+                      - generic [ref=e309]: Price outlier
+                    - paragraph [ref=e310]: £44.00/kg vs category median £6.98/kg — possible unit error.
+                - button "Dismiss this alert" [ref=e311] [cursor=pointer]:
+                  - img [ref=e312]
+              - generic [ref=e315]:
+                - generic "Click to fix \"Raspberry Grit\" in Pantry" [ref=e316] [cursor=pointer]:
+                  - img [ref=e318]
+                  - generic [ref=e320]:
+                    - generic [ref=e321]:
+                      - generic [ref=e322]: Raspberry Grit
+                      - generic [ref=e323]: Price outlier
+                    - paragraph [ref=e324]: £113.33/kg vs category median £7.16/kg — possible unit error.
+                - button "Dismiss this alert" [ref=e325] [cursor=pointer]:
+                  - img [ref=e326]
+              - generic [ref=e329]:
+                - generic "Click to fix \"Red Food Dye\" in Pantry" [ref=e330] [cursor=pointer]:
+                  - img [ref=e332]
+                  - generic [ref=e334]:
+                    - generic [ref=e335]:
+                      - generic [ref=e336]: Red Food Dye
+                      - generic [ref=e337]: Price outlier
+                    - paragraph [ref=e338]: £112.71/kg vs category median £6.98/kg — possible unit error.
+                - button "Dismiss this alert" [ref=e339] [cursor=pointer]:
+                  - img [ref=e340]
+              - generic [ref=e343]:
+                - generic "Click to fix \"White Crab Meat\" in Pantry" [ref=e344] [cursor=pointer]:
+                  - img [ref=e346]
+                  - generic [ref=e348]:
+                    - generic [ref=e349]:
+                      - generic [ref=e350]: White Crab Meat
+                      - generic [ref=e351]: Price outlier
+                    - paragraph [ref=e352]: £55.07/kg vs category median £8.47/kg — possible unit error.
+                - button "Dismiss this alert" [ref=e353] [cursor=pointer]:
+                  - img [ref=e354]
+              - generic [ref=e357]:
+                - generic "Click to fix \"Saffron - Pure Spanish\" in Pantry" [ref=e358] [cursor=pointer]:
+                  - img [ref=e360]
+                  - generic [ref=e362]:
+                    - generic [ref=e363]:
+                      - generic [ref=e364]: Saffron - Pure Spanish
+                      - generic [ref=e365]: Price outlier
+                    - paragraph [ref=e366]: £4500.00/kg vs category median £16.34/kg — possible unit error.
+                - button "Dismiss this alert" [ref=e367] [cursor=pointer]:
+                  - img [ref=e368]
+              - generic [ref=e371]:
+                - generic "Click to fix \"Seeds - Cardamom Seeds\" in Pantry" [ref=e372] [cursor=pointer]:
+                  - img [ref=e374]
+                  - generic [ref=e376]:
+                    - generic [ref=e377]:
+                      - generic [ref=e378]: Seeds - Cardamom Seeds
+                      - generic [ref=e379]: Price outlier
+                    - paragraph [ref=e380]: £109.38/kg vs category median £6.98/kg — possible unit error.
+                - button "Dismiss this alert" [ref=e381] [cursor=pointer]:
+                  - img [ref=e382]
+              - generic [ref=e385]:
+                - generic "Click to fix \"Ultratex\" in Pantry" [ref=e386] [cursor=pointer]:
+                  - img [ref=e388]
+                  - generic [ref=e390]:
+                    - generic [ref=e391]:
+                      - generic [ref=e392]: Ultratex
+                      - generic [ref=e393]: Price outlier
+                    - paragraph [ref=e394]: £54.00/kg vs category median £6.98/kg — possible unit error.
+                - button "Dismiss this alert" [ref=e395] [cursor=pointer]:
+                  - img [ref=e396]
+              - generic [ref=e399]:
+                - generic "Click to fix \"Truffle Shavings\" in Pantry" [ref=e400] [cursor=pointer]:
+                  - img [ref=e402]
+                  - generic [ref=e404]:
+                    - generic [ref=e405]:
+                      - generic [ref=e406]: Truffle Shavings
+                      - generic [ref=e407]: Price outlier
+                    - paragraph [ref=e408]: £234.38/kg vs category median £3.04/kg — possible unit error.
+                - button "Dismiss this alert" [ref=e409] [cursor=pointer]:
+                  - img [ref=e410]
+              - generic [ref=e413]:
+                - generic "Click to fix \"Water - Tap\" in Pantry" [ref=e414] [cursor=pointer]:
+                  - img [ref=e416]
+                  - generic [ref=e418]:
+                    - generic [ref=e419]:
+                      - generic [ref=e420]: Water - Tap
+                      - generic [ref=e421]: No price
+                    - paragraph [ref=e422]: Pack cost is £0 — missing pricing data.
+                - button "Dismiss this alert" [ref=e423] [cursor=pointer]:
+                  - img [ref=e424]
+        - generic [ref=e427]:
+          - generic [ref=e428]:
+            - heading "Catalog Price Drift" [level=3] [ref=e429]:
+              - img [ref=e430]
+              - text: Catalog Price Drift
+            - generic [ref=e435]: 20 changes detected
+          - paragraph [ref=e436]: Pantry prices differ from the latest scraped catalog prices by 10%+. Click to update.
+          - generic [ref=e437]:
+            - generic [ref=e438] [cursor=pointer]:
+              - generic [ref=e439]:
+                - generic [ref=e440]: Griddle Pad Holder
+                - generic [ref=e441]: Urban
+              - generic [ref=e442]:
+                - generic [ref=e443]: £1.00/kg
+                - generic [ref=e444]: £7.58/kg ▲658%
+            - generic [ref=e445] [cursor=pointer]:
+              - generic [ref=e446]:
+                - generic [ref=e447]: Vinegar - Red Wine
+                - generic [ref=e448]: David Catt
+              - generic [ref=e449]:
+                - generic [ref=e450]: £1.18/kg
+                - generic [ref=e451]: £8.20/kg ▲596%
+            - generic [ref=e452] [cursor=pointer]:
+              - generic [ref=e453]:
+                - generic [ref=e454]: Bay Leaves
+                - generic [ref=e455]: David Catt
+              - generic [ref=e456]:
+                - generic [ref=e457]: £6.55/kg
+                - generic [ref=e458]: £1.31/kg ▼80%
+            - generic [ref=e459] [cursor=pointer]:
+              - generic [ref=e460]:
+                - generic [ref=e461]: Buttermilk (box)
+                - generic [ref=e462]: David Catt
+              - generic [ref=e463]:
+                - generic [ref=e464]: £1.49/kg
+                - generic [ref=e465]: £2.36/kg ▲58%
+            - generic [ref=e466] [cursor=pointer]:
+              - generic [ref=e467]:
+                - generic [ref=e468]: Juice - Apple
+                - generic [ref=e469]: David Catt
+              - generic [ref=e470]:
+                - generic [ref=e471]: £2.14/kg
+                - generic [ref=e472]: £3.32/kg ▲55%
+            - generic [ref=e473] [cursor=pointer]:
+              - generic [ref=e474]:
+                - generic [ref=e475]: Pistachio Paste
+                - generic [ref=e476]: David Catt
+              - generic [ref=e477]:
+                - generic [ref=e478]: £44.00/kg
+                - generic [ref=e479]: £67.99/kg ▲55%
+            - generic [ref=e480] [cursor=pointer]:
+              - generic [ref=e481]:
+                - generic [ref=e482]: Chef's Essentials Tomato Ketchup
+                - generic [ref=e483]: Booker
+              - generic [ref=e484]:
+                - generic [ref=e485]: £2.11/kg
+                - generic [ref=e486]: £1.05/kg ▼50%
+            - generic [ref=e487] [cursor=pointer]:
+              - generic [ref=e488]:
+                - generic [ref=e489]: Chillies - Green
+                - generic [ref=e490]: David Catt
+              - generic [ref=e491]:
+                - generic [ref=e492]: £6.46/kg
+                - generic [ref=e493]: £9.40/kg ▲46%
+            - generic [ref=e494] [cursor=pointer]:
+              - generic [ref=e495]:
+                - generic [ref=e496]: Cabbage - Hispi
+                - generic [ref=e497]: David Catt
+              - generic [ref=e498]:
+                - generic [ref=e499]: £1.23/kg
+                - generic [ref=e500]: £1.69/kg ▲37%
+            - generic [ref=e501] [cursor=pointer]:
+              - generic [ref=e502]:
+                - generic [ref=e503]: Sugar - Caster
+                - generic [ref=e504]: David Catt
+              - generic [ref=e505]:
+                - generic [ref=e506]: £1.20/kg
+                - generic [ref=e507]: £1.63/kg ▲36%
+            - generic [ref=e508] [cursor=pointer]:
+              - generic [ref=e509]:
+                - generic [ref=e510]: Beetroot
+                - generic [ref=e511]: David Catt
+              - generic [ref=e512]:
+                - generic [ref=e513]: £0.94/kg
+                - generic [ref=e514]: £1.24/kg ▲32%
+            - generic [ref=e515] [cursor=pointer]:
+              - generic [ref=e516]:
+                - generic [ref=e517]: Cream - Double Vegan
+                - generic [ref=e518]: David Catt
+              - generic [ref=e519]:
+                - generic [ref=e520]: £3.75/kg
+                - generic [ref=e521]: £4.95/kg ▲32%
+            - generic [ref=e522] [cursor=pointer]:
+              - generic [ref=e523]:
+                - generic [ref=e524]: Tomatoes - Chopped Tinned
+                - generic [ref=e525]: David Catt
+              - generic [ref=e526]:
+                - generic [ref=e527]: £1.30/kg
+                - generic [ref=e528]: £1.65/kg ▲27%
+            - generic [ref=e529] [cursor=pointer]:
+              - generic [ref=e530]:
+                - generic [ref=e531]: Mushrooms - Chestnut
+                - generic [ref=e532]: David Catt
+              - generic [ref=e533]:
+                - generic [ref=e534]: £3.25/kg
+                - generic [ref=e535]: £4.00/kg ▲23%
+            - generic [ref=e536] [cursor=pointer]:
+              - generic [ref=e537]:
+                - generic [ref=e538]: Rosemary - Dried
+                - generic [ref=e539]: David Catt
+              - generic [ref=e540]:
+                - generic [ref=e541]: £10.00/kg
+                - generic [ref=e542]: £12.27/kg ▲23%
+            - generic [ref=e543] [cursor=pointer]:
+              - generic [ref=e544]:
+                - generic [ref=e545]: Cloves - Whole
+                - generic [ref=e546]: David Catt
+              - generic [ref=e547]:
+                - generic [ref=e548]: £34.57/kg
+                - generic [ref=e549]: £41.23/kg ▲19%
+            - generic [ref=e550] [cursor=pointer]:
+              - generic [ref=e551]:
+                - generic [ref=e552]: Chipolatas
+                - generic [ref=e553]: Crouch
+              - generic [ref=e554]:
+                - generic [ref=e555]: £6.95/kg
+                - generic [ref=e556]: £7.95/kg ▲14%
+            - generic [ref=e557] [cursor=pointer]:
+              - generic [ref=e558]:
+                - generic [ref=e559]: Butter - Unsalted
+                - generic [ref=e560]: David Catt
+              - generic [ref=e561]:
+                - generic [ref=e562]: £5.95/kg
+                - generic [ref=e563]: £6.68/kg ▲12%
+            - generic [ref=e564] [cursor=pointer]:
+              - generic [ref=e565]:
+                - generic [ref=e566]: Pepper - White (ground)
+                - generic [ref=e567]: David Catt
+              - generic [ref=e568]:
+                - generic [ref=e569]: £20.69/kg
+                - generic [ref=e570]: £22.89/kg ▲11%
+            - generic [ref=e571] [cursor=pointer]:
+              - generic [ref=e572]:
+                - generic [ref=e573]: Coriander - Ground
+                - generic [ref=e574]: David Catt
+              - generic [ref=e575]:
+                - generic [ref=e576]: £8.25/kg
+                - generic [ref=e577]: £7.38/kg ▼11%
+        - generic [ref=e578]:
+          - generic [ref=e579]:
+            - heading "Stock Holdings Breakdown" [level=3] [ref=e580]:
+              - img [ref=e581]
+              - text: Stock Holdings Breakdown
+            - generic [ref=e582]:
+              - button "By Value" [ref=e583] [cursor=pointer]
+              - button "By Weight" [ref=e584] [cursor=pointer]
+          - generic [ref=e585]:
+            - generic "Click to view \"Beef - Rump\" in Pantry" [ref=e586] [cursor=pointer]:
+              - generic "Beef - Rump" [ref=e587]
+              - generic [ref=e590]: £280.20
+            - generic "Click to view \"Beef - Sirloin\" in Pantry" [ref=e591] [cursor=pointer]:
+              - generic "Beef - Sirloin" [ref=e592]
+              - generic [ref=e595]: £226.97
+            - generic "Click to view \"Beef - Fillet\" in Pantry" [ref=e596] [cursor=pointer]:
+              - generic "Beef - Fillet" [ref=e597]
+              - generic [ref=e600]: £126.17
+            - generic "Click to view \"Beef - Tomahawk\" in Pantry" [ref=e601] [cursor=pointer]:
+              - generic "Beef - Tomahawk" [ref=e602]
+              - generic [ref=e605]: £99.74
+            - generic "Click to view \"Venison\" in Pantry" [ref=e606] [cursor=pointer]:
+              - generic "Venison" [ref=e607]
+              - generic [ref=e610]: £75.44
+            - generic "Click to view \"Beef - Ribeye\" in Pantry" [ref=e611] [cursor=pointer]:
+              - generic "Beef - Ribeye" [ref=e612]
+              - generic [ref=e615]: £54.33
+            - generic "Click to view \"Pork - Belly\" in Pantry" [ref=e616] [cursor=pointer]:
+              - generic "Pork - Belly" [ref=e617]
+              - generic [ref=e620]: £32.17
+            - generic "Click to view \"Bream\" in Pantry" [ref=e621] [cursor=pointer]:
+              - generic "Bream" [ref=e622]
+              - generic [ref=e625]: £22.50
