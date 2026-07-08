@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { useIngredients, useRecipes, useDishes, useStockMutations, useStockMovements, useStocktakeReports, useStocktakeMutations, useRecipeMutations } from '../hooks/useKitchenData';
 import { useStore } from '../store/useStore';
 import { useBleScale, isWebBluetoothSupported } from '../hooks/useBleScale';
@@ -54,6 +55,148 @@ function getIngredientUnitCostPer100g(ing: Ingredient): number {
   return calculateIngredientCost(ing, 100, 'g');
 }
 
+const CONTAINER_PROFILES = [
+  { id: '10l_tub', name: '10L Tub', tareWeight: 322 },
+  { id: '4l_tub', name: '4L Tub', tareWeight: 149 },
+  { id: '2l_tub', name: '2L Tub', tareWeight: 98 },
+  { id: '1l_tub', name: '1L Tub', tareWeight: 57 },
+  { id: 'polycarb_half_deep', name: 'Polycarb 1/2 Gastro Deep', tareWeight: 753 },
+  { id: 'polycarb_half_shallow', name: 'Polycarb 1/2 Gastro Shallow', tareWeight: 524 }
+];
+
+function getTareWeight(tareId: string | undefined): number {
+  if (!tareId || tareId === 'none') return 0;
+  return CONTAINER_PROFILES.find(c => c.id === tareId)?.tareWeight || 0;
+}
+
+// Reads the live scale weight directly from the store so only this small status bar
+// re-renders on each throttled BLE tick — the rest of the Stock Take modal (item list
+// etc.) never subscribes to scaleWeightGrams and so never re-renders from scale ticks.
+const ScaleStatusBar = React.memo(function ScaleStatusBar() {
+  const scaleWeightGrams = useStore((state) => state.scaleWeightGrams);
+  return (
+    <div className="h-12 bg-surface border-b border-outline-variant flex items-center px-6 text-xs flex-shrink-0">
+      <span className="text-outline uppercase label-caps text-[9px] mr-2">Raw Weight:</span>
+      <span className="data-tabular font-bold">{scaleWeightGrams} g</span>
+      <span className="text-[10px] text-outline ml-4">Pick each item's tub/container from the list below to auto-subtract its weight.</span>
+    </div>
+  );
+});
+
+interface StocktakeRecipeRowProps {
+  rec: Recipe;
+  scaleConnected: boolean;
+  tareId: string;
+  onTareChange: (recipeId: string, tareId: string) => void;
+  isEditing: boolean;
+  countValue: number | undefined;
+  onCountChange: (recipeId: string, value: number) => void;
+  onStartEdit: (recipeId: string) => void;
+  onStopEdit: () => void;
+  onFillFromScale: (recipeId: string, tareId: string) => void;
+}
+
+const StocktakeRecipeRow = React.memo(function StocktakeRecipeRow({
+  rec, scaleConnected, tareId, onTareChange, isEditing, countValue, onCountChange, onStartEdit, onStopEdit, onFillFromScale
+}: StocktakeRecipeRowProps) {
+  return (
+    <div className="flex items-center justify-between gap-2 p-3 sm:p-4 border border-primary/30 bg-secondary-container/20 rounded-sm">
+      <div className="min-w-0">
+        <span className="font-semibold text-sm text-on-surface truncate flex items-center gap-1.5">
+          <ChefHat className="h-3.5 w-3.5 text-primary flex-shrink-0" /> {rec.name}
+        </span>
+        <div className="text-[10px] text-outline uppercase tracking-wider mt-0.5">
+          Prep Recipe • Current: {rec.stockLevel ?? 0} {rec.batchUnit}
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        {scaleConnected && (
+          <>
+            <select value={tareId} onChange={e => onTareChange(rec.id, e.target.value)}
+              className="px-2 py-2 border border-outline-variant bg-surface-container-lowest text-[11px] rounded-sm max-w-[110px] sm:max-w-none">
+              <option value="none">No tub</option>
+              {CONTAINER_PROFILES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <button onClick={() => onFillFromScale(rec.id, tareId)}
+              title="Fill from scale (after tare)"
+              className="h-10 w-10 flex-shrink-0 border border-outline flex items-center justify-center rounded-sm bg-surface hover:bg-surface-container">
+              <Scale className="h-4 w-4" />
+            </button>
+          </>
+        )}
+        {isEditing ? (
+          <input type="number" autoFocus value={countValue !== undefined ? countValue : (rec.stockLevel || '')}
+            onChange={e => onCountChange(rec.id, parseFloat(e.target.value) || 0)}
+            onBlur={onStopEdit}
+            className="w-24 sm:w-28 px-3 py-2 border border-primary text-center data-tabular text-sm font-bold bg-surface-container-lowest" />
+        ) : (
+          <button onClick={() => onStartEdit(rec.id)}
+            className="w-24 sm:w-28 px-3 py-2 border border-outline-variant text-center data-tabular text-sm font-bold bg-surface-container-lowest rounded-sm">
+            {countValue !== undefined ? countValue : (rec.stockLevel || 0)}
+          </button>
+        )}
+        <span className="text-xs text-outline w-8">{rec.batchUnit}</span>
+      </div>
+    </div>
+  );
+});
+
+interface StocktakeIngredientRowProps {
+  ing: Ingredient;
+  isAlternateRow: boolean;
+  scaleConnected: boolean;
+  tareId: string;
+  onTareChange: (ingredientId: string, tareId: string) => void;
+  isEditing: boolean;
+  countValue: number | undefined;
+  onCountChange: (ingredientId: string, value: number) => void;
+  onStartEdit: (ingredientId: string) => void;
+  onStopEdit: () => void;
+  onFillFromScale: (ingredientId: string, tareId: string) => void;
+}
+
+const StocktakeIngredientRow = React.memo(function StocktakeIngredientRow({
+  ing, isAlternateRow, scaleConnected, tareId, onTareChange, isEditing, countValue, onCountChange, onStartEdit, onStopEdit, onFillFromScale
+}: StocktakeIngredientRowProps) {
+  return (
+    <div className={`flex items-center justify-between gap-2 p-3 sm:p-4 border border-outline-variant rounded-sm ${isAlternateRow ? 'bg-black/[0.0075]' : 'bg-transparent'}`}>
+      <div className="min-w-0">
+        <span className="font-semibold text-sm text-on-surface truncate block">{ing.name}</span>
+        <div className="text-[10px] text-outline uppercase tracking-wider mt-0.5">
+          {ing.category} • Current: {ing.stockLevel ?? 0}
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        {scaleConnected && (
+          <>
+            <select value={tareId} onChange={e => onTareChange(ing.id, e.target.value)}
+              className="px-2 py-2 border border-outline-variant bg-surface-container-lowest text-[11px] rounded-sm max-w-[110px] sm:max-w-none">
+              <option value="none">No tub</option>
+              {CONTAINER_PROFILES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <button onClick={() => onFillFromScale(ing.id, tareId)}
+              title="Fill net weight (after tare)"
+              className="h-10 w-10 flex-shrink-0 border border-outline flex items-center justify-center rounded-sm bg-surface hover:bg-surface-container">
+              <Scale className="h-4 w-4" />
+            </button>
+          </>
+        )}
+        {isEditing ? (
+          <input type="number" autoFocus value={countValue !== undefined ? countValue : (ing.stockLevel || '')}
+            onChange={e => onCountChange(ing.id, parseFloat(e.target.value) || 0)}
+            onBlur={onStopEdit}
+            className="w-24 sm:w-28 px-3 py-2 border border-primary text-center data-tabular text-sm font-bold bg-surface-container-lowest" />
+        ) : (
+          <button onClick={() => onStartEdit(ing.id)}
+            className="w-24 sm:w-28 px-3 py-2 border border-outline-variant text-center data-tabular text-sm font-bold bg-surface-container-lowest rounded-sm">
+            {countValue !== undefined ? countValue : (ing.stockLevel || 0)}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+});
+
 export const Stock: React.FC = () => {
   const { data: ingredients = [], isLoading } = useIngredients();
   const { data: recipes = [] } = useRecipes();
@@ -67,7 +210,6 @@ export const Stock: React.FC = () => {
   const scaleConnected = useStore((state) => state.scaleConnected);
   const showToast = useStore((state) => state.showToast);
   const setScaleConnected = useStore((state) => state.setScaleConnected);
-  const scaleWeightGrams = useStore((state) => state.scaleWeightGrams);
   const setScaleWeight = useStore((state) => state.setScaleWeight);
   const selectedIngredientId = useStore((state) => state.selectedIngredientId);
   const selectIngredient = useStore((state) => state.selectIngredient);
@@ -118,20 +260,6 @@ export const Stock: React.FC = () => {
   const [varianceReport, setVarianceReport] = useState<{
     name: string; projected: number; actual: number; variance: number; unit: string; costLoss: number;
   }[] | null>(null);
-
-  const containerProfiles = [
-    { id: '10l_tub', name: '10L Tub', tareWeight: 322 },
-    { id: '4l_tub', name: '4L Tub', tareWeight: 149 },
-    { id: '2l_tub', name: '2L Tub', tareWeight: 98 },
-    { id: '1l_tub', name: '1L Tub', tareWeight: 57 },
-    { id: 'polycarb_half_deep', name: 'Polycarb 1/2 Gastro Deep', tareWeight: 753 },
-    { id: 'polycarb_half_shallow', name: 'Polycarb 1/2 Gastro Shallow', tareWeight: 524 }
-  ];
-
-  const getTareWeight = (tareId: string | undefined) => {
-    if (!tareId || tareId === 'none') return 0;
-    return containerProfiles.find(c => c.id === tareId)?.tareWeight || 0;
-  };
 
   // ── Feature 1: cascade live menu → ingredient IDs ─────────────────────────
   const menuIngredientIds = useMemo(() => {
@@ -212,6 +340,32 @@ export const Stock: React.FC = () => {
     }
     return base;
   }, [recipes, liveRecipeIds, activeLocation, stocktakeSearch]);
+
+  // Stable row-callback handlers — passed as props to memoized rows so their identity
+  // never changes across renders, which is required for React.memo to actually skip re-renders.
+  const handleTareChange = useCallback((key: string, tareId: string) => {
+    setItemTareIds(prev => ({ ...prev, [key]: tareId }));
+  }, []);
+  const handleIngredientCountChange = useCallback((id: string, value: number) => {
+    setStockCounts(prev => ({ ...prev, [id]: value }));
+  }, []);
+  const handleRecipeCountChange = useCallback((id: string, value: number) => {
+    setRecipeCounts(prev => ({ ...prev, [id]: value }));
+  }, []);
+  const handleStartEdit = useCallback((key: string) => setEditingCountKey(key), []);
+  const handleStopEdit = useCallback(() => setEditingCountKey(null), []);
+  const handleFillIngredientFromScale = useCallback((id: string, tareId: string) => {
+    const rawGrams = useStore.getState().scaleWeightGrams;
+    const net = Math.max(0, rawGrams - getTareWeight(tareId));
+    setStockCounts(prev => ({ ...prev, [id]: net }));
+  }, []);
+  const handleFillRecipeFromScale = useCallback((id: string, tareId: string) => {
+    const rec = recipes.find(r => r.id === id);
+    const rawGrams = useStore.getState().scaleWeightGrams;
+    const netGrams = Math.max(0, rawGrams - getTareWeight(tareId));
+    const netInBatchUnit = rec && (rec.batchUnit === 'kg' || rec.batchUnit === 'l') ? netGrams / 1000 : netGrams;
+    setRecipeCounts(prev => ({ ...prev, [id]: netInBatchUnit }));
+  }, [recipes]);
 
   const isSaving = logMovement.isPending || saveReport.isPending;
 
@@ -483,6 +637,23 @@ export const Stock: React.FC = () => {
   }
 
   const categories = ['All', 'Prep', 'Dry Store', 'Dairy', 'Meat', 'Fish', 'Vegetable', 'Fruit', 'Frozen', 'Alcohol'];
+
+  // Merge prep recipes + ingredients into one list for virtualization (weak-device DOM-node budget).
+  type StocktakeRow =
+    | { kind: 'recipe'; rec: Recipe }
+    | { kind: 'ingredient'; ing: Ingredient; isAlternateRow: boolean };
+  const stocktakeRows: StocktakeRow[] = useMemo(() => [
+    ...stocktakeRecipes.map((rec): StocktakeRow => ({ kind: 'recipe', rec })),
+    ...stocktakeIngredients.map((ing, idx): StocktakeRow => ({ kind: 'ingredient', ing, isAlternateRow: idx % 2 === 1 }))
+  ], [stocktakeRecipes, stocktakeIngredients]);
+
+  const stocktakeScrollRef = useRef<HTMLDivElement>(null);
+  const stocktakeRowVirtualizer = useVirtualizer({
+    count: stocktakeRows.length,
+    getScrollElement: () => stocktakeScrollRef.current,
+    estimateSize: () => 84,
+    overscan: 8,
+  });
 
   return (
     <div className="p-4 sm:p-8 h-full overflow-y-auto flex flex-col gap-4 sm:gap-8 bg-surface-container-lowest">
@@ -977,13 +1148,7 @@ export const Stock: React.FC = () => {
               </div>
             </div>
 
-            {scaleConnected && (
-              <div className="h-12 bg-surface border-b border-outline-variant flex items-center px-6 text-xs flex-shrink-0">
-                <span className="text-outline uppercase label-caps text-[9px] mr-2">Raw Weight:</span>
-                <span className="data-tabular font-bold">{scaleWeightGrams} g</span>
-                <span className="text-[10px] text-outline ml-4">Pick each item's tub/container from the list below to auto-subtract its weight.</span>
-              </div>
-            )}
+            {scaleConnected && <ScaleStatusBar />}
 
             <div className="border-b border-outline-variant bg-surface flex items-center px-6 gap-2 flex-shrink-0 overflow-x-auto h-12">
               {categories.map(cat => (
@@ -1014,97 +1179,51 @@ export const Stock: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-3 sm:p-6 flex flex-col gap-3">
-              {stocktakeRecipes.map((rec) => (
-                <div key={`recipe-${rec.id}`} className="flex items-center justify-between gap-2 p-3 sm:p-4 border border-primary/30 bg-secondary-container/20 rounded-sm">
-                  <div className="min-w-0">
-                    <span className="font-semibold text-sm text-on-surface truncate flex items-center gap-1.5">
-                      <ChefHat className="h-3.5 w-3.5 text-primary flex-shrink-0" /> {rec.name}
-                    </span>
-                    <div className="text-[10px] text-outline uppercase tracking-wider mt-0.5">
-                      Prep Recipe • Current: {rec.stockLevel ?? 0} {rec.batchUnit}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {scaleConnected && (() => {
-                      const recTareId = itemTareIds[`recipe-${rec.id}`] || 'none';
-                      const recNetGrams = Math.max(0, scaleWeightGrams - getTareWeight(recTareId));
-                      const recNetInBatchUnit = (rec.batchUnit === 'kg' || rec.batchUnit === 'l') ? recNetGrams / 1000 : recNetGrams;
-                      return (
-                        <>
-                          <select value={recTareId} onChange={e => setItemTareIds(prev => ({ ...prev, [`recipe-${rec.id}`]: e.target.value }))}
-                            className="px-2 py-2 border border-outline-variant bg-surface-container-lowest text-[11px] rounded-sm max-w-[110px] sm:max-w-none">
-                            <option value="none">No tub</option>
-                            {containerProfiles.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                          </select>
-                          <button onClick={() => setRecipeCounts(prev => ({ ...prev, [rec.id]: recNetInBatchUnit }))}
-                            title={`Fill net weight (${recNetInBatchUnit} ${rec.batchUnit} after tare)`}
-                            className="h-10 w-10 flex-shrink-0 border border-outline flex items-center justify-center rounded-sm bg-surface hover:bg-surface-container">
-                            <Scale className="h-4 w-4" />
-                          </button>
-                        </>
-                      );
-                    })()}
-                    {editingCountKey === `recipe-${rec.id}` ? (
-                      <input type="number" autoFocus value={recipeCounts[rec.id] !== undefined ? recipeCounts[rec.id] : (rec.stockLevel || '')}
-                        onChange={e => setRecipeCounts(prev => ({ ...prev, [rec.id]: parseFloat(e.target.value) || 0 }))}
-                        onBlur={() => setEditingCountKey(null)}
-                        className="w-24 sm:w-28 px-3 py-2 border border-primary text-center data-tabular text-sm font-bold bg-surface-container-lowest" />
-                    ) : (
-                      <button onClick={() => setEditingCountKey(`recipe-${rec.id}`)}
-                        className="w-24 sm:w-28 px-3 py-2 border border-outline-variant text-center data-tabular text-sm font-bold bg-surface-container-lowest rounded-sm">
-                        {recipeCounts[rec.id] !== undefined ? recipeCounts[rec.id] : (rec.stockLevel || 0)}
-                      </button>
-                    )}
-                    <span className="text-xs text-outline w-8">{rec.batchUnit}</span>
-                  </div>
-                </div>
-              ))}
-              {stocktakeIngredients.length === 0 && stocktakeRecipes.length === 0 ? (
+            <div ref={stocktakeScrollRef} className="flex-1 overflow-y-auto p-3 sm:p-6">
+              {stocktakeRows.length === 0 ? (
                 <div className="py-12 text-center text-outline text-xs">
                   {stocktakeSearch ? 'No items match your search.' : menuOnlyMode ? 'No menu-relevant ingredients in this category.' : 'No ingredients in this category.'}
                 </div>
-              ) : stocktakeIngredients.map((ing, idx) => {
-                const tareId = itemTareIds[ing.id] || 'none';
-                const netWeight = Math.max(0, scaleWeightGrams - getTareWeight(tareId));
-                return (
-                <div key={ing.id} className={`flex items-center justify-between gap-2 p-3 sm:p-4 border border-outline-variant rounded-sm ${idx % 2 === 0 ? 'bg-transparent' : 'bg-black/[0.0075]'}`}>
-                  <div className="min-w-0">
-                    <span className="font-semibold text-sm text-on-surface truncate block">{ing.name}</span>
-                    <div className="text-[10px] text-outline uppercase tracking-wider mt-0.5">
-                      {ing.category} • Current: {ing.stockLevel ?? 0}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {scaleConnected && (
-                      <>
-                        <select value={tareId} onChange={e => setItemTareIds(prev => ({ ...prev, [ing.id]: e.target.value }))}
-                          className="px-2 py-2 border border-outline-variant bg-surface-container-lowest text-[11px] rounded-sm max-w-[110px] sm:max-w-none">
-                          <option value="none">No tub</option>
-                          {containerProfiles.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
-                        <button onClick={() => setStockCounts(prev => ({ ...prev, [ing.id]: netWeight }))}
-                          title={`Fill net weight (${netWeight}g after tare)`}
-                          className="h-10 w-10 flex-shrink-0 border border-outline flex items-center justify-center rounded-sm bg-surface hover:bg-surface-container">
-                          <Scale className="h-4 w-4" />
-                        </button>
-                      </>
-                    )}
-                    {editingCountKey === `ing-${ing.id}` ? (
-                      <input type="number" autoFocus value={stockCounts[ing.id] !== undefined ? stockCounts[ing.id] : (ing.stockLevel || '')}
-                        onChange={e => setStockCounts(prev => ({ ...prev, [ing.id]: parseFloat(e.target.value) || 0 }))}
-                        onBlur={() => setEditingCountKey(null)}
-                        className="w-24 sm:w-28 px-3 py-2 border border-primary text-center data-tabular text-sm font-bold bg-surface-container-lowest" />
-                    ) : (
-                      <button onClick={() => setEditingCountKey(`ing-${ing.id}`)}
-                        className="w-24 sm:w-28 px-3 py-2 border border-outline-variant text-center data-tabular text-sm font-bold bg-surface-container-lowest rounded-sm">
-                        {stockCounts[ing.id] !== undefined ? stockCounts[ing.id] : (ing.stockLevel || 0)}
-                      </button>
-                    )}
-                  </div>
+              ) : (
+                <div style={{ height: stocktakeRowVirtualizer.getTotalSize(), position: 'relative' }}>
+                  {stocktakeRowVirtualizer.getVirtualItems().map(vRow => {
+                    const row = stocktakeRows[vRow.index];
+                    return (
+                      <div key={vRow.key} data-index={vRow.index} ref={stocktakeRowVirtualizer.measureElement}
+                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${vRow.start}px)`, paddingBottom: 12 }}>
+                        {row.kind === 'recipe' ? (
+                          <StocktakeRecipeRow
+                            rec={row.rec}
+                            scaleConnected={scaleConnected}
+                            tareId={itemTareIds[`recipe-${row.rec.id}`] || 'none'}
+                            onTareChange={(id, tareId) => handleTareChange(`recipe-${id}`, tareId)}
+                            isEditing={editingCountKey === `recipe-${row.rec.id}`}
+                            countValue={recipeCounts[row.rec.id]}
+                            onCountChange={handleRecipeCountChange}
+                            onStartEdit={(id) => handleStartEdit(`recipe-${id}`)}
+                            onStopEdit={handleStopEdit}
+                            onFillFromScale={handleFillRecipeFromScale}
+                          />
+                        ) : (
+                          <StocktakeIngredientRow
+                            ing={row.ing}
+                            isAlternateRow={row.isAlternateRow}
+                            scaleConnected={scaleConnected}
+                            tareId={itemTareIds[row.ing.id] || 'none'}
+                            onTareChange={handleTareChange}
+                            isEditing={editingCountKey === `ing-${row.ing.id}`}
+                            countValue={stockCounts[row.ing.id]}
+                            onCountChange={handleIngredientCountChange}
+                            onStartEdit={(id) => handleStartEdit(`ing-${id}`)}
+                            onStopEdit={handleStopEdit}
+                            onFillFromScale={handleFillIngredientFromScale}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-                );
-              })}
+              )}
             </div>
 
             <div className="min-h-16 border-t border-outline-variant bg-surface flex flex-col sm:flex-row items-center gap-3 px-4 sm:px-6 py-3 sm:py-0 justify-between flex-shrink-0">

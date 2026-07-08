@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 // Salter Smart Scale Pro (KG2362BT / Chipsea "Healthcare eLectronic" module).
 // Service 0xFFE0, characteristic 0xFFE1 (notify) streams 7-byte frames:
@@ -8,6 +8,12 @@ import { useCallback, useRef, useState } from 'react';
 // don't reliably resolve the bare 16-bit shorthand (0xffe0) the way Chrome does.
 const SCALE_SERVICE = '0000ffe0-0000-1000-8000-00805f9b34fb';
 const SCALE_CHARACTERISTIC = '0000ffe1-0000-1000-8000-00805f9b34fb';
+
+// How often (ms) we flush the latest scale reading into React state. The scale streams
+// notifications several times a second — on a weak device, reacting to every single one
+// causes visible lag/crashes. We keep the latest reading in a ref (cheap) and only push
+// it into state on this cadence.
+const FLUSH_INTERVAL_MS = 180;
 
 export function isWebBluetoothSupported(): boolean {
   return typeof navigator !== 'undefined' && 'bluetooth' in navigator;
@@ -21,26 +27,38 @@ export function useBleScale({ onWeight }: UseBleScaleOptions) {
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lastRawHex, setLastRawHex] = useState<string>('');
   const deviceRef = useRef<BluetoothDevice | null>(null);
+  const characteristicRef = useRef<BluetoothRemoteGATTCharacteristic | null>(null);
+  const latestReadingRef = useRef<{ grams: number; stable: boolean } | null>(null);
+  const flushTimerRef = useRef<number>();
+
+  // Keep the latest onWeight callback in a ref so the flush loop always calls the
+  // current version without needing to restart the interval when it changes identity.
+  const onWeightRef = useRef(onWeight);
+  useEffect(() => { onWeightRef.current = onWeight; }, [onWeight]);
 
   const handleNotification = useCallback((event: Event) => {
     const value = (event.target as BluetoothRemoteGATTCharacteristic).value;
-    if (!value) return;
-    const bytes: string[] = [];
-    for (let i = 0; i < value.byteLength; i++) bytes.push(value.getUint8(i).toString(16).padStart(2, '0'));
-    setLastRawHex(bytes.join(' '));
-    if (value.byteLength < 6 || value.getUint8(0) !== 0x08) return;
+    if (!value || value.byteLength < 6 || value.getUint8(0) !== 0x08) return;
     const stable = value.getUint8(3) === 1;
     const grams = (value.getUint8(4) << 8) | value.getUint8(5);
     // Scale's max capacity is 10kg — anything above that is a corrupted/glitched BLE packet, not a real reading.
     if (grams > 10000) return;
-    onWeight(grams, stable);
-  }, [onWeight]);
+    latestReadingRef.current = { grams, stable };
+  }, []);
+
+  const cleanupConnection = useCallback(() => {
+    if (flushTimerRef.current) window.clearTimeout(flushTimerRef.current);
+    characteristicRef.current?.removeEventListener('characteristicvaluechanged', handleNotification);
+    characteristicRef.current = null;
+    deviceRef.current = null;
+  }, [handleNotification]);
 
   const disconnect = useCallback(() => {
     deviceRef.current?.gatt?.disconnect();
-  }, []);
+    cleanupConnection();
+    setConnected(false);
+  }, [cleanupConnection]);
 
   const connect = useCallback(async () => {
     setError(null);
@@ -50,7 +68,10 @@ export function useBleScale({ onWeight }: UseBleScaleOptions) {
         filters: [{ services: [SCALE_SERVICE] }],
         optionalServices: [SCALE_SERVICE],
       });
-      device.addEventListener('gattserverdisconnected', () => setConnected(false));
+      device.addEventListener('gattserverdisconnected', () => {
+        cleanupConnection();
+        setConnected(false);
+      });
 
       const server = await device.gatt!.connect();
       const service = await server.getPrimaryService(SCALE_SERVICE);
@@ -59,6 +80,7 @@ export function useBleScale({ onWeight }: UseBleScaleOptions) {
       characteristic.addEventListener('characteristicvaluechanged', handleNotification);
 
       deviceRef.current = device;
+      characteristicRef.current = characteristic;
       setConnected(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to connect to scale');
@@ -66,7 +88,29 @@ export function useBleScale({ onWeight }: UseBleScaleOptions) {
     } finally {
       setConnecting(false);
     }
-  }, [handleNotification]);
+  }, [handleNotification, cleanupConnection]);
 
-  return { connect, disconnect, connected, connecting, error, lastRawHex };
+  // Throttled flush loop: only runs while connected, pushes at most one update per interval.
+  useEffect(() => {
+    if (!connected) return;
+    const tick = () => {
+      if (latestReadingRef.current) {
+        onWeightRef.current(latestReadingRef.current.grams, latestReadingRef.current.stable);
+      }
+      flushTimerRef.current = window.setTimeout(tick, FLUSH_INTERVAL_MS);
+    };
+    flushTimerRef.current = window.setTimeout(tick, FLUSH_INTERVAL_MS);
+    return () => window.clearTimeout(flushTimerRef.current);
+  }, [connected]);
+
+  // Full teardown on unmount (e.g. navigating away, tablet sleeping mid-connection).
+  useEffect(() => {
+    return () => {
+      deviceRef.current?.gatt?.disconnect();
+      cleanupConnection();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return { connect, disconnect, connected, connecting, error };
 }
