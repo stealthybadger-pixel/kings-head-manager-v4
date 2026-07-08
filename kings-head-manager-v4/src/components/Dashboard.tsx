@@ -352,9 +352,9 @@ export const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="p-8 h-full overflow-y-auto flex flex-col gap-8 bg-surface-container-lowest">
+    <div className="p-4 sm:p-8 h-full overflow-y-auto flex flex-col gap-4 sm:gap-8 bg-surface-container-lowest">
       {/* 1. TOP STATS ROW */}
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
         {/* Stat Card: Ingredients */}
         <div 
           onClick={() => setView('pantry')}
@@ -404,7 +404,7 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* 2. OPERATIONAL BULLETINS & ANOMALIES */}
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Left column: Database Health & Smart Flags */}
         <div className="flex flex-col gap-6">
           {/* Scraper Status Card */}
@@ -605,7 +605,7 @@ export const Dashboard: React.FC = () => {
 
         {/* Price Drift Card */}
         {priceDrift.length > 0 && (
-          <div className="col-span-2 border border-outline-variant p-6 rounded-sm flex flex-col gap-4 bg-surface-container-lowest">
+          <div className="col-span-1 lg:col-span-2 border border-outline-variant p-4 sm:p-6 rounded-sm flex flex-col gap-4 bg-surface-container-lowest">
             <div className="flex justify-between items-center border-b border-outline-variant pb-2">
               <h3 className="label-caps text-on-surface font-bold flex items-center gap-1.5">
                 <RefreshCw className="h-4 w-4 text-primary" />
@@ -616,7 +616,7 @@ export const Dashboard: React.FC = () => {
               </span>
             </div>
             <p className="text-[11px] text-on-surface-variant">Pantry prices differ from the latest scraped catalog prices by 10%+. Click to update.</p>
-            <div className="grid grid-cols-2 gap-2 max-h-[240px] overflow-y-auto pr-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[240px] overflow-y-auto pr-1">
               {priceDrift.map(d => (
                 <div
                   key={d.id}

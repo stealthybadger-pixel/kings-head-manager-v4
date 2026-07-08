@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [react(), basicSsl()],
   server: {
     port: 3000,
-    https: true
+    https: process.env.VITE_HTTPS === '1'
   },
   optimizeDeps: {
     esbuildOptions: {

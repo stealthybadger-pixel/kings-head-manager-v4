@@ -14,25 +14,7 @@ import {
 } from 'lucide-react';
 import { SupplierProduct, Ingredient, IngredientSupplier } from '../types';
 import { findBestIngredientMatch, cleanProductName } from '../utils/matching';
-
-const CATEGORY_KEYWORDS: Record<string, string[]> = {
-  'Vegetable': ['tomato', 'potato', 'onion', 'carrot', 'pepper', 'lettuce', 'cucumber', 'courgette', 'broccoli', 'leek', 'mushroom', 'celery', 'spinach', 'kale', 'asparagus', 'garlic', 'shallot', 'beetroot', 'parsnip', 'cabbage', 'sweetcorn', 'pea', 'bean', 'salad', 'radish', 'fennel', 'artichoke', 'celeriac', 'chard', 'watercress', 'rocket', 'chicory', 'endive', 'samphire', 'vegetable'],
-  'Fruit': ['apple', 'pear', 'lemon', 'lime', 'orange', 'strawberry', 'raspberry', 'mango', 'pineapple', 'banana', 'melon', 'cherry', 'grape', 'peach', 'blueberry', 'blackberry', 'avocado', 'fig', 'pomegranate', 'passion fruit', 'grapefruit', 'plum', 'apricot', 'watermelon'],
-  'Meat': ['chicken', 'beef', 'pork', 'lamb', 'duck', 'turkey', 'steak', 'mince', 'sausage', 'bacon', 'ham', 'gammon', 'venison', 'veal', 'liver', 'kidney', 'rib', 'loin', 'brisket', 'rump', 'sirloin', 'chorizo', 'salami', 'pancetta', 'prosciutto'],
-  'Fish': ['salmon', 'cod', 'tuna', 'haddock', 'prawn', 'shrimp', 'crab', 'lobster', 'scallop', 'bass', 'mackerel', 'trout', 'plaice', 'halibut', 'sole', 'anchovy', 'sardine', 'squid', 'mussel', 'oyster', 'fish', 'seafood', 'bream', 'monkfish', 'skate'],
-  'Dairy': ['milk', 'cream', 'butter', 'cheese', 'yogurt', 'creme', 'mascarpone', 'mozzarella', 'brie', 'cheddar', 'parmesan', 'halloumi', 'feta', 'stilton', 'camembert', 'goats', 'dairy', 'crème', 'egg'],
-  'Dry Store': ['pasta', 'rice', 'flour', 'sugar', 'salt', 'lentil', 'chickpea', 'breadcrumb', 'couscous', 'quinoa', 'oat', 'cereal', 'noodle', 'cracker', 'biscuit', 'polenta', 'semolina', 'cornflour', 'custard', 'jelly', 'gelatine', 'bread', 'roll', 'bun', 'sourdough', 'brioche', 'focaccia', 'ciabatta', 'baguette', 'tortilla', 'wrap', 'pitta', 'crumpet', 'bagel', 'scone', 'croissant', 'oil', 'vinegar', 'dressing', 'balsamic', 'pastry', 'shortcrust', 'puff', 'filo', 'sauce', 'ketchup', 'mayo', 'mayonnaise', 'mustard', 'chutney', 'relish', 'jus', 'gravy', 'pesto', 'nut', 'seed', 'almond', 'walnut', 'cashew', 'pine nut', 'sunflower', 'pumpkin', 'sesame', 'peanut', 'pistachio', 'hazelnut', 'pecan', 'spice', 'paprika', 'cumin', 'coriander', 'turmeric', 'cinnamon', 'oregano', 'thyme', 'basil', 'rosemary', 'herb', 'cayenne', 'nutmeg', 'cardamom', 'clove', 'star anise', 'bay leaf', 'curry', 'tin', 'canned', 'jar', 'tinned', 'conserve', 'preserve'],
-  'Frozen': ['frozen'],
-  'Alcohol': ['wine', 'beer', 'spirit', 'gin', 'rum', 'vodka', 'whisky', 'brandy', 'champagne', 'prosecco', 'port', 'ale', 'lager', 'cider', 'sherry', 'liqueur', 'aperol'],
-};
-
-function inferCategory(productName: string): string | null {
-  const lower = productName.toLowerCase();
-  for (const [cat, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
-    if (keywords.some(kw => lower.includes(kw))) return cat;
-  }
-  return null;
-}
+import { inferCategory, CATEGORY_KEYWORDS } from '../utils/ingredientAutofill';
 
 export const Catalog: React.FC = () => {
   // Search & Filter State

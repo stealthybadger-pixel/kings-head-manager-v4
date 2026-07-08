@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useIngredients, useRecipes, useDishes, useStockMutations, useStockMovements, useStocktakeReports, useStocktakeMutations } from '../hooks/useKitchenData';
+import { useIngredients, useRecipes, useDishes, useStockMutations, useStockMovements, useStocktakeReports, useStocktakeMutations, useRecipeMutations } from '../hooks/useKitchenData';
 import { useStore } from '../store/useStore';
 import { useBleScale, isWebBluetoothSupported } from '../hooks/useBleScale';
-import { Search, Scale, FileText, CheckCircle2, X, Filter, Printer, Mail, ChevronDown, ChevronRight, BookOpen } from 'lucide-react';
+import { Search, Scale, FileText, CheckCircle2, X, Filter, Printer, Mail, ChevronDown, ChevronRight, BookOpen, ChefHat } from 'lucide-react';
 import { Ingredient, Recipe, RecipeItem, StocktakeReport, Unit } from '../types';
+import { DRY_STORE_SUBCATEGORIES } from '../utils/ingredientAutofill';
 
 interface ReportConfig {
   stockLevel: boolean;
@@ -61,6 +62,7 @@ export const Stock: React.FC = () => {
   const { data: wasteMovements = [] } = useStockMovements('waste');
   const { data: stocktakeReports = [] } = useStocktakeReports();
   const { saveReport } = useStocktakeMutations();
+  const { updateRecipe } = useRecipeMutations();
 
   const scaleConnected = useStore((state) => state.scaleConnected);
   const showToast = useStore((state) => state.showToast);
@@ -100,11 +102,15 @@ export const Stock: React.FC = () => {
   const [wasteDateTo, setWasteDateTo] = useState('');
   const [wasteIngFilter, setWasteIngFilter] = useState('');
 
-  // Sunday stock take
+  // Stock take
   const [activeLocation, setActiveLocation] = useState('All');
+  const [dryStoreSubCategory, setDryStoreSubCategory] = useState('All');
   const [stockCounts, setStockCounts] = useState<Record<string, number>>({});
-  const [scaleTareId, setScaleTareId] = useState<string>('none');
+  const [recipeCounts, setRecipeCounts] = useState<Record<string, number>>({});
+  const [itemTareIds, setItemTareIds] = useState<Record<string, string>>({});
   const [menuOnlyMode, setMenuOnlyMode] = useState(false);
+  const [stocktakeSearch, setStocktakeSearch] = useState('');
+  const [editingCountKey, setEditingCountKey] = useState<string | null>(null);
 
   // EPOS
   const [eposFile, setEposFile] = useState<File | null>(null);
@@ -114,18 +120,18 @@ export const Stock: React.FC = () => {
   }[] | null>(null);
 
   const containerProfiles = [
-    { id: '10l_tub', name: '10L Green Tub', tareWeight: 450 },
-    { id: '4l_tub', name: '4L Square Tub', tareWeight: 220 },
-    { id: '2l_bottle', name: '2L Squeeze Bottle', tareWeight: 85 },
-    { id: '1l_tub', name: '1L Round Tub', tareWeight: 60 }
+    { id: '10l_tub', name: '10L Tub', tareWeight: 322 },
+    { id: '4l_tub', name: '4L Tub', tareWeight: 149 },
+    { id: '2l_tub', name: '2L Tub', tareWeight: 98 },
+    { id: '1l_tub', name: '1L Tub', tareWeight: 57 },
+    { id: 'polycarb_half_deep', name: 'Polycarb 1/2 Gastro Deep', tareWeight: 753 },
+    { id: 'polycarb_half_shallow', name: 'Polycarb 1/2 Gastro Shallow', tareWeight: 524 }
   ];
 
-  const activeTare = useMemo(() => {
-    if (scaleTareId === 'none') return 0;
-    return containerProfiles.find(c => c.id === scaleTareId)?.tareWeight || 0;
-  }, [scaleTareId]);
-
-  const netWeightGrams = useMemo(() => Math.max(0, scaleWeightGrams - activeTare), [scaleWeightGrams, activeTare]);
+  const getTareWeight = (tareId: string | undefined) => {
+    if (!tareId || tareId === 'none') return 0;
+    return containerProfiles.find(c => c.id === tareId)?.tareWeight || 0;
+  };
 
   // ── Feature 1: cascade live menu → ingredient IDs ─────────────────────────
   const menuIngredientIds = useMemo(() => {
@@ -169,10 +175,43 @@ export const Stock: React.FC = () => {
 
   // ── Stocktake helpers ──────────────────────────────────────────────────────
   const stocktakeIngredients = useMemo(() => {
-    const base = activeLocation === 'All' ? ingredients : ingredients.filter(i => i.category === activeLocation);
-    if (!menuOnlyMode) return base;
-    return base.filter(i => menuIngredientIds.has(i.id));
-  }, [ingredients, activeLocation, menuOnlyMode, menuIngredientIds]);
+    let base = activeLocation === 'All' || activeLocation === 'Prep'
+      ? (activeLocation === 'Prep' ? [] : ingredients)
+      : ingredients.filter(i => i.category === activeLocation);
+    if (activeLocation === 'Dry Store' && dryStoreSubCategory !== 'All') {
+      base = base.filter(i => (i.subCategory || 'Other') === dryStoreSubCategory);
+    }
+    if (menuOnlyMode) {
+      base = base.filter(i => menuIngredientIds.has(i.id));
+    }
+    if (stocktakeSearch.trim()) {
+      const q = stocktakeSearch.trim().toLowerCase();
+      base = base.filter(i => i.name.toLowerCase().includes(q));
+    }
+    return base;
+  }, [ingredients, activeLocation, dryStoreSubCategory, menuOnlyMode, menuIngredientIds, stocktakeSearch]);
+
+  // Recipes prepped in batches (e.g. Mash Potato) that are directly used as a component
+  // of a currently-live dish — these get their own stock-take line alongside raw ingredients.
+  const liveRecipeIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const dish of dishes.filter(d => (d as any).isLive)) {
+      for (const item of (dish.items ?? [])) {
+        if (item.type === 'recipe' && item.subRecipeId) ids.add(item.subRecipeId);
+      }
+    }
+    return ids;
+  }, [dishes]);
+
+  const stocktakeRecipes = useMemo(() => {
+    if (activeLocation !== 'All' && activeLocation !== 'Prep') return [];
+    let base = recipes.filter(r => liveRecipeIds.has(r.id));
+    if (stocktakeSearch.trim()) {
+      const q = stocktakeSearch.trim().toLowerCase();
+      base = base.filter(r => r.name.toLowerCase().includes(q));
+    }
+    return base;
+  }, [recipes, liveRecipeIds, activeLocation, stocktakeSearch]);
 
   const isSaving = logMovement.isPending || saveReport.isPending;
 
@@ -230,6 +269,14 @@ export const Stock: React.FC = () => {
         menuOnly: menuOnlyMode
       });
 
+      // Persist counted prep-recipe batches (e.g. Mash Potato)
+      for (const [recipeId, count] of Object.entries(recipeCounts)) {
+        const rec = recipes.find(r => r.id === recipeId);
+        if (!rec || count === (rec.stockLevel ?? 0)) continue;
+        await updateRecipe.mutateAsync({ id: recipeId, data: { stockLevel: count } });
+        adjustmentCount++;
+      }
+
       showToast(
         adjustmentCount > 0
           ? `Stock take committed — ${adjustmentCount} adjustments saved`
@@ -238,6 +285,9 @@ export const Stock: React.FC = () => {
       );
       setShowStockTake(false);
       setStockCounts({});
+      setRecipeCounts({});
+      setStocktakeSearch('');
+      setEditingCountKey(null);
     } catch (err: any) {
       showToast(err.message || 'Failed to commit stock take', 'error');
     }
@@ -432,18 +482,18 @@ export const Stock: React.FC = () => {
     );
   }
 
-  const categories = ['All', 'Dry Store', 'Dairy', 'Meat', 'Fish', 'Vegetable', 'Fruit', 'Frozen', 'Alcohol'];
+  const categories = ['All', 'Prep', 'Dry Store', 'Dairy', 'Meat', 'Fish', 'Vegetable', 'Fruit', 'Frozen', 'Alcohol'];
 
   return (
-    <div className="p-8 h-full overflow-y-auto flex flex-col gap-8 bg-surface-container-lowest">
+    <div className="p-4 sm:p-8 h-full overflow-y-auto flex flex-col gap-4 sm:gap-8 bg-surface-container-lowest">
 
       {/* 1. CONTROL BAR */}
-      <div className="flex justify-between items-center border-b border-outline-variant pb-4">
+      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-outline-variant pb-4">
         <div>
           <h2 className="headline-sm font-semibold">Stock Ledger & Audits</h2>
           <span className="text-xs text-outline label-caps">EPOS COMPONENT WATERFALL</span>
         </div>
-        <div className="flex gap-3 flex-wrap justify-end">
+        <div className="flex gap-3 flex-wrap sm:justify-end">
           <button onClick={() => setShowReports(true)}
             className="h-10 px-4 border border-outline-variant text-xs font-bold label-caps rounded-sm hover:bg-surface-container flex items-center gap-1.5">
             <BookOpen className="h-4 w-4" /> Reports
@@ -462,13 +512,13 @@ export const Stock: React.FC = () => {
           </button>
           <button onClick={() => setShowStockTake(true)}
             className="h-10 px-6 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90">
-            Sunday Stock Take
+            Stock Take
           </button>
         </div>
       </div>
 
       {/* 2. SUMMARY GRID */}
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
         <div className="bg-surface border border-outline-variant p-6 rounded-sm">
           <h3 className="label-caps text-outline font-bold mb-4">Pantry Inventory Value</h3>
           <div className="display-lg text-primary data-tabular">£1,840.40</div>
@@ -482,7 +532,7 @@ export const Stock: React.FC = () => {
       </div>
 
       {/* 3. STOCK ON HAND DIRECTORY */}
-      <div className="border border-outline-variant p-6 rounded-sm flex flex-col gap-4 bg-surface-container-lowest">
+      <div className="border border-outline-variant p-4 sm:p-6 rounded-sm flex flex-col gap-4 bg-surface-container-lowest">
         <div className="flex justify-between items-center border-b border-outline-variant pb-2 flex-wrap gap-4">
           <div>
             <h3 className="label-caps text-on-surface font-bold flex items-center gap-1.5">
@@ -551,7 +601,7 @@ export const Stock: React.FC = () => {
 
       {/* WASTE LOG */}
       {showWastePanel && (
-        <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-8">
+        <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-3 sm:p-8">
           <div className="w-full max-w-lg bg-surface-container-lowest border border-outline-variant rounded-sm flex flex-col p-6">
             <h2 className="headline-sm font-semibold border-b border-outline-variant pb-3 mb-4">Daily Wastage Entry</h2>
             <div className="flex flex-col gap-6">
@@ -609,7 +659,7 @@ export const Stock: React.FC = () => {
 
       {/* FEATURE 2: WASTAGE HISTORY */}
       {showWastageHistory && (
-        <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-8">
+        <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-3 sm:p-8">
           <div className="w-full max-w-3xl h-[85vh] bg-surface-container-lowest border border-outline-variant rounded-sm flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant bg-surface flex-shrink-0">
               <div>
@@ -693,7 +743,7 @@ export const Stock: React.FC = () => {
 
       {/* FEATURE 3: REPORTS */}
       {showReports && (
-        <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-8">
+        <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-3 sm:p-8">
           <div className="w-full max-w-2xl h-[80vh] bg-surface-container-lowest border border-outline-variant rounded-sm flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant bg-surface flex-shrink-0">
               <h2 className="font-bold text-on-surface">Stocktake Reports</h2>
@@ -712,7 +762,7 @@ export const Stock: React.FC = () => {
             </div>
             <div className="flex-1 overflow-y-auto divide-y divide-outline-variant">
               {stocktakeReports.length === 0 ? (
-                <div className="py-12 text-center text-outline text-xs">No reports yet. Commit a Sunday Stock Take to create one.</div>
+                <div className="py-12 text-center text-outline text-xs">No reports yet. Commit a Stock Take to create one.</div>
               ) : (
                 stocktakeReports.map(report => (
                   <div key={report.id} className="px-6 py-4 flex items-center justify-between hover:bg-surface-container-low">
@@ -754,14 +804,14 @@ export const Stock: React.FC = () => {
 
       {/* EPOS IMPORTER */}
       {showEposImport && (
-        <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-8">
+        <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-3 sm:p-8">
           <div className="w-full max-w-3xl bg-surface-container-lowest border border-outline-variant rounded-sm flex flex-col p-6 max-h-[90vh]">
             <h2 className="headline-sm font-semibold border-b border-outline-variant pb-3 mb-4 flex items-center gap-2">
               <FileText className="h-5 w-5 text-primary" />EPOS Sales Importer & Variance Auditor
             </h2>
             <div className="flex flex-col gap-4 overflow-y-auto pr-1">
               <p className="text-xs text-on-surface-variant leading-relaxed">
-                Drop in your weekly EPOS Sales CSV. The system calculates theoretical ingredient usage and compares against your Sunday count.
+                Drop in your weekly EPOS Sales CSV. The system calculates theoretical ingredient usage and compares against your latest stock count.
               </p>
               <div className="border-2 border-dashed border-outline-variant p-6 text-center bg-surface hover:bg-surface-container cursor-pointer">
                 <input type="file" onChange={e => setEposFile(e.target.files?.[0] || null)} className="hidden" id="epos-file-input" />
@@ -810,7 +860,7 @@ export const Stock: React.FC = () => {
 
       {/* REPORT CONFIG MODAL */}
       {showReportConfig && (
-        <div className="fixed inset-0 z-[110] bg-black/40 flex items-center justify-center p-8">
+        <div className="fixed inset-0 z-[110] bg-black/40 flex items-center justify-center p-3 sm:p-8">
           <div className="w-full max-w-md bg-surface-container-lowest border border-outline-variant rounded-sm flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant bg-surface">
               <h2 className="font-bold text-on-surface">Report Options</h2>
@@ -893,16 +943,16 @@ export const Stock: React.FC = () => {
 
       {/* FEATURE 1: SUNDAY STOCK TAKE */}
       {showStockTake && (
-        <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-8">
-          <div className="w-full max-w-4xl h-[90vh] bg-surface-container-lowest border border-outline-variant rounded-sm flex flex-col overflow-hidden">
-            <div className="h-16 border-b border-outline-variant bg-surface flex items-center px-6 justify-between flex-shrink-0">
+        <div className={`fixed inset-0 flex items-center justify-center p-3 sm:p-8 transition-opacity ${bleScale.connecting ? 'z-0 opacity-0 pointer-events-none' : 'z-[100] bg-black/40'}`}>
+          <div className="w-full max-w-4xl h-full sm:h-[90vh] bg-surface-container-lowest border border-outline-variant rounded-sm flex flex-col overflow-hidden">
+            <div className="min-h-16 border-b border-outline-variant bg-surface flex flex-col sm:flex-row sm:items-center gap-3 px-4 sm:px-6 py-3 sm:py-0 justify-between flex-shrink-0">
               <div>
-                <h2 className="headline-sm font-semibold">Sunday Stock Take</h2>
+                <h2 className="headline-sm font-semibold">Stock Take</h2>
                 <span className="text-xs text-outline label-caps">
                   {menuOnlyMode ? `${menuIngredientIds.size} menu-relevant ingredients` : `${ingredients.length} total ingredients`}
                 </span>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
                 {/* Menu-only toggle */}
                 <button
                   onClick={() => setMenuOnlyMode(m => !m)}
@@ -928,71 +978,147 @@ export const Stock: React.FC = () => {
             </div>
 
             {scaleConnected && (
-              <div className="h-14 bg-surface border-b border-outline-variant flex items-center px-6 justify-between text-xs flex-shrink-0">
-                <div className="flex items-center gap-6">
-                  <div>
-                    <span className="text-outline uppercase label-caps text-[9px] mr-2">Tare:</span>
-                    <select value={scaleTareId} onChange={e => setScaleTareId(e.target.value)}
-                      className="px-2 py-1 border border-outline-variant bg-surface-container-lowest text-xs rounded-sm">
-                      <option value="none">None (0g)</option>
-                      {containerProfiles.map(c => <option key={c.id} value={c.id}>{c.name} ({c.tareWeight}g)</option>)}
-                    </select>
-                  </div>
-                  <div><span className="text-outline uppercase label-caps text-[9px] mr-2">Raw:</span><span className="data-tabular font-bold">{scaleWeightGrams} g</span></div>
-                  <div><span className="text-outline uppercase label-caps text-[9px] mr-2">Net:</span><span className="data-tabular font-bold text-primary">{netWeightGrams} g</span></div>
-                </div>
+              <div className="h-12 bg-surface border-b border-outline-variant flex items-center px-6 text-xs flex-shrink-0">
+                <span className="text-outline uppercase label-caps text-[9px] mr-2">Raw Weight:</span>
+                <span className="data-tabular font-bold">{scaleWeightGrams} g</span>
+                <span className="text-[10px] text-outline ml-4">Pick each item's tub/container from the list below to auto-subtract its weight.</span>
               </div>
             )}
 
             <div className="border-b border-outline-variant bg-surface flex items-center px-6 gap-2 flex-shrink-0 overflow-x-auto h-12">
               {categories.map(cat => (
-                <button key={cat} onClick={() => setActiveLocation(cat)}
+                <button key={cat} onClick={() => { setActiveLocation(cat); setDryStoreSubCategory('All'); }}
                   className={`h-8 px-4 text-xs font-bold label-caps rounded-sm transition-colors whitespace-nowrap ${activeLocation === cat ? 'bg-primary text-white' : 'text-outline hover:bg-surface-container'}`}>
                   {cat}
                 </button>
               ))}
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-3">
-              {stocktakeIngredients.length === 0 ? (
-                <div className="py-12 text-center text-outline text-xs">
-                  {menuOnlyMode ? 'No menu-relevant ingredients in this category.' : 'No ingredients in this category.'}
+            {activeLocation === 'Dry Store' && (
+              <div className="border-b border-outline-variant bg-surface-container-lowest flex items-center px-6 gap-2 flex-shrink-0 overflow-x-auto h-10">
+                {['All', ...DRY_STORE_SUBCATEGORIES].map(sub => (
+                  <button key={sub} onClick={() => setDryStoreSubCategory(sub)}
+                    className={`h-7 px-3 text-[10px] font-bold label-caps rounded-sm transition-colors whitespace-nowrap ${dryStoreSubCategory === sub ? 'bg-secondary-container text-primary' : 'text-outline hover:bg-surface-container'}`}>
+                    {sub}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="border-b border-outline-variant bg-surface px-4 sm:px-6 py-2 flex-shrink-0">
+              <div className="relative flex items-center bg-surface-container-lowest border border-outline-variant rounded-sm px-3 py-1.5 max-w-sm">
+                <Search className="h-3.5 w-3.5 text-outline mr-2 flex-shrink-0" />
+                <input type="text" placeholder="Search this stock take..." value={stocktakeSearch}
+                  onChange={e => setStocktakeSearch(e.target.value)}
+                  className="flex-1 text-sm bg-transparent outline-none border-none focus:ring-0 p-0 min-w-0" />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-3 sm:p-6 flex flex-col gap-3">
+              {stocktakeRecipes.map((rec) => (
+                <div key={`recipe-${rec.id}`} className="flex items-center justify-between gap-2 p-3 sm:p-4 border border-primary/30 bg-secondary-container/20 rounded-sm">
+                  <div className="min-w-0">
+                    <span className="font-semibold text-sm text-on-surface truncate flex items-center gap-1.5">
+                      <ChefHat className="h-3.5 w-3.5 text-primary flex-shrink-0" /> {rec.name}
+                    </span>
+                    <div className="text-[10px] text-outline uppercase tracking-wider mt-0.5">
+                      Prep Recipe • Current: {rec.stockLevel ?? 0} {rec.batchUnit}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {scaleConnected && (() => {
+                      const recTareId = itemTareIds[`recipe-${rec.id}`] || 'none';
+                      const recNetGrams = Math.max(0, scaleWeightGrams - getTareWeight(recTareId));
+                      const recNetInBatchUnit = (rec.batchUnit === 'kg' || rec.batchUnit === 'l') ? recNetGrams / 1000 : recNetGrams;
+                      return (
+                        <>
+                          <select value={recTareId} onChange={e => setItemTareIds(prev => ({ ...prev, [`recipe-${rec.id}`]: e.target.value }))}
+                            className="px-2 py-2 border border-outline-variant bg-surface-container-lowest text-[11px] rounded-sm max-w-[110px] sm:max-w-none">
+                            <option value="none">No tub</option>
+                            {containerProfiles.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                          </select>
+                          <button onClick={() => setRecipeCounts(prev => ({ ...prev, [rec.id]: recNetInBatchUnit }))}
+                            title={`Fill net weight (${recNetInBatchUnit} ${rec.batchUnit} after tare)`}
+                            className="h-10 w-10 flex-shrink-0 border border-outline flex items-center justify-center rounded-sm bg-surface hover:bg-surface-container">
+                            <Scale className="h-4 w-4" />
+                          </button>
+                        </>
+                      );
+                    })()}
+                    {editingCountKey === `recipe-${rec.id}` ? (
+                      <input type="number" autoFocus value={recipeCounts[rec.id] !== undefined ? recipeCounts[rec.id] : (rec.stockLevel || '')}
+                        onChange={e => setRecipeCounts(prev => ({ ...prev, [rec.id]: parseFloat(e.target.value) || 0 }))}
+                        onBlur={() => setEditingCountKey(null)}
+                        className="w-24 sm:w-28 px-3 py-2 border border-primary text-center data-tabular text-sm font-bold bg-surface-container-lowest" />
+                    ) : (
+                      <button onClick={() => setEditingCountKey(`recipe-${rec.id}`)}
+                        className="w-24 sm:w-28 px-3 py-2 border border-outline-variant text-center data-tabular text-sm font-bold bg-surface-container-lowest rounded-sm">
+                        {recipeCounts[rec.id] !== undefined ? recipeCounts[rec.id] : (rec.stockLevel || 0)}
+                      </button>
+                    )}
+                    <span className="text-xs text-outline w-8">{rec.batchUnit}</span>
+                  </div>
                 </div>
-              ) : stocktakeIngredients.map((ing, idx) => (
-                <div key={ing.id} className={`flex items-center justify-between p-4 border border-outline-variant rounded-sm ${idx % 2 === 0 ? 'bg-transparent' : 'bg-black/[0.0075]'}`}>
-                  <div>
-                    <span className="font-semibold text-sm text-on-surface">{ing.name}</span>
+              ))}
+              {stocktakeIngredients.length === 0 && stocktakeRecipes.length === 0 ? (
+                <div className="py-12 text-center text-outline text-xs">
+                  {stocktakeSearch ? 'No items match your search.' : menuOnlyMode ? 'No menu-relevant ingredients in this category.' : 'No ingredients in this category.'}
+                </div>
+              ) : stocktakeIngredients.map((ing, idx) => {
+                const tareId = itemTareIds[ing.id] || 'none';
+                const netWeight = Math.max(0, scaleWeightGrams - getTareWeight(tareId));
+                return (
+                <div key={ing.id} className={`flex items-center justify-between gap-2 p-3 sm:p-4 border border-outline-variant rounded-sm ${idx % 2 === 0 ? 'bg-transparent' : 'bg-black/[0.0075]'}`}>
+                  <div className="min-w-0">
+                    <span className="font-semibold text-sm text-on-surface truncate block">{ing.name}</span>
                     <div className="text-[10px] text-outline uppercase tracking-wider mt-0.5">
                       {ing.category} • Current: {ing.stockLevel ?? 0}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     {scaleConnected && (
-                      <button onClick={() => setStockCounts(prev => ({ ...prev, [ing.id]: netWeightGrams }))}
-                        className="h-10 w-10 border border-outline flex items-center justify-center rounded-sm bg-surface hover:bg-surface-container">
-                        <Scale className="h-4 w-4" />
+                      <>
+                        <select value={tareId} onChange={e => setItemTareIds(prev => ({ ...prev, [ing.id]: e.target.value }))}
+                          className="px-2 py-2 border border-outline-variant bg-surface-container-lowest text-[11px] rounded-sm max-w-[110px] sm:max-w-none">
+                          <option value="none">No tub</option>
+                          {containerProfiles.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                        <button onClick={() => setStockCounts(prev => ({ ...prev, [ing.id]: netWeight }))}
+                          title={`Fill net weight (${netWeight}g after tare)`}
+                          className="h-10 w-10 flex-shrink-0 border border-outline flex items-center justify-center rounded-sm bg-surface hover:bg-surface-container">
+                          <Scale className="h-4 w-4" />
+                        </button>
+                      </>
+                    )}
+                    {editingCountKey === `ing-${ing.id}` ? (
+                      <input type="number" autoFocus value={stockCounts[ing.id] !== undefined ? stockCounts[ing.id] : (ing.stockLevel || '')}
+                        onChange={e => setStockCounts(prev => ({ ...prev, [ing.id]: parseFloat(e.target.value) || 0 }))}
+                        onBlur={() => setEditingCountKey(null)}
+                        className="w-24 sm:w-28 px-3 py-2 border border-primary text-center data-tabular text-sm font-bold bg-surface-container-lowest" />
+                    ) : (
+                      <button onClick={() => setEditingCountKey(`ing-${ing.id}`)}
+                        className="w-24 sm:w-28 px-3 py-2 border border-outline-variant text-center data-tabular text-sm font-bold bg-surface-container-lowest rounded-sm">
+                        {stockCounts[ing.id] !== undefined ? stockCounts[ing.id] : (ing.stockLevel || 0)}
                       </button>
                     )}
-                    <input type="number" value={stockCounts[ing.id] !== undefined ? stockCounts[ing.id] : (ing.stockLevel || '')}
-                      onChange={e => setStockCounts(prev => ({ ...prev, [ing.id]: parseFloat(e.target.value) || 0 }))}
-                      className="w-28 px-3 py-2 border border-outline-variant text-center data-tabular text-sm font-bold bg-surface-container-lowest" />
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
 
-            <div className="h-16 border-t border-outline-variant bg-surface flex items-center px-6 justify-between flex-shrink-0">
-              <span className="text-xs text-outline">
+            <div className="min-h-16 border-t border-outline-variant bg-surface flex flex-col sm:flex-row items-center gap-3 px-4 sm:px-6 py-3 sm:py-0 justify-between flex-shrink-0">
+              <span className="text-xs text-outline order-2 sm:order-1">
                 {Object.keys(stockCounts).length} items counted
               </span>
-              <div className="flex gap-3">
-                <button onClick={() => { setShowStockTake(false); setStockCounts({}); }}
-                  className="h-10 px-4 border border-outline text-xs font-bold label-caps rounded-sm hover:bg-surface-container">
+              <div className="flex gap-3 w-full sm:w-auto order-1 sm:order-2">
+                <button onClick={() => { setShowStockTake(false); setStockCounts({}); setRecipeCounts({}); setStocktakeSearch(''); setEditingCountKey(null); }}
+                  className="h-10 px-4 flex-1 sm:flex-none border border-outline text-xs font-bold label-caps rounded-sm hover:bg-surface-container">
                   Cancel
                 </button>
                 <button onClick={handleCommitStockTake} disabled={isSaving}
-                  className="h-10 px-6 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90 disabled:opacity-50 flex items-center gap-2">
-                  {isSaving ? <><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />Committing...</> : 'Commit Sunday Counts'}
+                  className="h-10 px-4 sm:px-6 flex-1 sm:flex-none bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90 disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap">
+                  {isSaving ? <><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />Committing...</> : 'Commit Now'}
                 </button>
               </div>
             </div>

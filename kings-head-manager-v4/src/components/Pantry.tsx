@@ -2,8 +2,10 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { supplierBadgeClass } from '../utils/supplierColors';
 import { useIngredients, useIngredientMutations, useSupplierSearchQuery, useDishes } from '../hooks/useKitchenData';
 import { useStore } from '../store/useStore';
-import { Search, Plus, Trash2, AlertCircle, FileText, CheckCircle2, ListTodo, Check, ArrowRight } from 'lucide-react';
+import { Search, Plus, Trash2, AlertCircle, FileText, CheckCircle2, ListTodo, Check, ArrowRight, ArrowLeft } from 'lucide-react';
 import { Ingredient, IngredientCategory, SupplierName, Unit, Allergen, IngredientSupplier } from '../types';
+import { useIsMobile } from '../hooks/useIsMobile';
+import { inferIngredientDefaults, DRY_STORE_SUBCATEGORIES } from '../utils/ingredientAutofill';
 
 // Self-contained catalog search for a single supplier row
 const CatalogRowSearch: React.FC<{
@@ -125,6 +127,7 @@ export const Pantry: React.FC = () => {
   
   const selectedId = useStore((state) => state.selectedIngredientId);
   const selectIngredient = useStore((state) => state.selectIngredient);
+  const isMobile = useIsMobile();
   const showToast = useStore((state) => state.showToast);
   const navigateToCatalogWithSearch = useStore((state) => state.navigateToCatalogWithSearch);
 
@@ -251,7 +254,12 @@ export const Pantry: React.FC = () => {
     return null;
   }, [activeIngredient, catalogProducts]);
 
+  // Tracks which auto-fillable fields the user has manually overridden for the
+  // ingredient currently being created, so typing more of the name doesn't clobber them.
+  const autofillTouched = useRef({ category: false, subCategory: false, wastePercent: false, kcalPer100: false, allergens: false });
+
   const handleStartNew = () => {
+    autofillTouched.current = { category: false, subCategory: false, wastePercent: false, kcalPer100: false, allergens: false };
     setFormState({
       name: '',
       category: 'Dry Store',
@@ -264,6 +272,21 @@ export const Pantry: React.FC = () => {
     setIsNew(true);
     setIsEditing(true);
     selectIngredient(null);
+  };
+
+  const handleNameChange = (name: string) => {
+    setFormState(prev => {
+      const next = { ...prev, name };
+      if (!isNew) return next;
+      const guess = inferIngredientDefaults(name);
+      const touched = autofillTouched.current;
+      if (!touched.category && guess.category) next.category = guess.category as any;
+      if (!touched.subCategory && guess.subCategory) next.subCategory = guess.subCategory;
+      if (!touched.wastePercent && guess.wastePercent !== null) next.wastePercent = guess.wastePercent;
+      if (!touched.kcalPer100 && guess.kcalPer100 !== null) next.kcalPer100 = guess.kcalPer100;
+      if (!touched.allergens && guess.allergens.length > 0) next.allergens = guess.allergens;
+      return next;
+    });
   };
 
   // Trigger create new master ingredient view when selectedId is 'new'
@@ -567,9 +590,9 @@ export const Pantry: React.FC = () => {
 
   return (
     <div className="flex h-full w-full bg-surface-container-lowest">
-      
-      {/* 1. LEFT COLUMN: SEARCH & CATALOG LIST (35%) */}
-      <div className="w-[35%] border-r border-outline-variant h-full flex flex-col bg-surface-container-lowest">
+
+      {/* 1. LEFT COLUMN: SEARCH & CATALOG LIST (35% desktop / full-width mobile list view) */}
+      <div className={`${isMobile ? (isEditing ? 'hidden' : 'w-full') : 'w-[35%]'} border-r border-outline-variant h-full flex flex-col bg-surface-container-lowest`}>
         <div className="p-4 border-b border-outline-variant bg-surface flex flex-col gap-3">
           <div className="flex justify-between items-center">
             <span className="label-caps text-outline font-bold">Pantry Directory</span>
@@ -660,11 +683,19 @@ export const Pantry: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. RIGHT COLUMN: WORKSPACE PROFILE EDITOR (65%) */}
-      <div className="flex-1 h-full p-8 overflow-y-auto bg-surface-container-lowest flex flex-col gap-6">
+      {/* 2. RIGHT COLUMN: WORKSPACE PROFILE EDITOR (65% desktop / full-width mobile detail view) */}
+      <div className={`${isMobile ? (isEditing ? 'w-full' : 'hidden') : 'flex-1'} h-full p-4 sm:p-8 overflow-y-auto bg-surface-container-lowest flex flex-col gap-6`}>
         {isEditing ? (
           <>
-            <div className="flex justify-between items-center border-b border-outline-variant pb-4">
+            {isMobile && (
+              <button
+                onClick={() => { selectIngredient(null); setIsEditing(false); setIsNew(false); }}
+                className="flex items-center gap-1.5 text-xs font-bold label-caps text-outline -mb-2 min-h-[44px]"
+              >
+                <ArrowLeft className="h-4 w-4" /> Back to list
+              </button>
+            )}
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 border-b border-outline-variant pb-4">
               <div>
                 <h2 className="headline-sm font-semibold">{isNew ? 'Create New Ingredient' : formState.name}</h2>
                 <div className="flex items-center gap-2 mt-1">
@@ -720,45 +751,60 @@ export const Pantry: React.FC = () => {
             </div>
 
             {/* Inputs Grid */}
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
               <div>
                 <label className="label-caps text-outline block mb-2">Ingredient Name</label>
                 <input
                   type="text"
                   value={formState.name}
-                  onChange={(e) => setFormState(prev => ({ ...prev, name: e.target.value }))}
+                  onChange={(e) => handleNameChange(e.target.value)}
                   className="w-full px-3 py-2 border border-outline-variant rounded-sm text-sm"
                   placeholder="e.g., Maris Piper Potatoes"
                 />
+                {isNew && <span className="text-[10px] text-outline mt-1 block">Category, waste %, calories and allergens auto-fill as you type — edit any field to override.</span>}
               </div>
 
               <div>
                 <label className="label-caps text-outline block mb-2">Category</label>
-                <select 
+                <select
                   value={formState.category}
-                  onChange={(e) => setFormState(prev => ({ ...prev, category: e.target.value as any }))}
+                  onChange={(e) => { autofillTouched.current.category = true; setFormState(prev => ({ ...prev, category: e.target.value as any })); }}
                   className="w-full px-3 py-2 border border-outline-variant rounded-sm text-sm"
                 >
                   {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                 </select>
               </div>
 
+              {formState.category === 'Dry Store' && (
+                <div>
+                  <label className="label-caps text-outline block mb-2">Dry Store Sub-Category</label>
+                  <select
+                    value={formState.subCategory || ''}
+                    onChange={(e) => { autofillTouched.current.subCategory = true; setFormState(prev => ({ ...prev, subCategory: e.target.value || undefined })); }}
+                    className="w-full px-3 py-2 border border-outline-variant rounded-sm text-sm"
+                  >
+                    <option value="">— None —</option>
+                    {DRY_STORE_SUBCATEGORIES.map(sub => <option key={sub} value={sub}>{sub}</option>)}
+                  </select>
+                </div>
+              )}
+
               <div>
                 <label className="label-caps text-outline block mb-2">Waste Percentage (%)</label>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   value={formState.wastePercent}
-                  onChange={(e) => setFormState(prev => ({ ...prev, wastePercent: Math.max(0, parseFloat(e.target.value) || 0) }))}
+                  onChange={(e) => { autofillTouched.current.wastePercent = true; setFormState(prev => ({ ...prev, wastePercent: Math.max(0, parseFloat(e.target.value) || 0) })); }}
                   className="w-full px-3 py-2 border border-outline-variant rounded-sm text-sm data-tabular"
                 />
               </div>
 
               <div>
                 <label className="label-caps text-outline block mb-2">Calories (kcal per 100g)</label>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   value={formState.kcalPer100}
-                  onChange={(e) => setFormState(prev => ({ ...prev, kcalPer100: Math.max(0, parseInt(e.target.value) || 0) }))}
+                  onChange={(e) => { autofillTouched.current.kcalPer100 = true; setFormState(prev => ({ ...prev, kcalPer100: Math.max(0, parseInt(e.target.value) || 0) })); }}
                   className="w-full px-3 py-2 border border-outline-variant rounded-sm text-sm data-tabular"
                 />
               </div>
@@ -798,7 +844,7 @@ export const Pantry: React.FC = () => {
                     <button
                       key={allergen}
                       type="button"
-                      onClick={() => setFormState(prev => {
+                      onClick={() => { autofillTouched.current.allergens = true; setFormState(prev => {
                         const current = prev.allergens || [];
                         return {
                           ...prev,
@@ -806,7 +852,7 @@ export const Pantry: React.FC = () => {
                             ? current.filter(a => a !== allergen)
                             : [...current, allergen]
                         };
-                      })}
+                      }); }}
                       className={`px-2.5 py-1 text-xs font-semibold border transition-all ${
                         active
                           ? 'bg-error text-white border-error'

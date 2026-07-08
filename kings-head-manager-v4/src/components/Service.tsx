@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { useDishes, useIngredients, useRecipes, useDishMutations } from '../hooks/useKitchenData';
 import { useStore } from '../store/useStore';
-import { Search, Plus, Trash2, AlertTriangle, CheckCircle, TrendingUp, Radio } from 'lucide-react';
+import { Search, Plus, Trash2, AlertTriangle, CheckCircle, TrendingUp, Radio, ArrowLeft } from 'lucide-react';
 import { Allergen, AllergenSchema, Dish, DishItem, DishType, Ingredient, Recipe, Unit } from '../types';
 import { calculateIngredientCost } from '../utils/costing';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 const DISH_TYPES: DishType[] = ['Starter', 'Main', 'Side', 'Dessert', 'Drink', 'Other'];
 const ALL_ALLERGENS = AllergenSchema.options as Allergen[];
@@ -71,6 +72,7 @@ export const Service: React.FC = () => {
   const selectedId = useStore((state) => state.selectedDishId);
   const selectDish = useStore((state) => state.selectDish);
   const showToast = useStore((state) => state.showToast);
+  const isMobile = useIsMobile();
 
   // Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -275,8 +277,8 @@ export const Service: React.FC = () => {
   return (
     <div className="flex h-full w-full bg-surface-container-lowest">
       
-      {/* 1. LEFT PANEL: DISH DIRECTORY (35%) */}
-      <div className="w-[35%] border-r border-outline-variant h-full flex flex-col bg-surface-container-lowest">
+      {/* 1. LEFT PANEL: DISH DIRECTORY (35% desktop / full-width mobile list view) */}
+      <div className={`${isMobile ? (isEditing ? 'hidden' : 'w-full') : 'w-[35%]'} border-r border-outline-variant h-full flex flex-col bg-surface-container-lowest`}>
         <div className="p-4 border-b border-outline-variant bg-surface flex flex-col gap-3">
           <div className="flex justify-between items-center">
             <span className="label-caps text-outline font-bold">Menu List</span>
@@ -362,11 +364,19 @@ export const Service: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. RIGHT PANEL: COSTING WORKSPACE (65%) */}
-      <div className="flex-1 h-full p-8 overflow-y-auto bg-surface-container-lowest flex flex-col gap-6">
+      {/* 2. RIGHT PANEL: COSTING WORKSPACE (65% desktop / full-width mobile detail view) */}
+      <div className={`${isMobile ? (isEditing ? 'w-full' : 'hidden') : 'flex-1'} h-full p-4 sm:p-8 overflow-y-auto bg-surface-container-lowest flex flex-col gap-6`}>
         {isEditing ? (
           <>
-            <div className="flex justify-between items-center border-b border-outline-variant pb-4">
+            {isMobile && (
+              <button
+                onClick={() => { selectDish(null); setIsEditing(false); setIsNew(false); }}
+                className="flex items-center gap-1.5 text-xs font-bold label-caps text-outline -mb-2 min-h-[44px]"
+              >
+                <ArrowLeft className="h-4 w-4" /> Back to list
+              </button>
+            )}
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 border-b border-outline-variant pb-4">
               <div>
                 <h2 className="headline-sm font-semibold">{isNew ? 'New Dish Profile' : formState.name}</h2>
                 <span className="text-xs text-outline label-caps">Plate Cost Calculator</span>
@@ -409,7 +419,7 @@ export const Service: React.FC = () => {
             </div>
 
             {/* Inputs Grid */}
-            <div className="grid grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
               <div className="col-span-2">
                 <label className="label-caps text-outline block mb-2">Dish Name</label>
                 <input
@@ -418,17 +428,6 @@ export const Service: React.FC = () => {
                   onChange={(e) => setFormState(prev => ({ ...prev, name: e.target.value }))}
                   className="w-full px-3 py-2 border border-outline-variant rounded-sm text-sm"
                   placeholder="e.g., Roast Cod with Parsley Mash"
-                />
-              </div>
-
-              <div>
-                <label className="label-caps text-outline block mb-2">Retail Sell Price (£)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formState.retailPrice}
-                  onChange={(e) => setFormState(prev => ({ ...prev, retailPrice: Math.max(0, parseFloat(e.target.value) || 0) }))}
-                  className="w-full px-3 py-2 border border-outline-variant rounded-sm text-sm data-tabular"
                 />
               </div>
 
@@ -446,7 +445,7 @@ export const Service: React.FC = () => {
             </div>
 
             {/* Sliders */}
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="label-caps text-outline">Target GP %</label>
@@ -455,7 +454,11 @@ export const Service: React.FC = () => {
                 <input
                   type="range" min={0} max={100} step={1}
                   value={formState.targetGP}
-                  onChange={e => setFormState(prev => ({ ...prev, targetGP: Number(e.target.value) }))}
+                  onChange={e => {
+                    const targetGP = Number(e.target.value);
+                    const suggestedPrice = targetGP === 100 ? 0 : plateCost / (1 - targetGP / 100);
+                    setFormState(prev => ({ ...prev, targetGP, retailPrice: Math.round(suggestedPrice * 4) / 4 }));
+                  }}
                   className="w-full accent-primary h-1.5"
                 />
                 <div className="flex justify-between text-[10px] text-outline mt-0.5">
@@ -470,7 +473,11 @@ export const Service: React.FC = () => {
                 <input
                   type="range" min={0} max={100} step={0.25}
                   value={formState.retailPrice}
-                  onChange={e => setFormState(prev => ({ ...prev, retailPrice: Number(e.target.value) }))}
+                  onChange={e => {
+                    const retailPrice = Number(e.target.value);
+                    const impliedGP = retailPrice > 0 ? ((retailPrice - plateCost) / retailPrice) * 100 : 0;
+                    setFormState(prev => ({ ...prev, retailPrice, targetGP: Math.round(Math.max(0, Math.min(100, impliedGP))) }));
+                  }}
                   className="w-full accent-primary h-1.5"
                 />
                 <div className="flex justify-between text-[10px] text-outline mt-0.5">
@@ -652,7 +659,7 @@ export const Service: React.FC = () => {
             })()}
 
             {/* FINANCIAL CALCULATOR BOARD */}
-            <div className="mt-8 border-t border-outline-variant pt-6 grid grid-cols-3 gap-6 bg-surface p-6 border border-outline-variant rounded-sm">
+            <div className="mt-8 border-t border-outline-variant pt-6 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 bg-surface p-4 sm:p-6 border border-outline-variant rounded-sm">
               <div className="flex flex-col">
                 <span className="label-caps text-outline">Total Plate Cost</span>
                 <span className="text-2xl font-bold text-primary data-tabular mt-1">£{plateCost.toFixed(2)}</span>

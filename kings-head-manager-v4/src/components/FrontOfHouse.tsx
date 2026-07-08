@@ -154,7 +154,7 @@ const FrontOfHouse: React.FC = () => {
   return (
     <div className="flex flex-col h-full bg-surface overflow-hidden">
       {/* Header */}
-      <div className="flex-none border-b border-outline-variant px-5 py-3 flex items-center justify-between bg-surface">
+      <div className="flex-none border-b border-outline-variant px-4 sm:px-5 py-3 flex flex-wrap items-center justify-between gap-2 bg-surface">
         <div>
           <h1 className="text-sm font-bold uppercase tracking-widest text-primary">
             Front of House
@@ -179,10 +179,10 @@ const FrontOfHouse: React.FC = () => {
       </div>
 
       {/* Allergen filters */}
-      <div className="flex-none border-b border-outline-variant px-5 py-3 bg-surface-container-lowest">
-        <div className="flex items-center gap-4 mb-3">
+      <div className="flex-none border-b border-outline-variant px-4 sm:px-5 py-3 bg-surface-container-lowest">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-3">
           <p className="text-xs text-outline uppercase tracking-widest">Toggle to grey out:</p>
-          <div className="flex gap-3 text-[10px] font-bold uppercase tracking-wide">
+          <div className="flex flex-wrap gap-3 text-[10px] font-bold uppercase tracking-wide">
             {Object.entries(TYPE_LABEL_COLOUR).map(([type, cls]) => (
               <span key={type} className={cls}>● {type}</span>
             ))}
@@ -210,7 +210,7 @@ const FrontOfHouse: React.FC = () => {
       </div>
 
       {/* Dish grid */}
-      <div className="flex-1 overflow-y-auto p-5 bg-surface-container-lowest">
+      <div className="flex-1 overflow-y-auto p-3 sm:p-5 bg-surface-container-lowest">
         {isLoading ? (
           <div className="flex items-center justify-center h-full text-outline text-sm">
             Loading menu…
@@ -221,7 +221,7 @@ const FrontOfHouse: React.FC = () => {
             <p className="text-xs">Toggle dishes as Live in the Dishes section.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3">
             {liveDishes.map((dish) => {
               const greyed = isGreyed(dish);
               const dishAllgs = dishAllergenMap.get(dish.id) ?? new Set<Allergen>();

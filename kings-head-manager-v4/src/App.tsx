@@ -15,7 +15,8 @@ import {
   ScanLine,
   ChevronDown,
   UtensilsCrossed,
-  MonitorPlay
+  MonitorPlay,
+  Menu
 } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import Pantry from './components/Pantry';
@@ -28,8 +29,33 @@ import InvoiceScanner from './components/InvoiceScanner';
 import Help from './components/Help';
 import FrontOfHouse from './components/FrontOfHouse';
 import { useStore } from './store/useStore';
+import { useIsMobile } from './hooks/useIsMobile';
 
 export type ViewType = 'dashboard' | 'pantry' | 'catalog' | 'kitchen' | 'service' | 'stock' | 'suppliers' | 'invoice' | 'settings' | 'foh';
+
+// Views rendered on the floor during a shift — get the primary mobile tab bar slots.
+const MOBILE_TAB_ITEMS = [
+  { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
+  { id: 'stock', label: 'Stock', icon: Boxes },
+  { id: 'pantry', label: 'Pantry', icon: Database },
+  { id: 'service', label: 'Dishes', icon: Utensils },
+  { id: 'foh', label: 'FOH', icon: MonitorPlay },
+] as const;
+
+// Everything else lives behind the "More" sheet on mobile.
+const MOBILE_MORE_ITEMS = [
+  { id: 'catalog', label: 'Supplier Catalogue', icon: BookOpen },
+  { id: 'kitchen', label: 'Recipes', icon: ChefHat },
+  { id: 'invoice', label: 'Invoices', icon: ScanLine },
+  { id: 'suppliers', label: 'Suppliers', icon: Truck },
+  { id: 'settings', label: 'Help', icon: HelpCircle },
+] as const;
+
+const VIEW_TITLES: Record<ViewType, string> = {
+  dashboard: 'Dashboard', pantry: 'Pantry', catalog: 'Catalog', kitchen: 'Recipes',
+  service: 'Dishes', stock: 'Stock', suppliers: 'Suppliers', invoice: 'Invoices',
+  settings: 'Help', foh: 'Front of House'
+};
 
 const App: React.FC = () => {
   const currentView = useStore((state) => state.currentView);
@@ -38,6 +64,8 @@ const App: React.FC = () => {
   const dismissToast = useStore((state) => state.dismissToast);
   const [navCollapsed, setNavCollapsed] = useState<boolean>(true);
   const [kitchenOpen, setKitchenOpen] = useState<boolean>(true);
+  const isMobile = useIsMobile();
+  const [showMoreSheet, setShowMoreSheet] = useState(false);
 
   const topItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -57,6 +85,139 @@ const App: React.FC = () => {
     { id: 'suppliers', label: 'Suppliers', icon: Truck },
     { id: 'settings', label: 'Help', icon: HelpCircle },
   ] as const;
+
+  const viewContent = (
+    <>
+      {currentView === 'dashboard' && <Dashboard />}
+      {currentView === 'pantry' && <Pantry />}
+      {currentView === 'catalog' && <Catalog />}
+      {currentView === 'kitchen' && <Kitchen />}
+      {currentView === 'service' && <Service />}
+      {currentView === 'stock' && <Stock />}
+      {currentView === 'invoice' && <InvoiceScanner />}
+      {currentView === 'foh' && <FrontOfHouse />}
+      {currentView === 'suppliers' && <Suppliers />}
+      {currentView === 'settings' && <Help />}
+    </>
+  );
+
+  if (isMobile) {
+    const isMoreActive = MOBILE_MORE_ITEMS.some((i) => i.id === currentView);
+    return (
+      <div className="flex flex-col h-[100dvh] w-screen bg-background overflow-hidden text-on-surface font-sans">
+        {/* Slim top bar */}
+        <header className="h-14 flex items-center justify-between px-4 border-b border-outline-variant bg-surface-container-lowest flex-shrink-0">
+          <h1 className="text-base font-semibold text-on-surface capitalize truncate">
+            {VIEW_TITLES[currentView]}
+          </h1>
+          <span className="text-[9px] font-mono font-bold text-outline uppercase tracking-widest flex-shrink-0">v4</span>
+        </header>
+
+        {/* View content */}
+        <div className="flex-1 overflow-y-auto relative bg-surface-container-lowest">
+          {viewContent}
+        </div>
+
+        {/* Bottom tab bar */}
+        <nav className="flex-shrink-0 border-t border-outline-variant bg-surface-container flex items-stretch h-16 pb-[env(safe-area-inset-bottom)]">
+          {MOBILE_TAB_ITEMS.map((item) => {
+            const IconComponent = item.icon;
+            const isActive = currentView === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => { setCurrentView(item.id); setShowMoreSheet(false); }}
+                className={`flex-1 flex flex-col items-center justify-center gap-1 min-w-[44px] min-h-[44px] transition-colors ${
+                  isActive ? 'text-primary' : 'text-on-surface-variant'
+                }`}
+              >
+                <IconComponent className="h-5 w-5" />
+                <span className="text-[10px] font-semibold">{item.label}</span>
+              </button>
+            );
+          })}
+          <button
+            onClick={() => setShowMoreSheet(true)}
+            className={`flex-1 flex flex-col items-center justify-center gap-1 min-w-[44px] min-h-[44px] transition-colors ${
+              isMoreActive ? 'text-primary' : 'text-on-surface-variant'
+            }`}
+          >
+            <Menu className="h-5 w-5" />
+            <span className="text-[10px] font-semibold">More</span>
+          </button>
+        </nav>
+
+        {/* "More" overflow sheet */}
+        {showMoreSheet && (
+          <div className="fixed inset-0 z-[200] flex flex-col justify-end" onClick={() => setShowMoreSheet(false)}>
+            <div className="flex-1 bg-black/40" />
+            <div
+              className="bg-surface-container-lowest rounded-t-lg border-t border-outline-variant pb-[env(safe-area-inset-bottom)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="h-12 flex items-center justify-between px-4 border-b border-outline-variant">
+                <span className="text-xs font-bold label-caps text-outline">More</span>
+                <button onClick={() => setShowMoreSheet(false)} className="p-1 min-w-[44px] min-h-[44px] flex items-center justify-center">
+                  <X className="h-5 w-5 text-outline" />
+                </button>
+              </div>
+              {MOBILE_MORE_ITEMS.map((item) => {
+                const IconComponent = item.icon;
+                const isActive = currentView === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => { setCurrentView(item.id); setShowMoreSheet(false); }}
+                    className={`w-full flex items-center gap-4 px-4 min-h-[44px] py-3 border-b border-outline-variant/50 ${
+                      isActive ? 'text-primary font-semibold' : 'text-on-surface'
+                    }`}
+                  >
+                    <IconComponent className="h-5 w-5 flex-shrink-0" />
+                    <span className="text-sm">{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Toast notifications — bottom-anchored, full width on mobile */}
+        <div className="fixed bottom-20 left-3 right-3 z-[250] flex flex-col gap-2 pointer-events-none">
+          {toasts.map((toast) => {
+            const isSuccess = toast.type === 'success';
+            const isError = toast.type === 'error';
+            return (
+              <div
+                key={toast.id}
+                className={`pointer-events-auto flex items-start justify-between gap-3 p-3 rounded-md shadow-lg border backdrop-blur-sm animate-fade-in ${
+                  isSuccess
+                    ? 'bg-emerald-950/95 border-emerald-500/30 text-emerald-100'
+                    : isError
+                    ? 'bg-red-950/95 border-red-500/30 text-red-100'
+                    : 'bg-zinc-900/95 border-zinc-700/50 text-zinc-100'
+                }`}
+              >
+                <div className="flex gap-2 items-start">
+                  {isSuccess && <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />}
+                  {isError && <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />}
+                  {!isSuccess && !isError && <Info className="h-4 w-4 text-zinc-400 shrink-0 mt-0.5" />}
+                  <p className="text-xs font-semibold leading-relaxed">{toast.message}</p>
+                </div>
+                <button
+                  onClick={() => dismissToast(toast.id)}
+                  className={`shrink-0 p-0.5 rounded-full min-w-[24px] min-h-[24px] flex items-center justify-center ${
+                    isSuccess ? 'text-emerald-400' : isError ? 'text-red-400' : 'text-zinc-400'
+                  }`}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen w-screen bg-background overflow-hidden text-on-surface select-none font-sans">
@@ -173,16 +334,7 @@ const App: React.FC = () => {
 
         {/* View Router */}
         <div className="flex-1 overflow-hidden relative bg-surface-container-lowest">
-          {currentView === 'dashboard' && <Dashboard />}
-          {currentView === 'pantry' && <Pantry />}
-          {currentView === 'catalog' && <Catalog />}
-          {currentView === 'kitchen' && <Kitchen />}
-          {currentView === 'service' && <Service />}
-          {currentView === 'stock' && <Stock />}
-          {currentView === 'invoice' && <InvoiceScanner />}
-          {currentView === 'foh' && <FrontOfHouse />}
-          {currentView === 'suppliers' && <Suppliers />}
-          {currentView === 'settings' && <Help />}
+          {viewContent}
         </div>
       </main>
 
