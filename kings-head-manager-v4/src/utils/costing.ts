@@ -1,4 +1,4 @@
-import { Ingredient, Unit } from '../types';
+import { Ingredient, Unit, Recipe, RecipeItem, DishItem } from '../types';
 
 const GRAMS_PER_OZ = 28.3495231;
 
@@ -68,4 +68,33 @@ export const calculateIngredientCost = (
 
   // Adjust for waste
   return finalCost * (1 + (ingredient.wastePercent || 0) / 100);
+};
+
+// Recursively costs a Dish's (or Recipe's) component list, cascading through
+// nested sub-recipes. Shared by any screen that needs a plate/batch cost
+// (Service, Dashboard) so the calculation can't drift between them.
+export const calculatePlateCost = (
+  items: (RecipeItem | DishItem)[],
+  ingredients: Ingredient[],
+  recipes: Recipe[],
+  depth = 0
+): number => {
+  if (depth > 5) return 0;
+  let cost = 0;
+  for (const item of (items ?? [])) {
+    if (item.type === 'ingredient' && item.ingredientId) {
+      const ing = ingredients.find(i => i.id === item.ingredientId);
+      if (ing) cost += calculateIngredientCost(ing, item.quantity, item.unit);
+    } else if (item.type === 'recipe' && item.subRecipeId) {
+      const rec = recipes.find(r => r.id === item.subRecipeId);
+      if (rec && rec.batchSize) {
+        const batchCost = calculatePlateCost(rec.items ?? [], ingredients, recipes, depth + 1);
+        const batchSizeG = toBaseQuantity(rec.batchSize, rec.batchUnit);
+        const costPerG = batchCost / batchSizeG;
+        const qtyG = toBaseQuantity(item.quantity, item.unit);
+        cost += costPerG * qtyG;
+      }
+    }
+  }
+  return cost;
 };

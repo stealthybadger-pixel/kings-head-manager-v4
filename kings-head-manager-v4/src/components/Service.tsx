@@ -3,38 +3,11 @@ import { useDishes, useIngredients, useRecipes, useDishMutations } from '../hook
 import { useStore } from '../store/useStore';
 import { Search, Plus, Trash2, AlertTriangle, CheckCircle, TrendingUp, Radio, ArrowLeft, ExternalLink } from 'lucide-react';
 import { Allergen, AllergenSchema, Dish, DishItem, DishType, Ingredient, Recipe, Unit } from '../types';
-import { calculateIngredientCost, toBaseQuantity } from '../utils/costing';
+import { calculateIngredientCost, toBaseQuantity, calculatePlateCost as computePlateCost } from '../utils/costing';
 import { useIsMobile } from '../hooks/useIsMobile';
 
 const DISH_TYPES: DishType[] = ['Starter', 'Main', 'Side', 'Dessert', 'Drink', 'Other'];
 const ALL_ALLERGENS = AllergenSchema.options as Allergen[];
-
-// Module-level cost helper so it can be called before component const-functions are defined
-function computePlateCost(
-  items: DishItem[],
-  ingredients: Ingredient[],
-  recipes: Recipe[],
-  depth = 0
-): number {
-  if (depth > 5) return 0;
-  let cost = 0;
-  for (const item of (items ?? [])) {
-    if (item.type === 'ingredient' && item.ingredientId) {
-      const ing = ingredients.find(i => i.id === item.ingredientId);
-      if (ing) cost += calculateIngredientCost(ing, item.quantity, item.unit);
-    } else if (item.type === 'recipe' && item.subRecipeId) {
-      const rec = recipes.find(r => r.id === item.subRecipeId);
-      if (rec && rec.batchSize) {
-        const batchCost = computePlateCost(rec.items ?? [], ingredients, recipes, depth + 1);
-        const batchSizeG = toBaseQuantity(rec.batchSize, rec.batchUnit);
-        const costPerG = batchCost / batchSizeG;
-        const qtyG = toBaseQuantity(item.quantity, item.unit);
-        cost += costPerG * qtyG;
-      }
-    }
-  }
-  return cost;
-}
 
 function getDishAllergens(
   items: DishItem[],
@@ -78,6 +51,7 @@ export const Service: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [itemSearchQuery, setItemSearchQuery] = useState('');
   const [dishSort, setDishSort] = useState<'name' | 'date'>('name');
+  const [liveFilter, setLiveFilter] = useState<'all' | 'live'>('all');
 
   // Form edit state
   const [isEditing, setIsEditing] = useState(false);
@@ -91,7 +65,10 @@ export const Service: React.FC = () => {
 
   // Filtered + sorted dishes
   const filteredDishes = useMemo(() => {
-    const filtered = dishes.filter(d => d && d.name && d.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    const filtered = dishes.filter(d =>
+      d && d.name && d.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+      (liveFilter === 'all' || d.isLive)
+    );
     if (dishSort === 'date') {
       return [...filtered].sort((a, b) => {
         const aTime = (a as any).createdAt ? new Date((a as any).createdAt).getTime() : 0;
@@ -100,7 +77,7 @@ export const Service: React.FC = () => {
       });
     }
     return [...filtered].sort((a, b) => a.name.localeCompare(b.name));
-  }, [dishes, searchQuery, dishSort]);
+  }, [dishes, searchQuery, dishSort, liveFilter]);
 
   // Active dish
   const activeDish = useMemo(() => {
@@ -313,6 +290,21 @@ export const Service: React.FC = () => {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="flex-1 text-sm bg-transparent outline-none border-none focus:ring-0 p-0"
             />
+          </div>
+
+          <div className="flex border border-outline-variant rounded-sm overflow-hidden text-[10px] font-bold label-caps w-fit">
+            <button
+              onClick={() => setLiveFilter('all')}
+              className={`h-8 px-3 transition-colors ${liveFilter === 'all' ? 'bg-primary text-white' : 'bg-surface text-outline hover:bg-surface-container-low'}`}
+            >
+              All Dishes
+            </button>
+            <button
+              onClick={() => setLiveFilter('live')}
+              className={`h-8 px-3 border-l border-outline-variant transition-colors ${liveFilter === 'live' ? 'bg-primary text-white' : 'bg-surface text-outline hover:bg-surface-container-low'}`}
+            >
+              Live Menu Only
+            </button>
           </div>
         </div>
 

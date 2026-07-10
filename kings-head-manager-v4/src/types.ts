@@ -134,6 +134,11 @@ export const RecipeSchema = z.object({
   name: z.string(),
   batchSize: z.number().positive(),
   batchUnit: z.enum(['g', 'ml', 'ea', 'kg', 'l', 'oz']),
+  // When true, batchSize is a manually-entered actual yield (e.g. weighed
+  // after roasting/reduction) rather than the auto-summed raw-input total.
+  // Costing/stocktake use batchSize either way; this flag only controls
+  // whether the UI keeps recalculating it from the ingredient list.
+  manualYield: z.boolean().optional(),
   stockLevel: z.number().optional(),
   items: z.array(RecipeItemSchema),
   instructions: z.string(),

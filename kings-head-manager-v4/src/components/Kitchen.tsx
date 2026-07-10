@@ -184,8 +184,11 @@ export const Kitchen: React.FC = () => {
     }
   }, [selectedId]);
 
-  // Recalculate batch size dynamically from ingredients list
+  // Recalculate batch size dynamically from ingredients list, unless the
+  // cook has switched to a manual yield override (e.g. actual weighed
+  // output after roasting/reduction, which is less than the raw input sum).
   React.useEffect(() => {
+    if (formState.manualYield) return;
     const calculated = calculateDynamicBatchSize(formState.items, formState.batchUnit);
     // Only update if it actually changed to prevent infinite rendering loops
     if (Math.abs(formState.batchSize - calculated) > 0.0001) {
@@ -194,7 +197,7 @@ export const Kitchen: React.FC = () => {
         batchSize: parseFloat(calculated.toFixed(4))
       }));
     }
-  }, [formState.items, formState.batchUnit, formState.batchSize]);
+  }, [formState.items, formState.batchUnit, formState.batchSize, formState.manualYield]);
 
   const isSaving = addRecipe.isPending || updateRecipe.isPending;
 
@@ -470,7 +473,7 @@ export const Kitchen: React.FC = () => {
                 <div>
                   <div className="font-semibold text-sm text-on-surface">{recipe.name}</div>
                   <div className="text-xs text-on-surface-variant mt-0.5 flex items-center gap-1.5">
-                    <span>Batch: {recipe.batchSize} {recipe.batchUnit}</span>
+                    <span>Batch: {recipe.batchSize} {recipe.batchUnit}{recipe.manualYield ? ' (adj.)' : ''}</span>
                     <span className="text-outline-variant">•</span>
                     <span 
                       className={`font-semibold cursor-help ${usageDishes.length > 0 ? 'text-primary' : 'text-outline'}`}
@@ -582,16 +585,45 @@ export const Kitchen: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="label-caps text-outline block mb-2">Batch Yield Size</label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="label-caps text-outline">Batch Yield Size</label>
+                  <label className="flex items-center gap-1.5 text-[10px] font-bold text-outline cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={!!formState.manualYield}
+                      onChange={(e) => {
+                        const manualYield = e.target.checked;
+                        setFormState(prev => ({
+                          ...prev,
+                          manualYield,
+                          // Snap back to the auto-calculated total the moment
+                          // override is turned off, rather than leaving a
+                          // stale manual value behind.
+                          batchSize: manualYield
+                            ? prev.batchSize
+                            : parseFloat(calculateDynamicBatchSize(prev.items, prev.batchUnit).toFixed(4))
+                        }));
+                      }}
+                      className="h-3.5 w-3.5"
+                    />
+                    Manual (shrinkage)
+                  </label>
+                </div>
                 <div className="flex">
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     value={formState.batchSize}
-                    readOnly
-                    className="w-2/3 px-3 py-2 border border-outline-variant rounded-l-sm text-sm data-tabular bg-surface-container-low text-outline cursor-not-allowed"
-                    title="Calculated automatically from recipe ingredients total"
+                    readOnly={!formState.manualYield}
+                    onChange={(e) => {
+                      if (!formState.manualYield) return;
+                      setFormState(prev => ({ ...prev, batchSize: Math.max(0.0001, parseFloat(e.target.value) || 0) }));
+                    }}
+                    className={`w-2/3 px-3 py-2 border border-outline-variant rounded-l-sm text-sm data-tabular ${
+                      formState.manualYield ? 'bg-surface' : 'bg-surface-container-low text-outline cursor-not-allowed'
+                    }`}
+                    title={formState.manualYield ? 'Actual measured yield (e.g. after roasting/reduction)' : 'Calculated automatically from recipe ingredients total'}
                   />
-                  <select 
+                  <select
                     value={formState.batchUnit}
                     onChange={(e) => setFormState(prev => ({ ...prev, batchUnit: e.target.value as any }))}
                     className="w-1/3 border-t border-b border-r border-outline-variant bg-surface text-xs rounded-r-sm"
@@ -603,7 +635,11 @@ export const Kitchen: React.FC = () => {
                     <option value="ml">ml</option>
                   </select>
                 </div>
-                <span className="text-[9px] text-outline mt-1 block">Sum of ingredient components. Select unit to convert.</span>
+                <span className="text-[9px] text-outline mt-1 block">
+                  {formState.manualYield
+                    ? 'Manual override active — enter the actual weighed/measured yield (e.g. after roasting).'
+                    : 'Sum of ingredient components. Select unit to convert.'}
+                </span>
               </div>
             </div>
 
