@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, writeBatch, query, where, limit } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, deleteField, writeBatch, query, where, limit } from 'firebase/firestore';
 import { db } from '../firebase';
 import {
   Ingredient, IngredientSchema,
@@ -11,6 +11,22 @@ import {
   SupplierProduct, SupplierProductSchema,
   Supplier, SupplierSchema
 } from '../types';
+
+// Firestore's SDK is configured with `ignoreUndefinedProperties: true`
+// (see firebase.ts), which means updateDoc() silently DROPS any field set
+// to `undefined` from the write instead of clearing it — the old stored
+// value is left untouched. Any code that wants to actually clear an
+// optional field (e.g. unchecking a toggle) needs Firestore's deleteField()
+// sentinel instead of `undefined`. This converts every undefined value in
+// a partial-update payload to deleteField() so callers can just assign
+// `undefined` normally and have it behave as "clear this field".
+function withDeleteFieldForUndefined(payload: Record<string, any>): Record<string, any> {
+  const result: Record<string, any> = {};
+  for (const [key, value] of Object.entries(payload)) {
+    result[key] = value === undefined ? deleteField() : value;
+  }
+  return result;
+}
 
 // Generic fetcher that parses and validates with Zod
 async function fetchCollection<T>(collectionName: string, schema: any): Promise<T[]> {
@@ -82,7 +98,7 @@ export const useIngredientMutations = () => {
     mutationFn: async ({ id, data }: { id: string; data: Partial<Ingredient> }) => {
       const docRef = doc(db, 'ingredients', id);
       const { id: _, createdAt: __, ...updatePayload } = data as any;
-      const updateData = { ...updatePayload, updatedAt: new Date().toISOString() };
+      const updateData = withDeleteFieldForUndefined({ ...updatePayload, updatedAt: new Date().toISOString() });
       await updateDoc(docRef, updateData);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ingredients'] })
@@ -117,7 +133,7 @@ export const useRecipeMutations = () => {
     mutationFn: async ({ id, data }: { id: string; data: Partial<Recipe> }) => {
       const docRef = doc(db, 'recipes', id);
       const { id: _, createdAt: __, ...updatePayload } = data as any;
-      const updateData = { ...updatePayload, updatedAt: new Date().toISOString() };
+      const updateData = withDeleteFieldForUndefined({ ...updatePayload, updatedAt: new Date().toISOString() });
       await updateDoc(docRef, updateData);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['recipes'] })
@@ -152,7 +168,7 @@ export const useDishMutations = () => {
     mutationFn: async ({ id, data }: { id: string; data: Partial<Dish> }) => {
       const docRef = doc(db, 'dishes', id);
       const { id: _, createdAt: __, ...updatePayload } = data as any;
-      const updateData = { ...updatePayload, updatedAt: new Date().toISOString() };
+      const updateData = withDeleteFieldForUndefined({ ...updatePayload, updatedAt: new Date().toISOString() });
       await updateDoc(docRef, updateData);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['dishes'] })
@@ -342,7 +358,7 @@ export const useSupplierMutations = () => {
     mutationFn: async ({ id, data }: { id: string; data: Partial<Supplier> }) => {
       const docRef = doc(db, 'suppliers', id);
       const { id: _, createdAt: __, ...updatePayload } = data as any;
-      await updateDoc(docRef, { ...updatePayload, updatedAt: new Date().toISOString() });
+      await updateDoc(docRef, withDeleteFieldForUndefined({ ...updatePayload, updatedAt: new Date().toISOString() }));
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['suppliers'] })
   });
@@ -364,7 +380,7 @@ export const useSupplierProductMutations = () => {
     mutationFn: async ({ id, data }: { id: string; data: Partial<SupplierProduct> }) => {
       const docRef = doc(db, 'supplierProducts', id);
       const { id: _, ...updatePayload } = data as any;
-      await updateDoc(docRef, updatePayload);
+      await updateDoc(docRef, withDeleteFieldForUndefined(updatePayload));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['supplier_search'] });
