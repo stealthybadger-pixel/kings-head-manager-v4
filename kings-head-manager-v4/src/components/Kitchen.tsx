@@ -117,6 +117,7 @@ export const Kitchen: React.FC = () => {
   // Form edit state
   const [isEditing, setIsEditing] = useState(false);
   const [isNew, setIsNew] = useState(false);
+  const [usageFlyoutId, setUsageFlyoutId] = useState<string | null>(null);
   const [formState, setFormState] = useState<Omit<Recipe, 'id'> & { id?: string }>({
     name: '',
     batchSize: 1,
@@ -145,13 +146,6 @@ export const Kitchen: React.FC = () => {
   const activeRecipe = useMemo(() => {
     return recipes.find(r => r.id === selectedId) || null;
   }, [recipes, selectedId]);
-
-  const activeRecipeDishes = useMemo(() => {
-    if (!activeRecipe) return [];
-    return dishes.filter(d => 
-      d.items?.some(item => item.type === 'recipe' && item.subRecipeId === activeRecipe.id)
-    );
-  }, [activeRecipe, dishes]);
 
   // Set up form
   React.useEffect(() => {
@@ -454,19 +448,17 @@ export const Kitchen: React.FC = () => {
             const usageText = usageDishes.length > 0
               ? `Used in: ${usageDishes.length} dish${usageDishes.length > 1 ? 'es' : ''}`
               : 'Unused in menu';
-            const tooltipText = usageDishes.length > 0
-              ? `Used in:\n${usageDishes.map(d => `• ${d.name}`).join('\n')}`
-              : 'Not linked to any menu dishes';
+            const isFlyoutOpen = usageFlyoutId === recipe.id;
 
             return (
-              <div 
+              <div
                 key={recipe.id}
-                onClick={() => selectRecipe(recipe.id)}
-                className={`p-4 hover:bg-surface-container cursor-pointer flex justify-between items-center transition-colors ${
-                  selectedId === recipe.id 
-                    ? 'bg-surface-container' 
-                    : idx % 2 === 0 
-                      ? 'bg-transparent' 
+                onClick={() => { selectRecipe(recipe.id); setUsageFlyoutId(null); }}
+                className={`relative p-4 hover:bg-surface-container cursor-pointer flex justify-between items-center transition-colors ${
+                  selectedId === recipe.id
+                    ? 'bg-surface-container'
+                    : idx % 2 === 0
+                      ? 'bg-transparent'
                       : 'bg-black/[0.0075]'
                 }`}
               >
@@ -474,14 +466,38 @@ export const Kitchen: React.FC = () => {
                   <div className="font-semibold text-sm text-on-surface">{recipe.name}</div>
                   <div className="text-xs text-on-surface-variant mt-0.5 flex items-center gap-1.5">
                     <span>Batch: {recipe.batchSize} {recipe.batchUnit}{recipe.manualYield ? ' (adj.)' : ''}</span>
-                    <span className="text-outline-variant">•</span>
-                    <span 
-                      className={`font-semibold cursor-help ${usageDishes.length > 0 ? 'text-primary' : 'text-outline'}`}
-                      title={tooltipText}
-                    >
-                      {usageText}
-                    </span>
+                    {usageDishes.length > 0 && (
+                      <>
+                        <span className="text-outline-variant">•</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setUsageFlyoutId(isFlyoutOpen ? null : recipe.id);
+                          }}
+                          className="font-semibold text-primary hover:underline"
+                        >
+                          {usageText}
+                        </button>
+                      </>
+                    )}
                   </div>
+                  {isFlyoutOpen && (
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute left-4 top-full mt-1 z-20 bg-surface border border-outline-variant rounded-sm shadow-lg py-2 min-w-[200px] max-w-[280px]"
+                    >
+                      <div className="px-3 pb-1.5 mb-1 border-b border-outline-variant text-[10px] label-caps text-outline font-bold">
+                        Used in {usageDishes.length} dish{usageDishes.length > 1 ? 'es' : ''}
+                      </div>
+                      <div className="max-h-48 overflow-y-auto">
+                        {usageDishes.map(d => (
+                          <div key={d.id} className="px-3 py-1 text-xs text-on-surface truncate">
+                            {d.name}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="data-tabular text-sm text-primary font-bold">
                   £{calculateTotalCost(recipe.items).toFixed(2)}
@@ -502,16 +518,6 @@ export const Kitchen: React.FC = () => {
                 <div className="flex flex-wrap gap-2 items-center mt-1">
                   <span className="text-xs text-outline label-caps">Total Cost:</span>
                   <span className="text-xs text-primary font-bold data-tabular">£{totalCost.toFixed(2)}</span>
-                  {!isNew && (
-                    <>
-                      <span className="text-outline-variant">•</span>
-                      <span className="text-xs text-outline label-caps">
-                        {activeRecipeDishes.length > 0
-                          ? `Used in: ${activeRecipeDishes.map(d => d.name).join(', ')}`
-                          : 'Not linked to any dishes'}
-                      </span>
-                    </>
-                  )}
                 </div>
               </div>
               <div className="flex gap-4">
