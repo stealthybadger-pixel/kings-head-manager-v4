@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useIngredients, useRecipes, useDishes, useScrapeLogs, useAllSupplierProducts } from '../hooks/useKitchenData';
 import { AlertCircle, AlertTriangle, FileText, CheckCircle, TrendingUp, BarChart2, Check, X, RefreshCw, Clock } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { calculateIngredientCost, getBaseUnit } from '../utils/costing';
+import { calculateIngredientCost, getBaseUnit, calculatePlateCost } from '../utils/costing';
 
 export const Dashboard: React.FC = () => {
   const { data: ingredients = [], isLoading: loadingIngs } = useIngredients();
@@ -213,6 +213,7 @@ export const Dashboard: React.FC = () => {
       let ratePerKg = 0;
       if (unit === 'kg') ratePerKg = pref.packCost / pref.packSize;
       else if (unit === 'g') ratePerKg = (pref.packCost / pref.packSize) * 1000;
+      else if (unit === 'oz') ratePerKg = (pref.packCost / pref.packSize) * (1000 / 28.3495231);
       else return; // skip ea/ml for this check
       if (!ratesByCat[ing.category]) ratesByCat[ing.category] = [];
       ratesByCat[ing.category].push(ratePerKg);
@@ -257,6 +258,7 @@ export const Dashboard: React.FC = () => {
       let ratePerKg = 0;
       if (unit === 'kg') ratePerKg = pref.packCost / pref.packSize;
       else if (unit === 'g') ratePerKg = (pref.packCost / pref.packSize) * 1000;
+      else if (unit === 'oz') ratePerKg = (pref.packCost / pref.packSize) * (1000 / 28.3495231);
       if (ratePerKg > 0) {
         const catMedian = median(ratesByCat[ing.category] || []);
         if (catMedian > 0 && ratePerKg > catMedian * 6) {
@@ -295,6 +297,7 @@ export const Dashboard: React.FC = () => {
     const toRatePerKg = (cost: number, size: number, unit: string) => {
       if (unit === 'kg') return cost / size;
       if (unit === 'g') return (cost / size) * 1000;
+      if (unit === 'oz') return (cost / size) * (1000 / 28.3495231);
       if (unit === 'l') return cost / size;
       if (unit === 'ml') return (cost / size) * 1000;
       return cost / size;
@@ -337,6 +340,19 @@ export const Dashboard: React.FC = () => {
 
   const totalRecipes = recipes.length;
   const totalDishes = dishes.length;
+
+  // Average actual GP% across live-menu dishes only, so the headline number
+  // reflects what's actually being sold rather than the full historical list.
+  const liveDishGP = useMemo(() => {
+    const liveDishes = dishes.filter(d => d.isLive && d.retailPrice > 0);
+    if (liveDishes.length === 0) return null;
+    const totalGP = liveDishes.reduce((sum, dish) => {
+      const cost = calculatePlateCost(dish.items, ingredients, recipes);
+      const gp = ((dish.retailPrice - cost) / dish.retailPrice) * 100;
+      return sum + gp;
+    }, 0);
+    return totalGP / liveDishes.length;
+  }, [dishes, ingredients, recipes]);
 
   const isLoading = loadingIngs || loadingRecs || loadingDishes;
 
@@ -398,7 +414,13 @@ export const Dashboard: React.FC = () => {
           </div>
           <div className="display-lg text-primary mt-2 data-tabular">{totalDishes}</div>
           <div className="flex items-center gap-1.5 mt-2">
-            <span className="text-xs text-primary bg-secondary-container px-2 py-0.5 font-bold rounded-sm">72% Target GP</span>
+            {liveDishGP !== null ? (
+              <span className={`text-xs px-2 py-0.5 font-bold rounded-sm ${liveDishGP >= 70 ? 'text-primary bg-secondary-container' : 'text-error bg-error-container'}`}>
+                {liveDishGP.toFixed(1)}% Avg GP (Live Menu)
+              </span>
+            ) : (
+              <span className="text-xs text-outline bg-surface-container px-2 py-0.5 font-bold rounded-sm">No live dishes tagged yet</span>
+            )}
           </div>
         </div>
       </div>

@@ -3,11 +3,11 @@ import { useRecipes, useIngredients, useRecipeMutations, useIngredientMutations,
 import { useStore } from '../store/useStore';
 import { Search, Plus, Trash2, Camera, AlertCircle, Check, HelpCircle, ExternalLink, Upload, RefreshCw, X, Link2, Unlink } from 'lucide-react';
 import { Recipe, RecipeItem, Ingredient, Unit } from '../types';
-import { calculateIngredientCost } from '../utils/costing';
+import { calculatePlateCost } from '../utils/costing';
 
 async function scanRecipeWithGemini(base64Image: string, mimeType: string): Promise<{
   name: string;
-  ingredients: { rawName: string; parsedName: string; qty: number; unit: Unit }[];
+  ingredients: { rawName: string; parsedName: string; qty: number; unit: RecipeItem['unit'] }[];
   instructions: string;
 }> {
   const key = localStorage.getItem('geminiApiKey');
@@ -65,6 +65,8 @@ const calculateDynamicBatchSize = (items: RecipeItem[], targetUnit: string) => {
       totalGramsOrMls += qty;
     } else if (unit === 'kg') {
       totalGramsOrMls += qty * 1000;
+    } else if (unit === 'oz') {
+      totalGramsOrMls += qty * 28.3495231;
     } else if (unit === 'ml') {
       totalGramsOrMls += qty;
     } else if (unit === 'l') {
@@ -107,7 +109,7 @@ export const Kitchen: React.FC = () => {
   const [scanError, setScanError] = useState<string | null>(null);
   const [scanResults, setScanResults] = useState<{
     name: string;
-    ingredients: { rawName: string; parsedName: string; qty: number; unit: Unit; matchedId?: string }[];
+    ingredients: { rawName: string; parsedName: string; qty: number; unit: RecipeItem['unit']; matchedId?: string }[];
     instructions: string;
   } | null>(null);
   const scanFileRef = useRef<HTMLInputElement>(null);
@@ -115,6 +117,10 @@ export const Kitchen: React.FC = () => {
   // Form edit state
   const [isEditing, setIsEditing] = useState(false);
   const [isNew, setIsNew] = useState(false);
+  const [usageFlyoutId, setUsageFlyoutId] = useState<string | null>(null);
+  // Separate from formState.portionCount itself so toggling on can show an
+  // empty input rather than needing a value to already exist.
+  const [portionsEnabled, setPortionsEnabled] = useState(false);
   const [formState, setFormState] = useState<Omit<Recipe, 'id'> & { id?: string }>({
     name: '',
     batchSize: 1,
@@ -144,17 +150,11 @@ export const Kitchen: React.FC = () => {
     return recipes.find(r => r.id === selectedId) || null;
   }, [recipes, selectedId]);
 
-  const activeRecipeDishes = useMemo(() => {
-    if (!activeRecipe) return [];
-    return dishes.filter(d => 
-      d.items?.some(item => item.type === 'recipe' && item.subRecipeId === activeRecipe.id)
-    );
-  }, [activeRecipe, dishes]);
-
   // Set up form
   React.useEffect(() => {
     if (activeRecipe) {
       setFormState(activeRecipe);
+      setPortionsEnabled(activeRecipe.portionCount !== undefined);
       setIsEditing(true);
       setIsNew(false);
     } else {
@@ -170,6 +170,7 @@ export const Kitchen: React.FC = () => {
       items: [],
       instructions: ''
     });
+    setPortionsEnabled(false);
     setIsNew(true);
     setIsEditing(true);
     selectRecipe(null);
@@ -182,8 +183,11 @@ export const Kitchen: React.FC = () => {
     }
   }, [selectedId]);
 
-  // Recalculate batch size dynamically from ingredients list
+  // Recalculate batch size dynamically from ingredients list, unless the
+  // cook has switched to a manual yield override (e.g. actual weighed
+  // output after roasting/reduction, which is less than the raw input sum).
   React.useEffect(() => {
+    if (formState.manualYield) return;
     const calculated = calculateDynamicBatchSize(formState.items, formState.batchUnit);
     // Only update if it actually changed to prevent infinite rendering loops
     if (Math.abs(formState.batchSize - calculated) > 0.0001) {
@@ -192,14 +196,48 @@ export const Kitchen: React.FC = () => {
         batchSize: parseFloat(calculated.toFixed(4))
       }));
     }
-  }, [formState.items, formState.batchUnit, formState.batchSize]);
+  }, [formState.items, formState.batchUnit, formState.batchSize, formState.manualYield]);
 
   const isSaving = addRecipe.isPending || updateRecipe.isPending;
+
+  // Would adding `candidateSubRecipeId` as a component of `hostRecipeId` create
+  // a cycle? Walks the candidate's own sub-recipe tree looking for a path back
+  // to the host — catches both direct self-reference (candidate === host) and
+  // transitive cycles (A contains B, B would end up containing A).
+  const wouldCreateCircularReference = (
+    hostRecipeId: string | undefined,
+    candidateSubRecipeId: string,
+    visited = new Set<string>()
+  ): boolean => {
+    if (!hostRecipeId) return false;
+    if (candidateSubRecipeId === hostRecipeId) return true;
+    if (visited.has(candidateSubRecipeId)) return false;
+    visited.add(candidateSubRecipeId);
+
+    const candidate = recipes.find(r => r.id === candidateSubRecipeId);
+    if (!candidate) return false;
+
+    return (candidate.items ?? []).some(item =>
+      item.type === 'recipe' && item.subRecipeId
+        ? wouldCreateCircularReference(hostRecipeId, item.subRecipeId, visited)
+        : false
+    );
+  };
 
   const handleSave = async () => {
     if (!formState.name) {
       showToast("Recipe name is required", "error");
       return;
+    }
+    if (formState.id) {
+      const circularItem = formState.items.find(item =>
+        item.type === 'recipe' && item.subRecipeId && wouldCreateCircularReference(formState.id, item.subRecipeId)
+      );
+      if (circularItem) {
+        const badRecipe = recipes.find(r => r.id === (circularItem as any).subRecipeId);
+        showToast(`Can't save — "${badRecipe?.name || 'a sub-recipe'}" would create a circular reference back to this recipe.`, "error");
+        return;
+      }
     }
     try {
       if (isNew) {
@@ -231,6 +269,26 @@ export const Kitchen: React.FC = () => {
     }));
   };
 
+  // Add another Recipe as a sub-component (e.g. a pickling liquor inside a
+  // pickled-vegetables recipe). Blocks direct self-reference and transitive
+  // circular references at the point of adding, as a first line of defence —
+  // handleSave runs the same check again since items can also change after.
+  const handleAddSubRecipeRow = (subRecipe: Recipe) => {
+    if (formState.items.some(i => i.type === 'recipe' && i.subRecipeId === subRecipe.id)) return;
+    if (formState.id && wouldCreateCircularReference(formState.id, subRecipe.id)) {
+      showToast(`Can't add "${subRecipe.name}" — it would create a circular reference back to this recipe.`, "error");
+      return;
+    }
+
+    setFormState(prev => ({
+      ...prev,
+      items: [
+        ...prev.items,
+        { type: 'recipe', subRecipeId: subRecipe.id, quantity: 100, unit: subRecipe.batchUnit }
+      ]
+    }));
+  };
+
   const handleUpdateItemQty = (index: number, qty: number) => {
     setFormState(prev => {
       const items = [...prev.items];
@@ -250,7 +308,7 @@ export const Kitchen: React.FC = () => {
     });
   };
 
-  const handleUpdateItemUnit = (index: number, unit: Unit) => {
+  const handleUpdateItemUnit = (index: number, unit: RecipeItem['unit']) => {
     setFormState(prev => {
       const items = [...prev.items];
       items[index] = { ...items[index], unit };
@@ -265,35 +323,14 @@ export const Kitchen: React.FC = () => {
     }));
   };
 
-  // Calculating total recipe costs based on ingredient costing utility
-  const calculateTotalCost = (items: RecipeItem[]) => {
-    let cost = 0;
-    items.forEach(item => {
-      if (item.type === 'ingredient' && item.ingredientId) {
-        const ing = ingredients.find(i => i.id === item.ingredientId);
-        if (ing) {
-          cost += calculateIngredientCost(ing, item.quantity, item.unit);
-        }
-      } else if (item.type === 'recipe' && item.subRecipeId) {
-        const sub = recipes.find(r => r.id === item.subRecipeId);
-        if (sub && sub.batchSize) {
-          const batchCost = calculateTotalCost(sub.items);
-          let batchSizeG = sub.batchSize;
-          if (sub.batchUnit === 'kg' || sub.batchUnit === 'l') batchSizeG *= 1000;
-          
-          let qtyG = item.quantity;
-          if (item.unit === 'kg' || item.unit === 'l') qtyG *= 1000;
-          
-          cost += (batchCost / batchSizeG) * qtyG;
-        }
-      }
-    });
-    return cost;
-  };
+  // Recipe costing (including recursive sub-recipe cascading) is shared with
+  // Service.tsx/Dashboard.tsx via costing.ts, so it can't drift between
+  // screens and always has the recursion-depth guard against circular refs.
+  const calculateTotalCost = (items: RecipeItem[]) => calculatePlateCost(items, ingredients, recipes);
 
   const totalCost = useMemo(() => {
     return calculateTotalCost(formState.items);
-  }, [formState.items, ingredients]);
+  }, [formState.items, ingredients, recipes]);
 
   const handleScanFile = async (file: File) => {
     setScanFile(file);
@@ -397,9 +434,9 @@ export const Kitchen: React.FC = () => {
       {/* 1. LEFT PANEL: RECIPES DIRECTORY (35%) */}
       <div className="w-[35%] border-r border-outline-variant h-full flex flex-col bg-surface-container-lowest">
         <div className="p-4 border-b border-outline-variant bg-surface flex flex-col gap-3">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center flex-wrap gap-2">
             <span className="label-caps text-outline font-bold">Kitchen Library</span>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <div className="flex border border-outline-variant rounded-sm overflow-hidden text-[10px] font-bold label-caps">
                 <button
                   onClick={() => setRecipeSort('name')}
@@ -411,7 +448,7 @@ export const Kitchen: React.FC = () => {
                   onClick={() => setRecipeSort('date')}
                   className={`h-8 px-2.5 border-l border-outline-variant transition-colors ${recipeSort === 'date' ? 'bg-primary text-white' : 'bg-surface text-outline hover:bg-surface-container-low'}`}
                 >
-                  New
+                  Recent
                 </button>
               </div>
               <button
@@ -423,9 +460,11 @@ export const Kitchen: React.FC = () => {
               </button>
               <button
                 onClick={handleStartNew}
-                className="h-8 w-8 bg-primary text-white flex items-center justify-center rounded-sm hover:bg-opacity-90"
+                title="Create new recipe"
+                className="h-8 px-3 bg-primary text-white flex items-center justify-center gap-1 rounded-sm hover:bg-opacity-90 text-[10px] font-bold label-caps"
               >
                 <Plus className="h-4 w-4" />
+                New Recipe
               </button>
             </div>
           </div>
@@ -450,34 +489,56 @@ export const Kitchen: React.FC = () => {
             const usageText = usageDishes.length > 0
               ? `Used in: ${usageDishes.length} dish${usageDishes.length > 1 ? 'es' : ''}`
               : 'Unused in menu';
-            const tooltipText = usageDishes.length > 0
-              ? `Used in:\n${usageDishes.map(d => `• ${d.name}`).join('\n')}`
-              : 'Not linked to any menu dishes';
+            const isFlyoutOpen = usageFlyoutId === recipe.id;
 
             return (
-              <div 
+              <div
                 key={recipe.id}
-                onClick={() => selectRecipe(recipe.id)}
-                className={`p-4 hover:bg-surface-container cursor-pointer flex justify-between items-center transition-colors ${
-                  selectedId === recipe.id 
-                    ? 'bg-surface-container' 
-                    : idx % 2 === 0 
-                      ? 'bg-transparent' 
+                onClick={() => { selectRecipe(recipe.id); setUsageFlyoutId(null); }}
+                className={`relative p-4 hover:bg-surface-container cursor-pointer flex justify-between items-center transition-colors ${
+                  selectedId === recipe.id
+                    ? 'bg-surface-container'
+                    : idx % 2 === 0
+                      ? 'bg-transparent'
                       : 'bg-black/[0.0075]'
                 }`}
               >
                 <div>
                   <div className="font-semibold text-sm text-on-surface">{recipe.name}</div>
                   <div className="text-xs text-on-surface-variant mt-0.5 flex items-center gap-1.5">
-                    <span>Batch: {recipe.batchSize} {recipe.batchUnit}</span>
-                    <span className="text-outline-variant">•</span>
-                    <span 
-                      className={`font-semibold cursor-help ${usageDishes.length > 0 ? 'text-primary' : 'text-outline'}`}
-                      title={tooltipText}
-                    >
-                      {usageText}
-                    </span>
+                    <span>Batch: {recipe.batchSize} {recipe.batchUnit}{recipe.manualYield ? ' (adj.)' : ''}</span>
+                    {usageDishes.length > 0 && (
+                      <>
+                        <span className="text-outline-variant">•</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setUsageFlyoutId(isFlyoutOpen ? null : recipe.id);
+                          }}
+                          className="font-semibold text-primary hover:underline"
+                        >
+                          {usageText}
+                        </button>
+                      </>
+                    )}
                   </div>
+                  {isFlyoutOpen && (
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute left-4 top-full mt-1 z-20 bg-surface border border-outline-variant rounded-sm shadow-lg py-2 min-w-[200px] max-w-[280px]"
+                    >
+                      <div className="px-3 pb-1.5 mb-1 border-b border-outline-variant text-[10px] label-caps text-outline font-bold">
+                        Used in {usageDishes.length} dish{usageDishes.length > 1 ? 'es' : ''}
+                      </div>
+                      <div className="max-h-48 overflow-y-auto">
+                        {usageDishes.map(d => (
+                          <div key={d.id} className="px-3 py-1 text-xs text-on-surface truncate">
+                            {d.name}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="data-tabular text-sm text-primary font-bold">
                   £{calculateTotalCost(recipe.items).toFixed(2)}
@@ -498,16 +559,6 @@ export const Kitchen: React.FC = () => {
                 <div className="flex flex-wrap gap-2 items-center mt-1">
                   <span className="text-xs text-outline label-caps">Total Cost:</span>
                   <span className="text-xs text-primary font-bold data-tabular">£{totalCost.toFixed(2)}</span>
-                  {!isNew && (
-                    <>
-                      <span className="text-outline-variant">•</span>
-                      <span className="text-xs text-outline label-caps">
-                        {activeRecipeDishes.length > 0
-                          ? `Used in: ${activeRecipeDishes.map(d => d.name).join(', ')}`
-                          : 'Not linked to any dishes'}
-                      </span>
-                    </>
-                  )}
                 </div>
               </div>
               <div className="flex gap-4">
@@ -581,27 +632,114 @@ export const Kitchen: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="label-caps text-outline block mb-2">Batch Yield Size</label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="label-caps text-outline">Batch Yield Size</label>
+                  <label className="flex items-center gap-1.5 text-[10px] font-bold text-outline cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={!!formState.manualYield}
+                      onChange={(e) => {
+                        const manualYield = e.target.checked;
+                        setFormState(prev => ({
+                          ...prev,
+                          manualYield,
+                          // Snap back to the auto-calculated total the moment
+                          // override is turned off, rather than leaving a
+                          // stale manual value behind.
+                          batchSize: manualYield
+                            ? prev.batchSize
+                            : parseFloat(calculateDynamicBatchSize(prev.items, prev.batchUnit).toFixed(4))
+                        }));
+                      }}
+                      className="h-3.5 w-3.5"
+                    />
+                    Manual (shrinkage)
+                  </label>
+                </div>
                 <div className="flex">
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     value={formState.batchSize}
-                    readOnly
-                    className="w-2/3 px-3 py-2 border border-outline-variant rounded-l-sm text-sm data-tabular bg-surface-container-low text-outline cursor-not-allowed"
-                    title="Calculated automatically from recipe ingredients total"
+                    readOnly={!formState.manualYield}
+                    onChange={(e) => {
+                      if (!formState.manualYield) return;
+                      setFormState(prev => ({ ...prev, batchSize: Math.max(0.0001, parseFloat(e.target.value) || 0) }));
+                    }}
+                    className={`w-2/3 px-3 py-2 border border-outline-variant rounded-l-sm text-sm data-tabular ${
+                      formState.manualYield ? 'bg-surface' : 'bg-surface-container-low text-outline cursor-not-allowed'
+                    }`}
+                    title={formState.manualYield ? 'Actual measured yield (e.g. after roasting/reduction)' : 'Calculated automatically from recipe ingredients total'}
                   />
-                  <select 
+                  <select
                     value={formState.batchUnit}
                     onChange={(e) => setFormState(prev => ({ ...prev, batchUnit: e.target.value as any }))}
                     className="w-1/3 border-t border-b border-r border-outline-variant bg-surface text-xs rounded-r-sm"
                   >
                     <option value="kg">kg</option>
                     <option value="g">g</option>
+                    <option value="oz">oz</option>
                     <option value="l">l</option>
                     <option value="ml">ml</option>
                   </select>
                 </div>
-                <span className="text-[9px] text-outline mt-1 block">Sum of ingredient components. Select unit to convert.</span>
+                <span className="text-[9px] text-outline mt-1 block">
+                  {formState.manualYield
+                    ? 'Manual override active — enter the actual weighed/measured yield (e.g. after roasting).'
+                    : 'Sum of ingredient components. Select unit to convert.'}
+                </span>
+              </div>
+            </div>
+
+            {/* Portions — only relevant for recipes that yield discrete units
+                (bread rolls, cheesecake slices). Weight-based preps like a
+                pickled veg or a sauce shouldn't show a portion count at all,
+                so this is an explicit off-by-default toggle rather than an
+                always-visible field next to Batch Yield Size. */}
+            <div className="grid grid-cols-3 gap-6">
+              <div className="col-span-3 sm:col-span-1">
+                <label className="flex items-center gap-2 text-xs font-semibold text-on-surface cursor-pointer select-none mb-2">
+                  <input
+                    type="checkbox"
+                    checked={portionsEnabled}
+                    onChange={(e) => {
+                      const enabled = e.target.checked;
+                      setPortionsEnabled(enabled);
+                      if (!enabled) {
+                        // Clear the stored value when switching back off — a
+                        // weight-based recipe shouldn't retain a stale portion count.
+                        setFormState(prev => ({ ...prev, portionCount: undefined }));
+                      }
+                    }}
+                    className="h-4 w-4"
+                  />
+                  This recipe yields discrete portions (e.g. bread rolls, cheesecake)
+                </label>
+
+                {portionsEnabled && (
+                  <>
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={formState.portionCount ?? ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setFormState(prev => ({
+                          ...prev,
+                          portionCount: val === '' ? undefined : Math.max(1, parseFloat(val) || 1)
+                        }));
+                      }}
+                      placeholder="e.g. 12"
+                      autoFocus
+                      className="w-full px-3 py-2 border border-outline-variant rounded-sm text-sm data-tabular"
+                    />
+                    <span className="text-[9px] text-outline mt-1 block">
+                      {formState.portionCount
+                        ? `1 portion = ${(formState.batchSize / formState.portionCount).toFixed(3)} ${formState.batchUnit}. Selectable as "portion" when adding this recipe to a Dish.`
+                        : 'How many portions does one batch make?'}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
 
@@ -625,34 +763,24 @@ export const Kitchen: React.FC = () => {
               
               <div className="flex flex-col gap-3 mb-6">
                 {formState.items.map((item, idx) => {
-                  const ing = ingredients.find(i => i.id === item.ingredientId);
-                  let cost = 0;
-                  if (item.type === 'ingredient' && ing) {
-                    cost = calculateIngredientCost(ing, item.quantity, item.unit);
-                  } else if (item.type === 'recipe' && item.subRecipeId) {
-                    const sub = recipes.find(r => r.id === item.subRecipeId);
-                    if (sub && sub.batchSize) {
-                      const batchCost = calculateTotalCost(sub.items);
-                      let batchSizeG = sub.batchSize;
-                      if (sub.batchUnit === 'kg' || sub.batchUnit === 'l') batchSizeG *= 1000;
-                      let qtyG = item.quantity;
-                      if (item.unit === 'kg' || item.unit === 'l') qtyG *= 1000;
-                      cost = (batchCost / batchSizeG) * qtyG;
-                    }
-                  }
+                  const ing = item.type === 'ingredient' ? ingredients.find(i => i.id === item.ingredientId) : undefined;
+                  const sub = item.type === 'recipe' ? recipes.find(r => r.id === item.subRecipeId) : undefined;
+                  const cost = calculateTotalCost([item]);
 
                   return (
                     <div key={idx} className="flex gap-4 items-center bg-surface p-4 border border-outline-variant rounded-sm">
                       <div className="flex-1">
-                        <span className="font-semibold text-sm text-on-surface">{ing?.name || 'Unknown Item'}</span>
+                        <span className="font-semibold text-sm text-on-surface">{ing?.name || sub?.name || 'Unknown Item'}</span>
                         <div className="text-[10px] text-outline uppercase tracking-wider mt-0.5">
-                          {ing?.category} • Waste: {ing?.wastePercent || 0}%
+                          {item.type === 'ingredient'
+                            ? `${ing?.category ?? ''} • Waste: ${ing?.wastePercent || 0}%`
+                            : `Sub-Recipe${sub?.portionCount ? ` • ${sub.portionCount} portions/batch` : ''}`}
                         </div>
                       </div>
 
                       <div className="w-24">
-                        <input 
-                          type="number" 
+                        <input
+                          type="number"
                           value={item.quantity}
                           onChange={(e) => handleUpdateItemQty(idx, Math.max(0, parseFloat(e.target.value) || 0))}
                           className="w-full px-2 py-1 border border-outline-variant text-xs data-tabular text-center"
@@ -660,16 +788,18 @@ export const Kitchen: React.FC = () => {
                       </div>
 
                       <div className="w-20">
-                        <select 
+                        <select
                           value={item.unit}
                           onChange={(e) => handleUpdateItemUnit(idx, e.target.value as any)}
                           className="w-full px-2 py-1 border border-outline-variant bg-surface-container-lowest text-xs"
                         >
                           <option value="g">g</option>
                           <option value="kg">kg</option>
+                          <option value="oz">oz</option>
                           <option value="ml">ml</option>
                           <option value="l">l</option>
                           <option value="ea">ea</option>
+                          {item.type === 'recipe' && sub?.portionCount ? <option value="portion">portion</option> : null}
                         </select>
                       </div>
 
@@ -681,6 +811,15 @@ export const Kitchen: React.FC = () => {
                         <button
                           onClick={() => navigateToPantryWithIngredient(ing.id)}
                           title="Open in Pantry"
+                          className="p-1 text-outline hover:text-primary"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </button>
+                      )}
+                      {item.type === 'recipe' && sub && (
+                        <button
+                          onClick={() => selectRecipe(sub.id)}
+                          title="Open this sub-recipe"
                           className="p-1 text-outline hover:text-primary"
                         >
                           <ExternalLink className="h-4 w-4" />
@@ -699,13 +838,13 @@ export const Kitchen: React.FC = () => {
 
               {/* Add row search block */}
               <div className="bg-surface p-4 border border-outline-variant rounded-sm flex flex-col gap-3">
-                <span className="text-xs label-caps text-outline font-bold">Add Ingredient to Recipe</span>
+                <span className="text-xs label-caps text-outline font-bold">Add Ingredient or Recipe to Recipe</span>
                 <div className="flex gap-2">
                   <div className="relative flex-1 flex items-center bg-surface-container-lowest border border-outline-variant rounded-sm px-3 py-1.5 focus-within:border-primary">
                     <Search className="h-4 w-4 text-outline mr-2" />
-                    <input 
-                      type="text" 
-                      placeholder="Search ingredients..." 
+                    <input
+                      type="text"
+                      placeholder="Search ingredients or recipes..."
                       value={itemSearchQuery}
                       onChange={(e) => setItemSearchQuery(e.target.value)}
                       className="flex-1 text-xs bg-transparent outline-none border-none focus:ring-0 p-0"
@@ -713,26 +852,67 @@ export const Kitchen: React.FC = () => {
                   </div>
                 </div>
 
-                {itemSearchQuery.trim().length > 1 && (
-                  <div className="max-h-48 overflow-y-auto bg-surface-container-lowest border border-outline-variant divide-y divide-outline-variant rounded-sm">
-                    {ingredients
-                      .filter(i => i.name.toLowerCase().includes(itemSearchQuery.toLowerCase()))
-                      .slice(0, 5)
-                      .map(ing => (
-                        <div 
-                          key={ing.id}
-                          onClick={() => {
-                            handleAddIngredientRow(ing);
-                            setItemSearchQuery('');
-                          }}
-                          className="p-3 hover:bg-surface-container text-xs cursor-pointer flex justify-between font-semibold"
-                        >
-                          <span>{ing.name}</span>
-                          <span className="text-primary label-caps">+ Add</span>
+                {itemSearchQuery.trim().length > 1 && (() => {
+                  const matchingIngredients = ingredients
+                    .filter(i => i.name.toLowerCase().includes(itemSearchQuery.toLowerCase()))
+                    .slice(0, 5);
+                  const matchingRecipes = recipes
+                    .filter(r =>
+                      r.name.toLowerCase().includes(itemSearchQuery.toLowerCase()) &&
+                      r.id !== formState.id &&
+                      !(formState.id && wouldCreateCircularReference(formState.id, r.id))
+                    )
+                    .slice(0, 5);
+
+                  if (matchingIngredients.length === 0 && matchingRecipes.length === 0) {
+                    return (
+                      <div className="p-3 text-xs text-outline bg-surface-container-lowest border border-outline-variant rounded-sm">
+                        No matching ingredients or recipes.
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="max-h-64 overflow-y-auto bg-surface-container-lowest border border-outline-variant rounded-sm">
+                      {matchingIngredients.length > 0 && (
+                        <div className="divide-y divide-outline-variant">
+                          <div className="px-3 py-1 text-[9px] label-caps text-outline font-bold bg-surface-container-low">Ingredients</div>
+                          {matchingIngredients.map(ing => (
+                            <div
+                              key={`ing-${ing.id}`}
+                              onClick={() => {
+                                handleAddIngredientRow(ing);
+                                setItemSearchQuery('');
+                              }}
+                              className="p-3 hover:bg-surface-container text-xs cursor-pointer flex justify-between font-semibold"
+                            >
+                              <span>{ing.name}</span>
+                              <span className="text-primary label-caps">+ Add</span>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                  </div>
-                )}
+                      )}
+                      {matchingRecipes.length > 0 && (
+                        <div className="divide-y divide-outline-variant">
+                          <div className="px-3 py-1 text-[9px] label-caps text-outline font-bold bg-surface-container-low">Recipes</div>
+                          {matchingRecipes.map(rec => (
+                            <div
+                              key={`rec-${rec.id}`}
+                              onClick={() => {
+                                handleAddSubRecipeRow(rec);
+                                setItemSearchQuery('');
+                              }}
+                              className="p-3 hover:bg-surface-container text-xs cursor-pointer flex justify-between font-semibold"
+                            >
+                              <span>{rec.name}</span>
+                              <span className="text-primary label-caps">+ Add</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
             </div>

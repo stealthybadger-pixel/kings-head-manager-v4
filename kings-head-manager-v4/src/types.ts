@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export type Unit = 'g' | 'ml' | 'ea' | 'kg' | 'l';
+export type Unit = 'g' | 'ml' | 'ea' | 'kg' | 'l' | 'oz' | 'portion';
 
 export const IngredientCategorySchema = z.enum([
   'Vegetable',
@@ -56,7 +56,7 @@ export const IngredientSupplierSchema = z.object({
   name: z.string(),
   packCost: z.number().nonnegative(),
   packSize: z.number().positive(),
-  packUnit: z.enum(['g', 'ml', 'ea', 'kg', 'l']),
+  packUnit: z.enum(['g', 'ml', 'ea', 'kg', 'l', 'oz']),
   isPreferred: z.boolean()
 });
 export type IngredientSupplier = z.infer<typeof IngredientSupplierSchema>;
@@ -125,7 +125,9 @@ export const RecipeItemSchema = z.preprocess((val: any) => {
   ingredientId: z.string().optional(),
   subRecipeId: z.string().optional(),
   quantity: z.number().positive(),
-  unit: z.enum(['g', 'ml', 'ea', 'kg', 'l'])
+  // 'portion' is only meaningful when type === 'recipe' and the referenced
+  // Recipe has portionCount set — see DishItemSchema for the same pattern.
+  unit: z.enum(['g', 'ml', 'ea', 'kg', 'l', 'oz', 'portion'])
 }));
 export type RecipeItem = z.infer<typeof RecipeItemSchema>;
 
@@ -133,7 +135,16 @@ export const RecipeSchema = z.object({
   id: z.string(),
   name: z.string(),
   batchSize: z.number().positive(),
-  batchUnit: z.enum(['g', 'ml', 'ea', 'kg', 'l']),
+  batchUnit: z.enum(['g', 'ml', 'ea', 'kg', 'l', 'oz']),
+  // When true, batchSize is a manually-entered actual yield (e.g. weighed
+  // after roasting/reduction) rather than the auto-summed raw-input total.
+  // Costing/stocktake use batchSize either way; this flag only controls
+  // whether the UI keeps recalculating it from the ingredient list.
+  manualYield: z.boolean().optional(),
+  // Number of portions this batch yields (e.g. "makes 12 portions").
+  // When set, dish-builder can select "portion" as a unit for this recipe,
+  // resolving to batchSize / portionCount rather than a fixed weight.
+  portionCount: z.number().positive().optional(),
   stockLevel: z.number().optional(),
   items: z.array(RecipeItemSchema),
   instructions: z.string(),
@@ -164,7 +175,10 @@ export const DishItemSchema = z.preprocess((val: any) => {
   ingredientId: z.string().optional(),
   subRecipeId: z.string().optional(),
   quantity: z.number().positive(),
-  unit: z.enum(['g', 'ml', 'ea', 'kg', 'l'])
+  // 'portion' is only valid when type === 'recipe' and the referenced
+  // Recipe has portionCount set — it resolves to batchSize / portionCount
+  // at cost-calculation time rather than being a fixed weight itself.
+  unit: z.enum(['g', 'ml', 'ea', 'kg', 'l', 'oz', 'portion'])
 }));
 export type DishItem = z.infer<typeof DishItemSchema>;
 
@@ -258,7 +272,7 @@ export const SupplierProductSchema = z.object({
   supplier: z.string(),
   packCost: z.number().nonnegative(),
   packSize: z.number().positive(),
-  packUnit: z.enum(['g', 'ml', 'ea', 'kg', 'l']),
+  packUnit: z.enum(['g', 'ml', 'ea', 'kg', 'l', 'oz']),
   unitPrice: z.number().nonnegative(),
   source: z.string().optional(),
   capturedAt: z.string().optional(),

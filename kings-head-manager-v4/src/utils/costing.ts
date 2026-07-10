@@ -1,14 +1,21 @@
-import { Ingredient, Unit } from '../types';
+import { Ingredient, Unit, Recipe, RecipeItem, DishItem } from '../types';
+
+const GRAMS_PER_OZ = 28.3495231;
+
+// Converts a quantity in its given unit to the base unit's numeric value
+// (g for weight, ml for volume, ea for count).
+export const toBaseQuantity = (quantity: number, unit: string): number => {
+  if (unit === 'kg' || unit === 'l') return quantity * 1000;
+  if (unit === 'oz') return quantity * GRAMS_PER_OZ;
+  return quantity;
+};
 
 export const getBaseRate = (cost: number, size: number, unit: string): number => {
-  if (unit === 'kg' || unit === 'l') {
-    return cost / (size * 1000);
-  }
-  return cost / size;
+  return cost / toBaseQuantity(size, unit);
 };
 
 export const getBaseUnit = (unit: string): 'g' | 'ml' | 'ea' => {
-  if (unit === 'kg' || unit === 'g') return 'g';
+  if (unit === 'kg' || unit === 'g' || unit === 'oz') return 'g';
   if (unit === 'l' || unit === 'ml') return 'ml';
   return 'ea';
 };
@@ -30,11 +37,8 @@ export const calculateIngredientCost = (
   const ingBaseUnit = getBaseUnit(packUnit);
   const itemBaseUnit = getBaseUnit(unit);
 
-  let packQtyBase = packSize;
-  if (packUnit === 'kg' || packUnit === 'l') packQtyBase *= 1000;
-
-  let itemQtyBase = quantity;
-  if (unit === 'kg' || unit === 'l') itemQtyBase *= 1000;
+  const packQtyBase = toBaseQuantity(packSize, packUnit);
+  const itemQtyBase = toBaseQuantity(quantity, unit);
 
   let finalCost = 0;
 
@@ -64,4 +68,41 @@ export const calculateIngredientCost = (
 
   // Adjust for waste
   return finalCost * (1 + (ingredient.wastePercent || 0) / 100);
+};
+
+// Recursively costs a Dish's (or Recipe's) component list, cascading through
+// nested sub-recipes. Shared by any screen that needs a plate/batch cost
+// (Service, Dashboard) so the calculation can't drift between them.
+export const calculatePlateCost = (
+  items: (RecipeItem | DishItem)[],
+  ingredients: Ingredient[],
+  recipes: Recipe[],
+  depth = 0
+): number => {
+  if (depth > 5) return 0;
+  let cost = 0;
+  for (const item of (items ?? [])) {
+    if (item.type === 'ingredient' && item.ingredientId) {
+      const ing = ingredients.find(i => i.id === item.ingredientId);
+      if (ing) cost += calculateIngredientCost(ing, item.quantity, item.unit);
+    } else if (item.type === 'recipe' && item.subRecipeId) {
+      const rec = recipes.find(r => r.id === item.subRecipeId);
+      if (rec && rec.batchSize) {
+        const batchCost = calculatePlateCost(rec.items ?? [], ingredients, recipes, depth + 1);
+        if (item.unit === 'portion') {
+          // Portions are a slice of the batch by count, not by weight —
+          // resolve directly against the recipe's own portionCount rather
+          // than going through a weight conversion.
+          const portionCount = rec.portionCount || 1;
+          cost += (batchCost / portionCount) * item.quantity;
+        } else {
+          const batchSizeG = toBaseQuantity(rec.batchSize, rec.batchUnit);
+          const costPerG = batchCost / batchSizeG;
+          const qtyG = toBaseQuantity(item.quantity, item.unit);
+          cost += costPerG * qtyG;
+        }
+      }
+    }
+  }
+  return cost;
 };

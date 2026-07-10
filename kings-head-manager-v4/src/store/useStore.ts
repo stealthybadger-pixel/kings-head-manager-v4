@@ -40,6 +40,7 @@ interface UIState {
   navigateToCatalogWithSearch: (term: string) => void;
   navigateToPantryWithIngredient: (id: string) => void;
   navigateToStockWithIngredient: (id: string) => void;
+  navigateToKitchenWithRecipe: (id: string) => void;
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   dismissToast: (id: string) => void;
 }
@@ -105,7 +106,16 @@ export const useStore = create<UIState>((set) => ({
     categoryFilter: 'All',
     supplierFilter: 'All'
   }),
-  
+  navigateToKitchenWithRecipe: (id) => set({
+    currentView: 'kitchen',
+    selectedIngredientId: null,
+    selectedRecipeId: id,
+    selectedDishId: null,
+    searchTerm: '',
+    categoryFilter: 'All',
+    supplierFilter: 'All'
+  }),
+
   showToast: (message, type = 'success') => {
     const id = Math.random().toString(36).substring(2, 9);
     set((state) => ({
