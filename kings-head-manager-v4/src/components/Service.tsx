@@ -438,7 +438,7 @@ export const Service: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
               <div>
                 <div className="flex items-center justify-between mb-1 gap-3">
-                  <label className="label-caps text-outline">Target GP %</label>
+                  <label className="label-caps text-outline">GP %</label>
                   <div className="flex items-center gap-1">
                     <input
                       type="number" min={0} max={100} step={1}
@@ -704,19 +704,21 @@ export const Service: React.FC = () => {
                 <span className={`text-2xl font-bold mt-1 data-tabular ${isMarginAlert ? 'text-error' : 'text-primary'}`}>
                   {currentGP.toFixed(1)}%
                 </span>
-                <span className="text-[10px] text-secondary mt-1">Target: {formState.targetGP}%</span>
+                {isMarginAlert && (
+                  <span className="text-[10px] text-error mt-1">Lower than when price was last set ({formState.targetGP}%)</span>
+                )}
               </div>
 
               <div className="flex flex-col">
                 <span className="label-caps text-outline">Suggested Retail Price</span>
                 <span className="text-2xl font-bold text-primary data-tabular mt-1">£{suggestedSellPrice.toFixed(2)}</span>
-                <span className="text-[10px] text-secondary mt-1">Based on target GP%</span>
+                <span className="text-[10px] text-secondary mt-1">Based on the GP% above</span>
               </div>
 
               {isMarginAlert && (
                 <div className="col-span-3 bg-error-container border border-error p-3 text-on-error-container flex gap-2 items-center text-xs mt-2">
                   <AlertTriangle className="h-4 w-4 text-error" />
-                  <span>The sell price is below target GP margin. Consider increasing the retail price or cutting component sizes.</span>
+                  <span>Ingredient costs have moved since this price was last set — actual margin is now lower. Consider updating the price.</span>
                 </div>
               )}
             </div>
