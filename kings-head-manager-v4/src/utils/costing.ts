@@ -23,8 +23,21 @@ export const getBaseUnit = (unit: string): 'g' | 'ml' | 'ea' => {
 export const calculateIngredientCost = (
   ingredient: Ingredient,
   quantity: number,
-  unit: Unit
+  unit: Unit,
+  allIngredients?: Ingredient[]
 ): number => {
+  // Child cut of a whole-item breakdown (e.g. Chicken Supreme from Whole
+  // Chicken): has no supplier pricing of its own. Cost is the parent's rate
+  // for the same nominal quantity, inflated by the yield loss — buying
+  // enough parent to get 1kg of this cut costs (parent rate ÷ yield%).
+  if (ingredient.parentIngredientId && ingredient.childYieldPercent && allIngredients) {
+    const parent = allIngredients.find(i => i.id === ingredient.parentIngredientId);
+    if (parent) {
+      const parentCostForQty = calculateIngredientCost(parent, quantity, unit, allIngredients);
+      return parentCostForQty / (ingredient.childYieldPercent / 100);
+    }
+  }
+
   const pref = ingredient.suppliers?.find(s => s.isPreferred) || ingredient.suppliers?.[0];
   if (!pref) return 0;
 
@@ -84,7 +97,7 @@ export const calculatePlateCost = (
   for (const item of (items ?? [])) {
     if (item.type === 'ingredient' && item.ingredientId) {
       const ing = ingredients.find(i => i.id === item.ingredientId);
-      if (ing) cost += calculateIngredientCost(ing, item.quantity, item.unit);
+      if (ing) cost += calculateIngredientCost(ing, item.quantity, item.unit, ingredients);
     } else if (item.type === 'recipe' && item.subRecipeId) {
       const rec = recipes.find(r => r.id === item.subRecipeId);
       if (rec && rec.batchSize) {

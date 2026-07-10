@@ -180,7 +180,7 @@ export const Service: React.FC = () => {
   const getIngredientCost = (ingId: string, quantity: number, unit: Unit) => {
     const ing = ingredients.find(i => i.id === ingId);
     if (!ing) return 0;
-    return calculateIngredientCost(ing, quantity, unit);
+    return calculateIngredientCost(ing, quantity, unit, ingredients);
   };
 
   const getRecipeCost = (recipeId: string, quantity: number, unit: Unit) => {

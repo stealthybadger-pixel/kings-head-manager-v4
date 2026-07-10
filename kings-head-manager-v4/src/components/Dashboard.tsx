@@ -20,14 +20,20 @@ export const Dashboard: React.FC = () => {
 
   const getStockValue = (ing: any) => {
     if (!ing.stockLevel || ing.stockLevel <= 0) return 0;
+    // Child cuts (whole-animal breakdown) have no supplier pricing of their
+    // own — their cost derives from the parent, always resolved as weight.
+    if (ing.parentIngredientId) {
+      return calculateIngredientCost(ing, ing.stockLevel, 'g', ingredients);
+    }
     const pref = ing.suppliers?.find((s: any) => s.isPreferred) || ing.suppliers?.[0];
     if (!pref) return 0;
     const baseUnit = getBaseUnit(pref.packUnit);
-    return calculateIngredientCost(ing, ing.stockLevel, baseUnit);
+    return calculateIngredientCost(ing, ing.stockLevel, baseUnit, ingredients);
   };
 
   const getStockWeightKg = (ing: any) => {
     if (!ing.stockLevel || ing.stockLevel <= 0) return 0;
+    if (ing.parentIngredientId) return ing.stockLevel / 1000;
     const pref = ing.suppliers?.find((s: any) => s.isPreferred) || ing.suppliers?.[0];
     if (!pref) return 0;
     const baseUnit = getBaseUnit(pref.packUnit);
@@ -337,6 +343,10 @@ export const Dashboard: React.FC = () => {
   const auditedIngredients = ingredients.filter(i => i.audited).length;
   const incompleteIngredients = ingredients.filter(i => i.incomplete).length;
   const auditPercent = totalIngredients ? Math.round((auditedIngredients / totalIngredients) * 100) : 0;
+  // Child cuts (whole-item breakdown) never have their own supplier pricing
+  // by design — excluded from this ratio so adding them doesn't make
+  // "Preferred Supplier Setup" completeness look artificially worse.
+  const supplierEligibleIngredients = ingredients.filter(i => !i.parentIngredientId);
 
   const totalRecipes = recipes.length;
   const totalDishes = dishes.length;
@@ -475,7 +485,7 @@ export const Dashboard: React.FC = () => {
               <div className="flex items-center justify-between text-sm">
                 <span className="text-on-surface-variant">Preferred Supplier Setup:</span>
                 <span className="text-on-surface font-semibold">
-                  {ingredients.filter(i => i.suppliers?.some(s => s.isPreferred)).length} / {totalIngredients}
+                  {supplierEligibleIngredients.filter(i => i.suppliers?.some(s => s.isPreferred)).length} / {supplierEligibleIngredients.length}
                 </span>
               </div>
               <div className="flex items-center justify-between text-sm">

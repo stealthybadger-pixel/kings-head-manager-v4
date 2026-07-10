@@ -98,6 +98,17 @@ export const IngredientSchema = z.preprocess((val: any) => {
   incomplete: z.boolean().optional(),
   pieceWeight: z.number().positive().optional(),
   eaWeight: z.number().positive().optional(),
+  // Whole-animal/whole-item breakdown ("child ingredients"): a child cut
+  // (e.g. Chicken Supreme) points back at its parent (e.g. Whole Chicken)
+  // and records what % of the parent's weight it yields. A child has no
+  // supplier pricing of its own — its cost is always derived from the
+  // parent's preferred-supplier rate, inflated by the yield loss
+  // (parent rate ÷ yield%), the same way wastePercent already inflates
+  // cost elsewhere. Yields across all children of one parent don't need
+  // to sum to 100% — the remainder is trim/carcass waste, implicitly
+  // absorbed rather than tracked as its own child.
+  parentIngredientId: z.string().optional(),
+  childYieldPercent: z.number().positive().max(100).optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional()
 }));

@@ -297,7 +297,7 @@ export const Stock: React.FC = () => {
       const ing = ingMap.get(m.ingredientId);
       if (!ing) return sum;
       const qty = Math.abs(m.quantity);
-      return sum + calculateIngredientCost(ing, qty, 'g');
+      return sum + calculateIngredientCost(ing, qty, 'g', ingredients);
     }, 0);
   }, [filteredWaste, ingMap]);
 
@@ -400,7 +400,7 @@ export const Stock: React.FC = () => {
         const ing = ingredients.find(i => i.id === ingId);
         if (!ing) continue;
         counts[ingId] = count;
-        totalValue += calculateIngredientCost(ing, count, 'g');
+        totalValue += calculateIngredientCost(ing, count, 'g', ingredients);
         const delta = count - (ing.stockLevel || 0);
         if (delta !== 0) {
           await logMovement.mutateAsync({
@@ -460,7 +460,7 @@ export const Stock: React.FC = () => {
     for (const ing of scopedIngredients) {
       const level = ing.stockLevel ?? 0;
       counts[ing.id] = level;
-      if (cfg.stockValue) totalValue += calculateIngredientCost(ing, level, 'g');
+      if (cfg.stockValue) totalValue += calculateIngredientCost(ing, level, 'g', ingredients);
     }
 
     const columns = Object.entries(cfg)
@@ -477,7 +477,7 @@ export const Stock: React.FC = () => {
       wastageCount = recentWaste.length;
       wastageTotal = recentWaste.reduce((sum, m) => {
         const ing = ingMap.get(m.ingredientId);
-        return sum + (ing ? calculateIngredientCost(ing, Math.abs(m.quantity), 'g') : 0);
+        return sum + (ing ? calculateIngredientCost(ing, Math.abs(m.quantity), 'g', ingredients) : 0);
       }, 0);
     }
 
@@ -528,7 +528,7 @@ export const Stock: React.FC = () => {
 
     const rows = Object.entries(report.counts).map(([id, count]) => {
       const ing = ingMap.get(id);
-      const value = (ing && showValue) ? calculateIngredientCost(ing, count, 'g') : 0;
+      const value = (ing && showValue) ? calculateIngredientCost(ing, count, 'g', ingredients) : 0;
       const pref = ing?.suppliers?.find(s => s.isPreferred) ?? ing?.suppliers?.[0];
       return `<tr>
         <td>${ing?.name ?? id}</td>
@@ -887,7 +887,7 @@ export const Stock: React.FC = () => {
                   <tbody className="divide-y divide-outline-variant">
                     {filteredWaste.map(m => {
                       const ing = ingMap.get(m.ingredientId);
-                      const cost = ing ? calculateIngredientCost(ing, Math.abs(m.quantity), 'g') : 0;
+                      const cost = ing ? calculateIngredientCost(ing, Math.abs(m.quantity), 'g', ingredients) : 0;
                       return (
                         <tr key={m.id} className="hover:bg-surface-container-low">
                           <td className="p-3 data-tabular text-on-surface">{m.date}</td>
