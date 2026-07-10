@@ -7,7 +7,7 @@ import { calculateIngredientCost, toBaseQuantity } from '../utils/costing';
 
 async function scanRecipeWithGemini(base64Image: string, mimeType: string): Promise<{
   name: string;
-  ingredients: { rawName: string; parsedName: string; qty: number; unit: Unit }[];
+  ingredients: { rawName: string; parsedName: string; qty: number; unit: RecipeItem['unit'] }[];
   instructions: string;
 }> {
   const key = localStorage.getItem('geminiApiKey');
@@ -109,7 +109,7 @@ export const Kitchen: React.FC = () => {
   const [scanError, setScanError] = useState<string | null>(null);
   const [scanResults, setScanResults] = useState<{
     name: string;
-    ingredients: { rawName: string; parsedName: string; qty: number; unit: Unit; matchedId?: string }[];
+    ingredients: { rawName: string; parsedName: string; qty: number; unit: RecipeItem['unit']; matchedId?: string }[];
     instructions: string;
   } | null>(null);
   const scanFileRef = useRef<HTMLInputElement>(null);
@@ -255,7 +255,7 @@ export const Kitchen: React.FC = () => {
     });
   };
 
-  const handleUpdateItemUnit = (index: number, unit: Unit) => {
+  const handleUpdateItemUnit = (index: number, unit: RecipeItem['unit']) => {
     setFormState(prev => {
       const items = [...prev.items];
       items[index] = { ...items[index], unit };
@@ -639,6 +639,33 @@ export const Kitchen: React.FC = () => {
                   {formState.manualYield
                     ? 'Manual override active — enter the actual weighed/measured yield (e.g. after roasting).'
                     : 'Sum of ingredient components. Select unit to convert.'}
+                </span>
+              </div>
+            </div>
+
+            {/* Portions — lets this recipe be added to a Dish as "1 portion" rather than a raw weight */}
+            <div className="grid grid-cols-3 gap-6">
+              <div>
+                <label className="label-caps text-outline block mb-2">Portions Per Batch</label>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={formState.portionCount ?? ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFormState(prev => ({
+                      ...prev,
+                      portionCount: val === '' ? undefined : Math.max(1, parseFloat(val) || 1)
+                    }));
+                  }}
+                  placeholder="e.g. 12"
+                  className="w-full px-3 py-2 border border-outline-variant rounded-sm text-sm data-tabular"
+                />
+                <span className="text-[9px] text-outline mt-1 block">
+                  {formState.portionCount
+                    ? `1 portion = ${(formState.batchSize / formState.portionCount).toFixed(3)} ${formState.batchUnit}. Selectable as "portion" when adding this recipe to a Dish.`
+                    : 'Optional — set this to allow "portion" as a unit when adding this recipe to a Dish (e.g. burger buns, bread rolls).'}
                 </span>
               </div>
             </div>

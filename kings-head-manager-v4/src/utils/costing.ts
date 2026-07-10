@@ -89,10 +89,18 @@ export const calculatePlateCost = (
       const rec = recipes.find(r => r.id === item.subRecipeId);
       if (rec && rec.batchSize) {
         const batchCost = calculatePlateCost(rec.items ?? [], ingredients, recipes, depth + 1);
-        const batchSizeG = toBaseQuantity(rec.batchSize, rec.batchUnit);
-        const costPerG = batchCost / batchSizeG;
-        const qtyG = toBaseQuantity(item.quantity, item.unit);
-        cost += costPerG * qtyG;
+        if (item.unit === 'portion') {
+          // Portions are a slice of the batch by count, not by weight —
+          // resolve directly against the recipe's own portionCount rather
+          // than going through a weight conversion.
+          const portionCount = rec.portionCount || 1;
+          cost += (batchCost / portionCount) * item.quantity;
+        } else {
+          const batchSizeG = toBaseQuantity(rec.batchSize, rec.batchUnit);
+          const costPerG = batchCost / batchSizeG;
+          const qtyG = toBaseQuantity(item.quantity, item.unit);
+          cost += costPerG * qtyG;
+        }
       }
     }
   }

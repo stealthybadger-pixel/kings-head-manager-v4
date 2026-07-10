@@ -198,6 +198,12 @@ export const Service: React.FC = () => {
       }
     });
 
+    // Portions are a slice of the batch by count, not by weight.
+    if (unit === 'portion') {
+      const portionCount = rec.portionCount || 1;
+      return (batchCost / portionCount) * quantity;
+    }
+
     // Translate batch cost to unit cost
     const batchSizeG = toBaseQuantity(rec.batchSize, rec.batchUnit);
     const costPerG = batchCost / batchSizeG;
@@ -507,14 +513,15 @@ export const Service: React.FC = () => {
               <div className="flex flex-col gap-3 mb-6">
                 {(formState.items || []).map((item, idx) => {
                   if (!item) return null;
-                  const name = item.type === 'ingredient' 
-                    ? ingredients.find(i => i.id === item.ingredientId)?.name 
-                    : recipes.find(r => r.id === item.subRecipeId)?.name;
-                    
+                  const linkedRecipe = item.type === 'recipe' ? recipes.find(r => r.id === item.subRecipeId) : undefined;
+                  const name = item.type === 'ingredient'
+                    ? ingredients.find(i => i.id === item.ingredientId)?.name
+                    : linkedRecipe?.name;
+
                   const cost = item.type === 'ingredient' && item.ingredientId
                     ? getIngredientCost(item.ingredientId, item.quantity || 0, item.unit)
-                    : item.subRecipeId 
-                      ? getRecipeCost(item.subRecipeId, item.quantity || 0, item.unit) 
+                    : item.subRecipeId
+                      ? getRecipeCost(item.subRecipeId, item.quantity || 0, item.unit)
                       : 0;
 
                   return (
@@ -523,6 +530,7 @@ export const Service: React.FC = () => {
                         <span className="font-semibold text-sm text-on-surface">{name || 'Unknown Component'}</span>
                         <div className="text-[10px] text-outline uppercase tracking-wider mt-0.5">
                           {item.type}
+                          {linkedRecipe?.portionCount ? ` • ${linkedRecipe.portionCount} portions/batch` : ''}
                         </div>
                       </div>
 
@@ -547,6 +555,7 @@ export const Service: React.FC = () => {
                           <option value="ml">ml</option>
                           <option value="l">l</option>
                           <option value="ea">ea</option>
+                          {linkedRecipe?.portionCount ? <option value="portion">portion</option> : null}
                         </select>
                       </div>
 
