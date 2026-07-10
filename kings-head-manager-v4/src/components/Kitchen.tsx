@@ -3,7 +3,7 @@ import { useRecipes, useIngredients, useRecipeMutations, useIngredientMutations,
 import { useStore } from '../store/useStore';
 import { Search, Plus, Trash2, Camera, AlertCircle, Check, HelpCircle, ExternalLink, Upload, RefreshCw, X, Link2, Unlink } from 'lucide-react';
 import { Recipe, RecipeItem, Ingredient, Unit } from '../types';
-import { calculateIngredientCost } from '../utils/costing';
+import { calculateIngredientCost, toBaseQuantity } from '../utils/costing';
 
 async function scanRecipeWithGemini(base64Image: string, mimeType: string): Promise<{
   name: string;
@@ -65,6 +65,8 @@ const calculateDynamicBatchSize = (items: RecipeItem[], targetUnit: string) => {
       totalGramsOrMls += qty;
     } else if (unit === 'kg') {
       totalGramsOrMls += qty * 1000;
+    } else if (unit === 'oz') {
+      totalGramsOrMls += qty * 28.3495231;
     } else if (unit === 'ml') {
       totalGramsOrMls += qty;
     } else if (unit === 'l') {
@@ -278,12 +280,9 @@ export const Kitchen: React.FC = () => {
         const sub = recipes.find(r => r.id === item.subRecipeId);
         if (sub && sub.batchSize) {
           const batchCost = calculateTotalCost(sub.items);
-          let batchSizeG = sub.batchSize;
-          if (sub.batchUnit === 'kg' || sub.batchUnit === 'l') batchSizeG *= 1000;
-          
-          let qtyG = item.quantity;
-          if (item.unit === 'kg' || item.unit === 'l') qtyG *= 1000;
-          
+          const batchSizeG = toBaseQuantity(sub.batchSize, sub.batchUnit);
+          const qtyG = toBaseQuantity(item.quantity, item.unit);
+
           cost += (batchCost / batchSizeG) * qtyG;
         }
       }
@@ -397,9 +396,9 @@ export const Kitchen: React.FC = () => {
       {/* 1. LEFT PANEL: RECIPES DIRECTORY (35%) */}
       <div className="w-[35%] border-r border-outline-variant h-full flex flex-col bg-surface-container-lowest">
         <div className="p-4 border-b border-outline-variant bg-surface flex flex-col gap-3">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center flex-wrap gap-2">
             <span className="label-caps text-outline font-bold">Kitchen Library</span>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <div className="flex border border-outline-variant rounded-sm overflow-hidden text-[10px] font-bold label-caps">
                 <button
                   onClick={() => setRecipeSort('name')}
@@ -411,7 +410,7 @@ export const Kitchen: React.FC = () => {
                   onClick={() => setRecipeSort('date')}
                   className={`h-8 px-2.5 border-l border-outline-variant transition-colors ${recipeSort === 'date' ? 'bg-primary text-white' : 'bg-surface text-outline hover:bg-surface-container-low'}`}
                 >
-                  New
+                  Recent
                 </button>
               </div>
               <button
@@ -423,9 +422,11 @@ export const Kitchen: React.FC = () => {
               </button>
               <button
                 onClick={handleStartNew}
-                className="h-8 w-8 bg-primary text-white flex items-center justify-center rounded-sm hover:bg-opacity-90"
+                title="Create new recipe"
+                className="h-8 px-3 bg-primary text-white flex items-center justify-center gap-1 rounded-sm hover:bg-opacity-90 text-[10px] font-bold label-caps"
               >
                 <Plus className="h-4 w-4" />
+                New Recipe
               </button>
             </div>
           </div>
@@ -597,6 +598,7 @@ export const Kitchen: React.FC = () => {
                   >
                     <option value="kg">kg</option>
                     <option value="g">g</option>
+                    <option value="oz">oz</option>
                     <option value="l">l</option>
                     <option value="ml">ml</option>
                   </select>
@@ -633,10 +635,8 @@ export const Kitchen: React.FC = () => {
                     const sub = recipes.find(r => r.id === item.subRecipeId);
                     if (sub && sub.batchSize) {
                       const batchCost = calculateTotalCost(sub.items);
-                      let batchSizeG = sub.batchSize;
-                      if (sub.batchUnit === 'kg' || sub.batchUnit === 'l') batchSizeG *= 1000;
-                      let qtyG = item.quantity;
-                      if (item.unit === 'kg' || item.unit === 'l') qtyG *= 1000;
+                      const batchSizeG = toBaseQuantity(sub.batchSize, sub.batchUnit);
+                      const qtyG = toBaseQuantity(item.quantity, item.unit);
                       cost = (batchCost / batchSizeG) * qtyG;
                     }
                   }
@@ -667,6 +667,7 @@ export const Kitchen: React.FC = () => {
                         >
                           <option value="g">g</option>
                           <option value="kg">kg</option>
+                          <option value="oz">oz</option>
                           <option value="ml">ml</option>
                           <option value="l">l</option>
                           <option value="ea">ea</option>

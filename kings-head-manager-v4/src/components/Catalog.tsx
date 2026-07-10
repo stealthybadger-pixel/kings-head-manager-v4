@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { supplierBadgeClass } from '../utils/supplierColors';
-import { useSupplierSearchQuery, useSupplierProductsBySupplier, useIngredients, useIngredientMutations, useSupplierProductMutations } from '../hooks/useKitchenData';
+import { useSupplierSearchQuery, useSupplierProductsBySupplier, useIngredients, useIngredientMutations, useSupplierProductMutations, useSuppliers } from '../hooks/useKitchenData';
 import { useStore } from '../store/useStore';
 import { 
   Search, 
@@ -15,6 +15,7 @@ import {
 import { SupplierProduct, Ingredient, IngredientSupplier } from '../types';
 import { findBestIngredientMatch, cleanProductName } from '../utils/matching';
 import { inferCategory, CATEGORY_KEYWORDS } from '../utils/ingredientAutofill';
+import { getBaseRate, getBaseUnit } from '../utils/costing';
 
 export const Catalog: React.FC = () => {
   // Search & Filter State
@@ -69,29 +70,17 @@ export const Catalog: React.FC = () => {
   const [manualMatches, setManualMatches] = useState<Record<string, string>>({}); // productId -> ingredientId
   const [linkingProductId, setLinkingProductId] = useState<string | null>(null);
 
-  // Helpers for unit rate calculation (standardized to base units: g, ml, ea)
-  const getBaseRate = (cost: number, size: number, unit: string): number => {
-    if (unit === 'kg' || unit === 'l') {
-      return cost / (size * 1000);
-    }
-    return cost / size;
-  };
-
+  // Unit rate calculation (standardized to base units: g, ml, ea) uses the
+  // shared costing helpers so 'oz' is handled consistently everywhere.
   const formatUnitPrice = (cost: number, size: number, unit: string): string => {
     const rate = getBaseRate(cost, size, unit);
-    if (unit === 'kg' || unit === 'g') {
+    if (unit === 'kg' || unit === 'g' || unit === 'oz') {
       return `£${(rate * 1000).toFixed(2)} / kg`;
     }
     if (unit === 'l' || unit === 'ml') {
       return `£${(rate * 1000).toFixed(2)} / l`;
     }
     return `£${rate.toFixed(2)} / ea`;
-  };
-
-  const getBaseUnit = (unit: string): 'g' | 'ml' | 'ea' => {
-    if (unit === 'kg' || unit === 'g') return 'g';
-    if (unit === 'l' || unit === 'ml') return 'ml';
-    return 'ea';
   };
 
   // Filter first (cheap), then paginate, then match (expensive)
@@ -245,7 +234,9 @@ export const Catalog: React.FC = () => {
     }
   };
 
-  const uniqueSuppliers = ['David Catt', 'Urban', 'Cranbrook', 'Crouch', 'Booker', 'Internal'];
+  const { data: dbSuppliers = [] } = useSuppliers();
+  const FALLBACK_SUPPLIERS = ['David Catt', 'Urban', 'Cranbrook', 'Crouch', 'Booker', 'Internal'];
+  const uniqueSuppliers = dbSuppliers.length > 0 ? dbSuppliers.map(s => s.name) : FALLBACK_SUPPLIERS;
 
 
   return (
@@ -457,7 +448,7 @@ export const Catalog: React.FC = () => {
                       onChange={(e) => setEditFormState(prev => prev ? { ...prev, packUnit: e.target.value as any } : null)}
                       className="w-full px-2 py-1.5 border border-outline bg-surface-container-lowest text-xs"
                     >
-                      {['g', 'ml', 'ea', 'kg', 'l'].map(u => <option key={u} value={u}>{u}</option>)}
+                      {['g', 'ml', 'ea', 'kg', 'l', 'oz'].map(u => <option key={u} value={u}>{u}</option>)}
                     </select>
                   </div>
                 </div>

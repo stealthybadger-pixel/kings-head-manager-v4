@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export type Unit = 'g' | 'ml' | 'ea' | 'kg' | 'l';
+export type Unit = 'g' | 'ml' | 'ea' | 'kg' | 'l' | 'oz';
 
 export const IngredientCategorySchema = z.enum([
   'Vegetable',
@@ -56,7 +56,7 @@ export const IngredientSupplierSchema = z.object({
   name: z.string(),
   packCost: z.number().nonnegative(),
   packSize: z.number().positive(),
-  packUnit: z.enum(['g', 'ml', 'ea', 'kg', 'l']),
+  packUnit: z.enum(['g', 'ml', 'ea', 'kg', 'l', 'oz']),
   isPreferred: z.boolean()
 });
 export type IngredientSupplier = z.infer<typeof IngredientSupplierSchema>;
@@ -125,7 +125,7 @@ export const RecipeItemSchema = z.preprocess((val: any) => {
   ingredientId: z.string().optional(),
   subRecipeId: z.string().optional(),
   quantity: z.number().positive(),
-  unit: z.enum(['g', 'ml', 'ea', 'kg', 'l'])
+  unit: z.enum(['g', 'ml', 'ea', 'kg', 'l', 'oz'])
 }));
 export type RecipeItem = z.infer<typeof RecipeItemSchema>;
 
@@ -133,7 +133,7 @@ export const RecipeSchema = z.object({
   id: z.string(),
   name: z.string(),
   batchSize: z.number().positive(),
-  batchUnit: z.enum(['g', 'ml', 'ea', 'kg', 'l']),
+  batchUnit: z.enum(['g', 'ml', 'ea', 'kg', 'l', 'oz']),
   stockLevel: z.number().optional(),
   items: z.array(RecipeItemSchema),
   instructions: z.string(),
@@ -164,7 +164,7 @@ export const DishItemSchema = z.preprocess((val: any) => {
   ingredientId: z.string().optional(),
   subRecipeId: z.string().optional(),
   quantity: z.number().positive(),
-  unit: z.enum(['g', 'ml', 'ea', 'kg', 'l'])
+  unit: z.enum(['g', 'ml', 'ea', 'kg', 'l', 'oz'])
 }));
 export type DishItem = z.infer<typeof DishItemSchema>;
 
@@ -258,7 +258,7 @@ export const SupplierProductSchema = z.object({
   supplier: z.string(),
   packCost: z.number().nonnegative(),
   packSize: z.number().positive(),
-  packUnit: z.enum(['g', 'ml', 'ea', 'kg', 'l']),
+  packUnit: z.enum(['g', 'ml', 'ea', 'kg', 'l', 'oz']),
   unitPrice: z.number().nonnegative(),
   source: z.string().optional(),
   capturedAt: z.string().optional(),

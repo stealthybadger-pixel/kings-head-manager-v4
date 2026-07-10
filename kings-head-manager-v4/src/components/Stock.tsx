@@ -796,6 +796,7 @@ export const Stock: React.FC = () => {
                     className="w-full px-3 py-3 border border-outline-variant bg-surface-container-lowest text-sm">
                     <option value="g">grams (g)</option>
                     <option value="kg">kilograms (kg)</option>
+                    <option value="oz">ounces (oz)</option>
                     <option value="ml">milliliters (ml)</option>
                     <option value="l">liters (l)</option>
                     <option value="ea">each (ea)</option>

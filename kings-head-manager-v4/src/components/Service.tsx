@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { useDishes, useIngredients, useRecipes, useDishMutations } from '../hooks/useKitchenData';
 import { useStore } from '../store/useStore';
-import { Search, Plus, Trash2, AlertTriangle, CheckCircle, TrendingUp, Radio, ArrowLeft } from 'lucide-react';
+import { Search, Plus, Trash2, AlertTriangle, CheckCircle, TrendingUp, Radio, ArrowLeft, ExternalLink } from 'lucide-react';
 import { Allergen, AllergenSchema, Dish, DishItem, DishType, Ingredient, Recipe, Unit } from '../types';
-import { calculateIngredientCost } from '../utils/costing';
+import { calculateIngredientCost, toBaseQuantity } from '../utils/costing';
 import { useIsMobile } from '../hooks/useIsMobile';
 
 const DISH_TYPES: DishType[] = ['Starter', 'Main', 'Side', 'Dessert', 'Drink', 'Other'];
@@ -26,11 +26,9 @@ function computePlateCost(
       const rec = recipes.find(r => r.id === item.subRecipeId);
       if (rec && rec.batchSize) {
         const batchCost = computePlateCost(rec.items ?? [], ingredients, recipes, depth + 1);
-        let batchSizeG = rec.batchSize;
-        if (rec.batchUnit === 'kg' || rec.batchUnit === 'l') batchSizeG *= 1000;
+        const batchSizeG = toBaseQuantity(rec.batchSize, rec.batchUnit);
         const costPerG = batchCost / batchSizeG;
-        let qtyG = item.quantity;
-        if (item.unit === 'kg' || item.unit === 'l') qtyG *= 1000;
+        const qtyG = toBaseQuantity(item.quantity, item.unit);
         cost += costPerG * qtyG;
       }
     }
@@ -72,6 +70,8 @@ export const Service: React.FC = () => {
   const selectedId = useStore((state) => state.selectedDishId);
   const selectDish = useStore((state) => state.selectDish);
   const showToast = useStore((state) => state.showToast);
+  const navigateToPantryWithIngredient = useStore((state) => state.navigateToPantryWithIngredient);
+  const navigateToKitchenWithRecipe = useStore((state) => state.navigateToKitchenWithRecipe);
   const isMobile = useIsMobile();
 
   // Search
@@ -222,14 +222,10 @@ export const Service: React.FC = () => {
     });
 
     // Translate batch cost to unit cost
-    let batchSizeG = rec.batchSize;
-    if (rec.batchUnit === 'kg') batchSizeG *= 1000;
-    if (rec.batchUnit === 'l') batchSizeG *= 1000;
+    const batchSizeG = toBaseQuantity(rec.batchSize, rec.batchUnit);
     const costPerG = batchCost / batchSizeG;
 
-    let qtyG = quantity;
-    if (unit === 'kg') qtyG *= 1000;
-    if (unit === 'l') qtyG *= 1000;
+    const qtyG = toBaseQuantity(quantity, unit);
 
     return costPerG * qtyG;
   };
@@ -280,9 +276,9 @@ export const Service: React.FC = () => {
       {/* 1. LEFT PANEL: DISH DIRECTORY (35% desktop / full-width mobile list view) */}
       <div className={`${isMobile ? (isEditing ? 'hidden' : 'w-full') : 'w-[35%]'} border-r border-outline-variant h-full flex flex-col bg-surface-container-lowest`}>
         <div className="p-4 border-b border-outline-variant bg-surface flex flex-col gap-3">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center flex-wrap gap-2">
             <span className="label-caps text-outline font-bold">Menu List</span>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <div className="flex border border-outline-variant rounded-sm overflow-hidden text-[10px] font-bold label-caps">
                 <button
                   onClick={() => setDishSort('name')}
@@ -294,14 +290,16 @@ export const Service: React.FC = () => {
                   onClick={() => setDishSort('date')}
                   className={`h-8 px-2.5 border-l border-outline-variant transition-colors ${dishSort === 'date' ? 'bg-primary text-white' : 'bg-surface text-outline hover:bg-surface-container-low'}`}
                 >
-                  New
+                  Recent
                 </button>
               </div>
               <button
                 onClick={handleStartNew}
-                className="h-8 w-8 bg-primary text-white flex items-center justify-center rounded-sm hover:bg-opacity-90"
+                title="Create new dish"
+                className="h-8 px-3 bg-primary text-white flex items-center justify-center gap-1 rounded-sm hover:bg-opacity-90 text-[10px] font-bold label-caps"
               >
                 <Plus className="h-4 w-4" />
+                New Dish
               </button>
             </div>
           </div>
@@ -447,9 +445,21 @@ export const Service: React.FC = () => {
             {/* Sliders */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
               <div>
-                <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center justify-between mb-1 gap-3">
                   <label className="label-caps text-outline">Target GP %</label>
-                  <span className="data-tabular text-sm font-bold text-primary">{formState.targetGP}%</span>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number" min={0} max={100} step={1}
+                      value={formState.targetGP}
+                      onChange={e => {
+                        const targetGP = Math.max(0, Math.min(100, Number(e.target.value) || 0));
+                        const suggestedPrice = targetGP === 100 ? 0 : plateCost / (1 - targetGP / 100);
+                        setFormState(prev => ({ ...prev, targetGP, retailPrice: Math.round(suggestedPrice * 4) / 4 }));
+                      }}
+                      className="w-16 px-1.5 py-0.5 border border-outline-variant rounded-sm text-sm font-bold text-primary data-tabular text-right"
+                    />
+                    <span className="text-sm font-bold text-primary">%</span>
+                  </div>
                 </div>
                 <input
                   type="range" min={0} max={100} step={1}
@@ -466,13 +476,25 @@ export const Service: React.FC = () => {
                 </div>
               </div>
               <div>
-                <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center justify-between mb-1 gap-3">
                   <label className="label-caps text-outline">Retail Price</label>
-                  <span className="data-tabular text-sm font-bold text-primary">£{formState.retailPrice.toFixed(2)}</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm font-bold text-primary">£</span>
+                    <input
+                      type="number" min={0} step={0.25}
+                      value={formState.retailPrice}
+                      onChange={e => {
+                        const retailPrice = Math.max(0, Number(e.target.value) || 0);
+                        const impliedGP = retailPrice > 0 ? ((retailPrice - plateCost) / retailPrice) * 100 : 0;
+                        setFormState(prev => ({ ...prev, retailPrice, targetGP: Math.round(Math.max(0, Math.min(100, impliedGP))) }));
+                      }}
+                      className="w-20 px-1.5 py-0.5 border border-outline-variant rounded-sm text-sm font-bold text-primary data-tabular text-right"
+                    />
+                  </div>
                 </div>
                 <input
                   type="range" min={0} max={100} step={0.25}
-                  value={formState.retailPrice}
+                  value={Math.min(formState.retailPrice, 100)}
                   onChange={e => {
                     const retailPrice = Number(e.target.value);
                     const impliedGP = retailPrice > 0 ? ((retailPrice - plateCost) / retailPrice) * 100 : 0;
@@ -481,7 +503,7 @@ export const Service: React.FC = () => {
                   className="w-full accent-primary h-1.5"
                 />
                 <div className="flex justify-between text-[10px] text-outline mt-0.5">
-                  <span>£0</span><span>£50</span><span>£100</span>
+                  <span>£0</span><span>£50</span><span>£100+</span>
                 </div>
               </div>
             </div>
@@ -529,6 +551,7 @@ export const Service: React.FC = () => {
                         >
                           <option value="g">g</option>
                           <option value="kg">kg</option>
+                          <option value="oz">oz</option>
                           <option value="ml">ml</option>
                           <option value="l">l</option>
                           <option value="ea">ea</option>
@@ -539,7 +562,26 @@ export const Service: React.FC = () => {
                         £{cost.toFixed(2)}
                       </div>
 
-                      <button 
+                      {item.type === 'ingredient' && item.ingredientId && (
+                        <button
+                          onClick={() => navigateToPantryWithIngredient(item.ingredientId!)}
+                          title="Open in Pantry"
+                          className="p-1 text-outline hover:text-primary"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </button>
+                      )}
+                      {item.type === 'recipe' && item.subRecipeId && (
+                        <button
+                          onClick={() => navigateToKitchenWithRecipe(item.subRecipeId!)}
+                          title="Open in Kitchen"
+                          className="p-1 text-outline hover:text-primary"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </button>
+                      )}
+
+                      <button
                         onClick={() => handleRemoveRow(idx)}
                         className="p-1 text-error hover:bg-error-container"
                       >

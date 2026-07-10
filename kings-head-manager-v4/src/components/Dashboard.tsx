@@ -213,6 +213,7 @@ export const Dashboard: React.FC = () => {
       let ratePerKg = 0;
       if (unit === 'kg') ratePerKg = pref.packCost / pref.packSize;
       else if (unit === 'g') ratePerKg = (pref.packCost / pref.packSize) * 1000;
+      else if (unit === 'oz') ratePerKg = (pref.packCost / pref.packSize) * (1000 / 28.3495231);
       else return; // skip ea/ml for this check
       if (!ratesByCat[ing.category]) ratesByCat[ing.category] = [];
       ratesByCat[ing.category].push(ratePerKg);
@@ -257,6 +258,7 @@ export const Dashboard: React.FC = () => {
       let ratePerKg = 0;
       if (unit === 'kg') ratePerKg = pref.packCost / pref.packSize;
       else if (unit === 'g') ratePerKg = (pref.packCost / pref.packSize) * 1000;
+      else if (unit === 'oz') ratePerKg = (pref.packCost / pref.packSize) * (1000 / 28.3495231);
       if (ratePerKg > 0) {
         const catMedian = median(ratesByCat[ing.category] || []);
         if (catMedian > 0 && ratePerKg > catMedian * 6) {
@@ -295,6 +297,7 @@ export const Dashboard: React.FC = () => {
     const toRatePerKg = (cost: number, size: number, unit: string) => {
       if (unit === 'kg') return cost / size;
       if (unit === 'g') return (cost / size) * 1000;
+      if (unit === 'oz') return (cost / size) * (1000 / 28.3495231);
       if (unit === 'l') return cost / size;
       if (unit === 'ml') return (cost / size) * 1000;
       return cost / size;

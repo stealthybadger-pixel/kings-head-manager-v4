@@ -1,14 +1,21 @@
 import { Ingredient, Unit } from '../types';
 
+const GRAMS_PER_OZ = 28.3495231;
+
+// Converts a quantity in its given unit to the base unit's numeric value
+// (g for weight, ml for volume, ea for count).
+export const toBaseQuantity = (quantity: number, unit: string): number => {
+  if (unit === 'kg' || unit === 'l') return quantity * 1000;
+  if (unit === 'oz') return quantity * GRAMS_PER_OZ;
+  return quantity;
+};
+
 export const getBaseRate = (cost: number, size: number, unit: string): number => {
-  if (unit === 'kg' || unit === 'l') {
-    return cost / (size * 1000);
-  }
-  return cost / size;
+  return cost / toBaseQuantity(size, unit);
 };
 
 export const getBaseUnit = (unit: string): 'g' | 'ml' | 'ea' => {
-  if (unit === 'kg' || unit === 'g') return 'g';
+  if (unit === 'kg' || unit === 'g' || unit === 'oz') return 'g';
   if (unit === 'l' || unit === 'ml') return 'ml';
   return 'ea';
 };
@@ -30,11 +37,8 @@ export const calculateIngredientCost = (
   const ingBaseUnit = getBaseUnit(packUnit);
   const itemBaseUnit = getBaseUnit(unit);
 
-  let packQtyBase = packSize;
-  if (packUnit === 'kg' || packUnit === 'l') packQtyBase *= 1000;
-
-  let itemQtyBase = quantity;
-  if (unit === 'kg' || unit === 'l') itemQtyBase *= 1000;
+  const packQtyBase = toBaseQuantity(packSize, packUnit);
+  const itemQtyBase = toBaseQuantity(quantity, unit);
 
   let finalCost = 0;
 

@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { supplierBadgeClass } from '../utils/supplierColors';
-import { useIngredients, useIngredientMutations, useSupplierSearchQuery, useDishes } from '../hooks/useKitchenData';
+import { useIngredients, useIngredientMutations, useSupplierSearchQuery, useDishes, useSuppliers } from '../hooks/useKitchenData';
 import { useStore } from '../store/useStore';
 import { Search, Plus, Trash2, AlertCircle, FileText, CheckCircle2, ListTodo, Check, ArrowRight, ArrowLeft } from 'lucide-react';
 import { Ingredient, IngredientCategory, SupplierName, Unit, Allergen, IngredientSupplier } from '../types';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { inferIngredientDefaults, DRY_STORE_SUBCATEGORIES } from '../utils/ingredientAutofill';
+import { getBaseRate, getBaseUnit } from '../utils/costing';
 
 // Self-contained catalog search for a single supplier row
 const CatalogRowSearch: React.FC<{
@@ -101,8 +102,8 @@ const isIngredientMatched = (candName: string, dbIngredients: Ingredient[]) => {
 
 const formatSupplierUnitPrice = (cost: number, size: number, unit: string): string => {
   if (!size || size <= 0) return '£0.00';
-  if (unit === 'kg' || unit === 'g') {
-    const perKg = unit === 'kg' ? cost / size : (cost / size) * 1000;
+  if (unit === 'kg' || unit === 'g' || unit === 'oz') {
+    const perKg = unit === 'kg' ? cost / size : (cost / size) * (unit === 'oz' ? (1000 / 28.3495231) : 1000);
     return `£${perKg.toFixed(2)} / kg`;
   }
   if (unit === 'l' || unit === 'ml') {
@@ -123,6 +124,7 @@ export interface AuditTask {
 export const Pantry: React.FC = () => {
   const { data: ingredients = [], isLoading } = useIngredients();
   const { data: dishes = [] } = useDishes();
+  const { data: dbSuppliers = [] } = useSuppliers();
   const { addIngredient, updateIngredient, deleteIngredient } = useIngredientMutations();
   
   const selectedId = useStore((state) => state.selectedIngredientId);
@@ -158,8 +160,11 @@ export const Pantry: React.FC = () => {
   });
 
   const categories: IngredientCategory[] = ['Vegetable', 'Fruit', 'Meat', 'Fish', 'Dry Store', 'Frozen', 'Dairy', 'Alcohol', 'Non Consumables'];
-  const suppliersList: SupplierName[] = ['David Catt', 'Urban', 'Cranbrook', 'Crouch', 'Booker', 'Glovers', 'Internal'];
-  const units: Unit[] = ['g', 'ml', 'ea', 'kg', 'l'];
+  // Live list of suppliers so newly-added suppliers show up here immediately,
+  // rather than requiring a code change to a hardcoded list.
+  const FALLBACK_SUPPLIERS = ['David Catt', 'Urban', 'Cranbrook', 'Crouch', 'Booker', 'Glovers', 'Internal'];
+  const suppliersList: string[] = dbSuppliers.length > 0 ? dbSuppliers.map(s => s.name) : FALLBACK_SUPPLIERS;
+  const units: Unit[] = ['g', 'ml', 'ea', 'kg', 'l', 'oz'];
   const allergensList: Allergen[] = ['Milk', 'Eggs', 'Fish', 'Crustaceans', 'Molluscs', 'Peanuts', 'Nuts', 'Sesame', 'Soya', 'Wheat (Gluten)', 'Celery', 'Mustard', 'Sulphites', 'Lupin'];
 
   // Filtered ingredients
@@ -206,17 +211,6 @@ export const Pantry: React.FC = () => {
     // Find preferred supplier unit rate
     const prefSup = activeIngredient.suppliers?.find(s => s.isPreferred) || activeIngredient.suppliers?.[0];
     if (!prefSup) return null;
-
-    const getBaseRate = (cost: number, size: number, unit: string) => {
-      if (unit === 'kg' || unit === 'l') return cost / (size * 1000);
-      return cost / size;
-    };
-
-    const getBaseUnit = (unit: string) => {
-      if (unit === 'kg' || unit === 'g') return 'g';
-      if (unit === 'l' || unit === 'ml') return 'ml';
-      return 'ea';
-    };
 
     const currentRate = getBaseRate(prefSup.packCost, prefSup.packSize, prefSup.packUnit);
     const currentBaseUnit = getBaseUnit(prefSup.packUnit);
@@ -594,9 +588,9 @@ export const Pantry: React.FC = () => {
       {/* 1. LEFT COLUMN: SEARCH & CATALOG LIST (35% desktop / full-width mobile list view) */}
       <div className={`${isMobile ? (isEditing ? 'hidden' : 'w-full') : 'w-[35%]'} border-r border-outline-variant h-full flex flex-col bg-surface-container-lowest`}>
         <div className="p-4 border-b border-outline-variant bg-surface flex flex-col gap-3">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center flex-wrap gap-2">
             <span className="label-caps text-outline font-bold">Pantry Directory</span>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <div className="flex border border-outline-variant rounded-sm overflow-hidden text-[10px] font-bold label-caps">
                 <button
                   onClick={() => setPantrySort('name')}
@@ -608,7 +602,7 @@ export const Pantry: React.FC = () => {
                   onClick={() => setPantrySort('date')}
                   className={`h-8 px-2.5 border-l border-outline-variant transition-colors ${pantrySort === 'date' ? 'bg-primary text-white' : 'bg-surface text-outline hover:bg-surface-container-low'}`}
                 >
-                  New
+                  Recent
                 </button>
               </div>
               <button
@@ -619,6 +613,7 @@ export const Pantry: React.FC = () => {
               </button>
               <button
                 onClick={handleStartNew}
+                title="Create new ingredient"
                 className="h-8 w-8 bg-primary text-white flex items-center justify-center rounded-sm hover:bg-opacity-90"
               >
                 <Plus className="h-4 w-4" />
