@@ -3,7 +3,7 @@ import { useRecipes, useIngredients, useRecipeMutations, useIngredientMutations,
 import { useStore } from '../store/useStore';
 import { Search, Plus, Trash2, Camera, AlertCircle, Check, HelpCircle, ExternalLink, Upload, RefreshCw, X, Link2, Unlink } from 'lucide-react';
 import { Recipe, RecipeItem, Ingredient, Unit } from '../types';
-import { calculateIngredientCost, toBaseQuantity } from '../utils/costing';
+import { calculatePlateCost } from '../utils/costing';
 
 async function scanRecipeWithGemini(base64Image: string, mimeType: string): Promise<{
   name: string;
@@ -195,10 +195,44 @@ export const Kitchen: React.FC = () => {
 
   const isSaving = addRecipe.isPending || updateRecipe.isPending;
 
+  // Would adding `candidateSubRecipeId` as a component of `hostRecipeId` create
+  // a cycle? Walks the candidate's own sub-recipe tree looking for a path back
+  // to the host — catches both direct self-reference (candidate === host) and
+  // transitive cycles (A contains B, B would end up containing A).
+  const wouldCreateCircularReference = (
+    hostRecipeId: string | undefined,
+    candidateSubRecipeId: string,
+    visited = new Set<string>()
+  ): boolean => {
+    if (!hostRecipeId) return false;
+    if (candidateSubRecipeId === hostRecipeId) return true;
+    if (visited.has(candidateSubRecipeId)) return false;
+    visited.add(candidateSubRecipeId);
+
+    const candidate = recipes.find(r => r.id === candidateSubRecipeId);
+    if (!candidate) return false;
+
+    return (candidate.items ?? []).some(item =>
+      item.type === 'recipe' && item.subRecipeId
+        ? wouldCreateCircularReference(hostRecipeId, item.subRecipeId, visited)
+        : false
+    );
+  };
+
   const handleSave = async () => {
     if (!formState.name) {
       showToast("Recipe name is required", "error");
       return;
+    }
+    if (formState.id) {
+      const circularItem = formState.items.find(item =>
+        item.type === 'recipe' && item.subRecipeId && wouldCreateCircularReference(formState.id, item.subRecipeId)
+      );
+      if (circularItem) {
+        const badRecipe = recipes.find(r => r.id === (circularItem as any).subRecipeId);
+        showToast(`Can't save — "${badRecipe?.name || 'a sub-recipe'}" would create a circular reference back to this recipe.`, "error");
+        return;
+      }
     }
     try {
       if (isNew) {
@@ -226,6 +260,26 @@ export const Kitchen: React.FC = () => {
       items: [
         ...prev.items,
         { type: 'ingredient', ingredientId: ing.id, quantity: 100, unit: 'g' }
+      ]
+    }));
+  };
+
+  // Add another Recipe as a sub-component (e.g. a pickling liquor inside a
+  // pickled-vegetables recipe). Blocks direct self-reference and transitive
+  // circular references at the point of adding, as a first line of defence —
+  // handleSave runs the same check again since items can also change after.
+  const handleAddSubRecipeRow = (subRecipe: Recipe) => {
+    if (formState.items.some(i => i.type === 'recipe' && i.subRecipeId === subRecipe.id)) return;
+    if (formState.id && wouldCreateCircularReference(formState.id, subRecipe.id)) {
+      showToast(`Can't add "${subRecipe.name}" — it would create a circular reference back to this recipe.`, "error");
+      return;
+    }
+
+    setFormState(prev => ({
+      ...prev,
+      items: [
+        ...prev.items,
+        { type: 'recipe', subRecipeId: subRecipe.id, quantity: 100, unit: subRecipe.batchUnit }
       ]
     }));
   };
@@ -264,32 +318,14 @@ export const Kitchen: React.FC = () => {
     }));
   };
 
-  // Calculating total recipe costs based on ingredient costing utility
-  const calculateTotalCost = (items: RecipeItem[]) => {
-    let cost = 0;
-    items.forEach(item => {
-      if (item.type === 'ingredient' && item.ingredientId) {
-        const ing = ingredients.find(i => i.id === item.ingredientId);
-        if (ing) {
-          cost += calculateIngredientCost(ing, item.quantity, item.unit);
-        }
-      } else if (item.type === 'recipe' && item.subRecipeId) {
-        const sub = recipes.find(r => r.id === item.subRecipeId);
-        if (sub && sub.batchSize) {
-          const batchCost = calculateTotalCost(sub.items);
-          const batchSizeG = toBaseQuantity(sub.batchSize, sub.batchUnit);
-          const qtyG = toBaseQuantity(item.quantity, item.unit);
-
-          cost += (batchCost / batchSizeG) * qtyG;
-        }
-      }
-    });
-    return cost;
-  };
+  // Recipe costing (including recursive sub-recipe cascading) is shared with
+  // Service.tsx/Dashboard.tsx via costing.ts, so it can't drift between
+  // screens and always has the recursion-depth guard against circular refs.
+  const calculateTotalCost = (items: RecipeItem[]) => calculatePlateCost(items, ingredients, recipes);
 
   const totalCost = useMemo(() => {
     return calculateTotalCost(formState.items);
-  }, [formState.items, ingredients]);
+  }, [formState.items, ingredients, recipes]);
 
   const handleScanFile = async (file: File) => {
     setScanFile(file);
@@ -696,32 +732,24 @@ export const Kitchen: React.FC = () => {
               
               <div className="flex flex-col gap-3 mb-6">
                 {formState.items.map((item, idx) => {
-                  const ing = ingredients.find(i => i.id === item.ingredientId);
-                  let cost = 0;
-                  if (item.type === 'ingredient' && ing) {
-                    cost = calculateIngredientCost(ing, item.quantity, item.unit);
-                  } else if (item.type === 'recipe' && item.subRecipeId) {
-                    const sub = recipes.find(r => r.id === item.subRecipeId);
-                    if (sub && sub.batchSize) {
-                      const batchCost = calculateTotalCost(sub.items);
-                      const batchSizeG = toBaseQuantity(sub.batchSize, sub.batchUnit);
-                      const qtyG = toBaseQuantity(item.quantity, item.unit);
-                      cost = (batchCost / batchSizeG) * qtyG;
-                    }
-                  }
+                  const ing = item.type === 'ingredient' ? ingredients.find(i => i.id === item.ingredientId) : undefined;
+                  const sub = item.type === 'recipe' ? recipes.find(r => r.id === item.subRecipeId) : undefined;
+                  const cost = calculateTotalCost([item]);
 
                   return (
                     <div key={idx} className="flex gap-4 items-center bg-surface p-4 border border-outline-variant rounded-sm">
                       <div className="flex-1">
-                        <span className="font-semibold text-sm text-on-surface">{ing?.name || 'Unknown Item'}</span>
+                        <span className="font-semibold text-sm text-on-surface">{ing?.name || sub?.name || 'Unknown Item'}</span>
                         <div className="text-[10px] text-outline uppercase tracking-wider mt-0.5">
-                          {ing?.category} • Waste: {ing?.wastePercent || 0}%
+                          {item.type === 'ingredient'
+                            ? `${ing?.category ?? ''} • Waste: ${ing?.wastePercent || 0}%`
+                            : `Sub-Recipe${sub?.portionCount ? ` • ${sub.portionCount} portions/batch` : ''}`}
                         </div>
                       </div>
 
                       <div className="w-24">
-                        <input 
-                          type="number" 
+                        <input
+                          type="number"
                           value={item.quantity}
                           onChange={(e) => handleUpdateItemQty(idx, Math.max(0, parseFloat(e.target.value) || 0))}
                           className="w-full px-2 py-1 border border-outline-variant text-xs data-tabular text-center"
@@ -729,7 +757,7 @@ export const Kitchen: React.FC = () => {
                       </div>
 
                       <div className="w-20">
-                        <select 
+                        <select
                           value={item.unit}
                           onChange={(e) => handleUpdateItemUnit(idx, e.target.value as any)}
                           className="w-full px-2 py-1 border border-outline-variant bg-surface-container-lowest text-xs"
@@ -740,6 +768,7 @@ export const Kitchen: React.FC = () => {
                           <option value="ml">ml</option>
                           <option value="l">l</option>
                           <option value="ea">ea</option>
+                          {item.type === 'recipe' && sub?.portionCount ? <option value="portion">portion</option> : null}
                         </select>
                       </div>
 
@@ -751,6 +780,15 @@ export const Kitchen: React.FC = () => {
                         <button
                           onClick={() => navigateToPantryWithIngredient(ing.id)}
                           title="Open in Pantry"
+                          className="p-1 text-outline hover:text-primary"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </button>
+                      )}
+                      {item.type === 'recipe' && sub && (
+                        <button
+                          onClick={() => selectRecipe(sub.id)}
+                          title="Open this sub-recipe"
                           className="p-1 text-outline hover:text-primary"
                         >
                           <ExternalLink className="h-4 w-4" />
@@ -769,13 +807,13 @@ export const Kitchen: React.FC = () => {
 
               {/* Add row search block */}
               <div className="bg-surface p-4 border border-outline-variant rounded-sm flex flex-col gap-3">
-                <span className="text-xs label-caps text-outline font-bold">Add Ingredient to Recipe</span>
+                <span className="text-xs label-caps text-outline font-bold">Add Ingredient or Recipe to Recipe</span>
                 <div className="flex gap-2">
                   <div className="relative flex-1 flex items-center bg-surface-container-lowest border border-outline-variant rounded-sm px-3 py-1.5 focus-within:border-primary">
                     <Search className="h-4 w-4 text-outline mr-2" />
-                    <input 
-                      type="text" 
-                      placeholder="Search ingredients..." 
+                    <input
+                      type="text"
+                      placeholder="Search ingredients or recipes..."
                       value={itemSearchQuery}
                       onChange={(e) => setItemSearchQuery(e.target.value)}
                       className="flex-1 text-xs bg-transparent outline-none border-none focus:ring-0 p-0"
@@ -783,26 +821,67 @@ export const Kitchen: React.FC = () => {
                   </div>
                 </div>
 
-                {itemSearchQuery.trim().length > 1 && (
-                  <div className="max-h-48 overflow-y-auto bg-surface-container-lowest border border-outline-variant divide-y divide-outline-variant rounded-sm">
-                    {ingredients
-                      .filter(i => i.name.toLowerCase().includes(itemSearchQuery.toLowerCase()))
-                      .slice(0, 5)
-                      .map(ing => (
-                        <div 
-                          key={ing.id}
-                          onClick={() => {
-                            handleAddIngredientRow(ing);
-                            setItemSearchQuery('');
-                          }}
-                          className="p-3 hover:bg-surface-container text-xs cursor-pointer flex justify-between font-semibold"
-                        >
-                          <span>{ing.name}</span>
-                          <span className="text-primary label-caps">+ Add</span>
+                {itemSearchQuery.trim().length > 1 && (() => {
+                  const matchingIngredients = ingredients
+                    .filter(i => i.name.toLowerCase().includes(itemSearchQuery.toLowerCase()))
+                    .slice(0, 5);
+                  const matchingRecipes = recipes
+                    .filter(r =>
+                      r.name.toLowerCase().includes(itemSearchQuery.toLowerCase()) &&
+                      r.id !== formState.id &&
+                      !(formState.id && wouldCreateCircularReference(formState.id, r.id))
+                    )
+                    .slice(0, 5);
+
+                  if (matchingIngredients.length === 0 && matchingRecipes.length === 0) {
+                    return (
+                      <div className="p-3 text-xs text-outline bg-surface-container-lowest border border-outline-variant rounded-sm">
+                        No matching ingredients or recipes.
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="max-h-64 overflow-y-auto bg-surface-container-lowest border border-outline-variant rounded-sm">
+                      {matchingIngredients.length > 0 && (
+                        <div className="divide-y divide-outline-variant">
+                          <div className="px-3 py-1 text-[9px] label-caps text-outline font-bold bg-surface-container-low">Ingredients</div>
+                          {matchingIngredients.map(ing => (
+                            <div
+                              key={`ing-${ing.id}`}
+                              onClick={() => {
+                                handleAddIngredientRow(ing);
+                                setItemSearchQuery('');
+                              }}
+                              className="p-3 hover:bg-surface-container text-xs cursor-pointer flex justify-between font-semibold"
+                            >
+                              <span>{ing.name}</span>
+                              <span className="text-primary label-caps">+ Add</span>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                  </div>
-                )}
+                      )}
+                      {matchingRecipes.length > 0 && (
+                        <div className="divide-y divide-outline-variant">
+                          <div className="px-3 py-1 text-[9px] label-caps text-outline font-bold bg-surface-container-low">Recipes</div>
+                          {matchingRecipes.map(rec => (
+                            <div
+                              key={`rec-${rec.id}`}
+                              onClick={() => {
+                                handleAddSubRecipeRow(rec);
+                                setItemSearchQuery('');
+                              }}
+                              className="p-3 hover:bg-surface-container text-xs cursor-pointer flex justify-between font-semibold"
+                            >
+                              <span>{rec.name}</span>
+                              <span className="text-primary label-caps">+ Add</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
             </div>

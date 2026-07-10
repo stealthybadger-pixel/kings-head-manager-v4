@@ -125,7 +125,9 @@ export const RecipeItemSchema = z.preprocess((val: any) => {
   ingredientId: z.string().optional(),
   subRecipeId: z.string().optional(),
   quantity: z.number().positive(),
-  unit: z.enum(['g', 'ml', 'ea', 'kg', 'l', 'oz'])
+  // 'portion' is only meaningful when type === 'recipe' and the referenced
+  // Recipe has portionCount set — see DishItemSchema for the same pattern.
+  unit: z.enum(['g', 'ml', 'ea', 'kg', 'l', 'oz', 'portion'])
 }));
 export type RecipeItem = z.infer<typeof RecipeItemSchema>;
 
