@@ -118,6 +118,9 @@ export const Kitchen: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isNew, setIsNew] = useState(false);
   const [usageFlyoutId, setUsageFlyoutId] = useState<string | null>(null);
+  // Separate from formState.portionCount itself so toggling on can show an
+  // empty input rather than needing a value to already exist.
+  const [portionsEnabled, setPortionsEnabled] = useState(false);
   const [formState, setFormState] = useState<Omit<Recipe, 'id'> & { id?: string }>({
     name: '',
     batchSize: 1,
@@ -151,6 +154,7 @@ export const Kitchen: React.FC = () => {
   React.useEffect(() => {
     if (activeRecipe) {
       setFormState(activeRecipe);
+      setPortionsEnabled(activeRecipe.portionCount !== undefined);
       setIsEditing(true);
       setIsNew(false);
     } else {
@@ -166,6 +170,7 @@ export const Kitchen: React.FC = () => {
       items: [],
       instructions: ''
     });
+    setPortionsEnabled(false);
     setIsNew(true);
     setIsEditing(true);
     selectRecipe(null);
@@ -685,30 +690,56 @@ export const Kitchen: React.FC = () => {
               </div>
             </div>
 
-            {/* Portions — lets this recipe be added to a Dish as "1 portion" rather than a raw weight */}
+            {/* Portions — only relevant for recipes that yield discrete units
+                (bread rolls, cheesecake slices). Weight-based preps like a
+                pickled veg or a sauce shouldn't show a portion count at all,
+                so this is an explicit off-by-default toggle rather than an
+                always-visible field next to Batch Yield Size. */}
             <div className="grid grid-cols-3 gap-6">
-              <div>
-                <label className="label-caps text-outline block mb-2">Portions Per Batch</label>
-                <input
-                  type="number"
-                  min={1}
-                  step={1}
-                  value={formState.portionCount ?? ''}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setFormState(prev => ({
-                      ...prev,
-                      portionCount: val === '' ? undefined : Math.max(1, parseFloat(val) || 1)
-                    }));
-                  }}
-                  placeholder="e.g. 12"
-                  className="w-full px-3 py-2 border border-outline-variant rounded-sm text-sm data-tabular"
-                />
-                <span className="text-[9px] text-outline mt-1 block">
-                  {formState.portionCount
-                    ? `1 portion = ${(formState.batchSize / formState.portionCount).toFixed(3)} ${formState.batchUnit}. Selectable as "portion" when adding this recipe to a Dish.`
-                    : 'Optional — set this to allow "portion" as a unit when adding this recipe to a Dish (e.g. burger buns, bread rolls).'}
-                </span>
+              <div className="col-span-3 sm:col-span-1">
+                <label className="flex items-center gap-2 text-xs font-semibold text-on-surface cursor-pointer select-none mb-2">
+                  <input
+                    type="checkbox"
+                    checked={portionsEnabled}
+                    onChange={(e) => {
+                      const enabled = e.target.checked;
+                      setPortionsEnabled(enabled);
+                      if (!enabled) {
+                        // Clear the stored value when switching back off — a
+                        // weight-based recipe shouldn't retain a stale portion count.
+                        setFormState(prev => ({ ...prev, portionCount: undefined }));
+                      }
+                    }}
+                    className="h-4 w-4"
+                  />
+                  This recipe yields discrete portions (e.g. bread rolls, cheesecake)
+                </label>
+
+                {portionsEnabled && (
+                  <>
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={formState.portionCount ?? ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setFormState(prev => ({
+                          ...prev,
+                          portionCount: val === '' ? undefined : Math.max(1, parseFloat(val) || 1)
+                        }));
+                      }}
+                      placeholder="e.g. 12"
+                      autoFocus
+                      className="w-full px-3 py-2 border border-outline-variant rounded-sm text-sm data-tabular"
+                    />
+                    <span className="text-[9px] text-outline mt-1 block">
+                      {formState.portionCount
+                        ? `1 portion = ${(formState.batchSize / formState.portionCount).toFixed(3)} ${formState.batchUnit}. Selectable as "portion" when adding this recipe to a Dish.`
+                        : 'How many portions does one batch make?'}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
 
