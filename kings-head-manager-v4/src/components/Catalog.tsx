@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { SupplierProduct, Ingredient, IngredientSupplier } from '../types';
 import { findBestIngredientMatch, cleanProductName } from '../utils/matching';
-import { inferCategory, CATEGORY_KEYWORDS } from '../utils/ingredientAutofill';
+import { inferCategory, CATEGORY_KEYWORDS, inferIngredientDefaults } from '../utils/ingredientAutofill';
 import { getBaseRate, getBaseUnit } from '../utils/costing';
 
 export const Catalog: React.FC = () => {
@@ -206,14 +206,16 @@ export const Catalog: React.FC = () => {
   // Action: Create a brand new pantry ingredient from a catalog product
   const handleCreateIngredientFromProduct = async (prod: SupplierProduct) => {
     const name = prod.originalName || prod.name.replace(/\s*\(Box\)|\s*\(Tray\)|\s*\(Case\)|\s*\(Sachet\)/gi, '');
-    
+    const guess = inferIngredientDefaults(name);
+
     const newIngredient = {
       name: name,
-      category: 'Dry Store' as const,
-      wastePercent: 0,
-      kcalPer100: 0,
+      category: (guess.category ?? 'Dry Store') as any,
+      subCategory: guess.subCategory ?? undefined,
+      wastePercent: guess.wastePercent ?? 0,
+      kcalPer100: guess.kcalPer100 ?? 0,
       stockLevel: 0,
-      allergens: [],
+      allergens: guess.allergens,
       suppliers: [{
         name: prod.supplier,
         packCost: prod.packCost,

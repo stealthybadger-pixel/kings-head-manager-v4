@@ -21,7 +21,8 @@ import {
   LogOut,
   ShieldCheck,
   Thermometer,
-  Refrigerator
+  Refrigerator,
+  ClipboardList
 } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import Pantry from './components/Pantry';
@@ -37,11 +38,12 @@ import Team from './components/Team';
 import Login from './components/Login';
 import FoodTempChecks from './components/FoodTempChecks';
 import EquipmentTempChecks from './components/EquipmentTempChecks';
+import TempCheckRecords from './components/TempCheckRecords';
 import { useStore } from './store/useStore';
 import { useIsMobile } from './hooks/useIsMobile';
 import { useAuth } from './hooks/useAuth';
 
-export type ViewType = 'dashboard' | 'pantry' | 'catalog' | 'kitchen' | 'service' | 'stock' | 'suppliers' | 'invoice' | 'settings' | 'foh' | 'team' | 'food-temp' | 'equipment-temp';
+export type ViewType = 'dashboard' | 'pantry' | 'catalog' | 'kitchen' | 'service' | 'stock' | 'suppliers' | 'invoice' | 'settings' | 'foh' | 'team' | 'food-temp' | 'equipment-temp' | 'temp-records';
 
 // Views rendered on the floor during a shift — get the primary mobile tab bar slots.
 const MOBILE_TAB_ITEMS = [
@@ -60,6 +62,7 @@ const MOBILE_MORE_ITEMS = [
   { id: 'suppliers', label: 'Suppliers', icon: Truck },
   { id: 'food-temp', label: 'Food Temp Checks', icon: Thermometer },
   { id: 'equipment-temp', label: 'Equipment Temp Checks', icon: Refrigerator },
+  { id: 'temp-records', label: 'Temp Check Records', icon: ClipboardList },
   { id: 'settings', label: 'Help', icon: HelpCircle },
 ] as const;
 
@@ -67,7 +70,8 @@ const VIEW_TITLES: Record<ViewType, string> = {
   dashboard: 'Dashboard', pantry: 'Pantry', catalog: 'Catalog', kitchen: 'Recipes',
   service: 'Dishes', stock: 'Stock', suppliers: 'Suppliers', invoice: 'Invoices',
   settings: 'Help', foh: 'Front of House', team: 'Team',
-  'food-temp': 'Food Temp Checks', 'equipment-temp': 'Equipment Temp Checks'
+  'food-temp': 'Food Temp Checks', 'equipment-temp': 'Equipment Temp Checks',
+  'temp-records': 'Temp Check Records'
 };
 
 const App: React.FC = () => {
@@ -98,6 +102,7 @@ const App: React.FC = () => {
   const complianceItems = [
     { id: 'food-temp', label: 'Food Temp Checks', icon: Thermometer },
     { id: 'equipment-temp', label: 'Equipment Temp Checks', icon: Refrigerator },
+    { id: 'temp-records', label: 'Temp Check Records', icon: ClipboardList },
   ] as const;
 
   const bottomItems = [
@@ -140,6 +145,7 @@ const App: React.FC = () => {
       {currentView === 'team' && (isManager ? <Team /> : <Dashboard />)}
       {currentView === 'food-temp' && <FoodTempChecks />}
       {currentView === 'equipment-temp' && <EquipmentTempChecks />}
+      {currentView === 'temp-records' && <TempCheckRecords />}
       {currentView === 'settings' && <Help />}
     </>
   );

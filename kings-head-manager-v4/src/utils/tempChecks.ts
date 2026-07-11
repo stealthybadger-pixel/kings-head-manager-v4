@@ -9,40 +9,63 @@ export const FOOD_TEMP_THRESHOLDS: Record<FoodCheckType, number> = {
   'Hot Hold': 63
 };
 
+export type FoodTempItemType = 'ingredient' | 'recipe' | 'dish';
+
+interface ResolvedCheck {
+  itemId: string;
+  itemName: string;
+  itemType: FoodTempItemType;
+  checkType: FoodCheckType;
+}
+
 /**
  * Walks a dish's component tree (ingredients + nested recipes, recursively)
  * to resolve which food-safety temperature checks it needs, based on
  * tempCheckType tags set once on the underlying ingredients/recipes.
  *
- * If a recipe has its own tempCheckType set, that's used and its own
- * ingredients are NOT recursed into — the recipe's cooking process has
- * already resolved the raw/cooked state (e.g. "12 Hour Cooked Pork Belly"
- * is tagged Reheat even though its raw pork belly ingredient might itself
- * be tagged Cooked Core for use in other, cooked-to-order dishes).
+ * Each resolved check identifies the actual item being probed (a recipe
+ * or ingredient) rather than the dish — the same batch of e.g. Beef
+ * Sirloin is often shared across several live dishes, so checks are
+ * deduped per item, not per dish, by buildFoodTempChecklist below.
  *
- * Hot Hold is added separately from dish.requiresHotHoldCheck, since it's
- * a service-holding property rather than a protein state.
+ * A recipe's own tempCheckType always wins over recursing into its
+ * ingredients: 'Cooked Core' / 'Reheat' resolve the check to that recipe
+ * itself, and 'None' explicitly stops resolution with no check at all —
+ * for something cooked during prep but served cold (e.g. a chicken
+ * terrine), where the raw chicken inside would otherwise leak through as
+ * a false Cooked Core tile.
+ *
+ * Hot Hold is added separately from dish.requiresHotHoldCheck, identifying
+ * the dish itself as the probed item — it's a service-holding property
+ * with no single underlying ingredient/recipe to point to.
  */
-export function resolveDishTempChecks(
+function resolveDishTempChecks(
   dish: Dish,
   recipesById: Map<string, Recipe>,
   ingredientsById: Map<string, Ingredient>
-): FoodCheckType[] {
-  const found = new Set<FoodCheckType>();
+): ResolvedCheck[] {
+  const found = new Map<string, ResolvedCheck>();
   const visitedRecipeIds = new Set<string>();
+
+  function add(check: ResolvedCheck) {
+    found.set(`${check.itemId}|${check.checkType}`, check);
+  }
 
   function visitRecipe(recipe: Recipe) {
     if (visitedRecipeIds.has(recipe.id)) return; // guard against cycles
     visitedRecipeIds.add(recipe.id);
 
-    if (recipe.tempCheckType) {
-      found.add(recipe.tempCheckType);
+    if (recipe.tempCheckType === 'None') return;
+    if (recipe.tempCheckType === 'Cooked Core' || recipe.tempCheckType === 'Reheat') {
+      add({ itemId: recipe.id, itemName: recipe.name, itemType: 'recipe', checkType: recipe.tempCheckType });
       return;
     }
     for (const item of recipe.items) {
       if (item.type === 'ingredient' && item.ingredientId) {
         const ingredient = ingredientsById.get(item.ingredientId);
-        if (ingredient?.tempCheckType) found.add(ingredient.tempCheckType);
+        if (ingredient?.tempCheckType) {
+          add({ itemId: ingredient.id, itemName: ingredient.name, itemType: 'ingredient', checkType: ingredient.tempCheckType });
+        }
       } else if (item.type === 'recipe' && item.subRecipeId) {
         const subRecipe = recipesById.get(item.subRecipeId);
         if (subRecipe) visitRecipe(subRecipe);
@@ -53,25 +76,38 @@ export function resolveDishTempChecks(
   for (const item of dish.items) {
     if (item.type === 'ingredient' && item.ingredientId) {
       const ingredient = ingredientsById.get(item.ingredientId);
-      if (ingredient?.tempCheckType) found.add(ingredient.tempCheckType);
+      if (ingredient?.tempCheckType) {
+        add({ itemId: ingredient.id, itemName: ingredient.name, itemType: 'ingredient', checkType: ingredient.tempCheckType });
+      }
     } else if (item.type === 'recipe' && item.subRecipeId) {
       const recipe = recipesById.get(item.subRecipeId);
       if (recipe) visitRecipe(recipe);
     }
   }
 
-  if (dish.requiresHotHoldCheck) found.add('Hot Hold');
+  if (dish.requiresHotHoldCheck) {
+    add({ itemId: dish.id, itemName: dish.name, itemType: 'dish', checkType: 'Hot Hold' });
+  }
 
-  return Array.from(found);
+  return Array.from(found.values());
 }
 
 export interface FoodTempChecklistItem {
-  dishId: string;
-  dishName: string;
+  itemId: string;
+  itemName: string;
+  itemType: FoodTempItemType;
   checkType: FoodCheckType;
+  // Live dishes currently using this item — context shown on the tile,
+  // not something the record itself is tied to.
+  dishNames: string[];
 }
 
-/** Flattens every live dish's resolved checks into one tile per (dish, checkType) pair. */
+/**
+ * Resolves every live dish's checks and dedupes them by the underlying
+ * item (ingredient/recipe/dish) being probed, merging in which dishes
+ * currently use each one for context. This is the pool a kitchen picks
+ * from during a shift — not a per-dish mandatory checklist.
+ */
 export function buildFoodTempChecklist(
   dishes: Dish[],
   recipes: Recipe[],
@@ -80,13 +116,27 @@ export function buildFoodTempChecklist(
   const recipesById = new Map(recipes.map(r => [r.id, r]));
   const ingredientsById = new Map(ingredients.map(i => [i.id, i]));
 
-  const items: FoodTempChecklistItem[] = [];
+  const byKey = new Map<string, FoodTempChecklistItem>();
+
   for (const dish of dishes) {
     if (!dish.isLive) continue;
     const checks = resolveDishTempChecks(dish, recipesById, ingredientsById);
-    for (const checkType of checks) {
-      items.push({ dishId: dish.id, dishName: dish.name, checkType });
+    for (const check of checks) {
+      const key = `${check.itemId}|${check.checkType}`;
+      const existing = byKey.get(key);
+      if (existing) {
+        if (!existing.dishNames.includes(dish.name)) existing.dishNames.push(dish.name);
+      } else {
+        byKey.set(key, {
+          itemId: check.itemId,
+          itemName: check.itemName,
+          itemType: check.itemType,
+          checkType: check.checkType,
+          dishNames: [dish.name]
+        });
+      }
     }
   }
-  return items;
+
+  return Array.from(byKey.values()).sort((a, b) => a.itemName.localeCompare(b.itemName));
 }

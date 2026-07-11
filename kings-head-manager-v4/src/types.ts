@@ -54,6 +54,14 @@ export type Allergen = z.infer<typeof AllergenSchema>;
 export const TempCheckTypeSchema = z.enum(['Cooked Core', 'Reheat']);
 export type TempCheckType = z.infer<typeof TempCheckTypeSchema>;
 
+// Recipes get a third option Ingredients don't need: 'None' explicitly
+// resolves the recipe as needing no service-time check and stops the
+// resolver from recursing into its ingredients — for things cooked
+// during prep but served cold (e.g. a chicken terrine), where the raw
+// chicken inside would otherwise incorrectly surface a Cooked Core tile.
+export const RecipeTempCheckTypeSchema = z.enum(['Cooked Core', 'Reheat', 'None']);
+export type RecipeTempCheckType = z.infer<typeof RecipeTempCheckTypeSchema>;
+
 export const FoodCheckTypeSchema = z.enum(['Cooked Core', 'Reheat', 'Hot Hold']);
 export type FoodCheckType = z.infer<typeof FoodCheckTypeSchema>;
 
@@ -177,11 +185,13 @@ export const RecipeSchema = z.object({
   instructions: z.string(),
   // Set on recipes that resolve a meat/fish protein to a known cooked
   // state — e.g. "12 Hour Cooked Pork Belly" -> Reheat, "Pan-Seared
-  // Chicken Breast" -> Cooked Core. When set, dish temp-check resolution
-  // stops here rather than recursing into this recipe's own ingredients
-  // (the cooking process already changed the raw/cooked state). See
-  // TempCheckTypeSchema and utils/tempChecks.ts.
-  tempCheckType: TempCheckTypeSchema.optional(),
+  // Chicken Breast" -> Cooked Core, or "None" for something cooked during
+  // prep but served cold (e.g. a chicken terrine) where the raw chicken
+  // inside would otherwise leak through as a false Cooked Core tile. Any
+  // of the three stops dish temp-check resolution here rather than
+  // recursing into this recipe's own ingredients. See
+  // RecipeTempCheckTypeSchema and utils/tempChecks.ts.
+  tempCheckType: RecipeTempCheckTypeSchema.optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional()
 });
@@ -216,6 +226,24 @@ export const DishItemSchema = z.preprocess((val: any) => {
 }));
 export type DishItem = z.infer<typeof DishItemSchema>;
 
+// An optional add-on for a dish (e.g. "Bacon" on a burger, "Chicken" on a
+// Caesar salad) — priced separately from the base dish so you don't need
+// a distinct live-menu entry per combination. extraPrice is what the
+// customer is charged for adding it; cost is derived from quantity/unit
+// the same way a normal DishItem is. Purely a costing/planning tool for
+// now — not yet surfaced to FOH or EPOS.
+export const DishModifierSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: z.enum(['ingredient', 'recipe']),
+  ingredientId: z.string().optional(),
+  subRecipeId: z.string().optional(),
+  quantity: z.number().positive(),
+  unit: z.enum(['g', 'ml', 'ea', 'kg', 'l', 'oz', 'portion']),
+  extraPrice: z.number().nonnegative()
+});
+export type DishModifier = z.infer<typeof DishModifierSchema>;
+
 export const DishSchema = z.preprocess((val: any) => {
   if (val && typeof val === 'object') {
     const copy = { ...val };
@@ -246,6 +274,7 @@ export const DishSchema = z.preprocess((val: any) => {
   // bain-marie), not derivable from ingredient/recipe raw-cooked state
   // like Cooked Core / Reheat are — so it's a manual per-dish flag.
   requiresHotHoldCheck: z.boolean().optional(),
+  modifiers: z.array(DishModifierSchema).optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional()
 }));
@@ -330,18 +359,24 @@ export const AppUserSchema = z.object({
 });
 export type AppUser = z.infer<typeof AppUserSchema>;
 
-// A single recorded food probe reading against one dish's required check.
+// A single recorded food probe reading against one ingredient/recipe/dish's
+// required check. Keyed by the item actually being probed (a batch of
+// Beef Sirloin, say) rather than any one dish it happens to go into —
+// the same physical item is often used across several live dishes.
 // requiredMinC is snapshotted at record time (not looked up live) so
 // historical records stay accurate if thresholds change later.
+// Only passing readings are ever recorded — if a probe reads below the
+// minimum, the item goes back to cook further and gets re-probed rather
+// than logging a failed attempt, so `pass` is always true here.
 export const FoodTempCheckSchema = z.object({
   id: z.string(),
-  dishId: z.string(),
-  dishName: z.string(),
+  itemId: z.string(),
+  itemName: z.string(),
+  itemType: z.enum(['ingredient', 'recipe', 'dish']),
   checkType: FoodCheckTypeSchema,
   temperatureC: z.number(),
   requiredMinC: z.number(),
   pass: z.boolean(),
-  correctiveNotes: z.string().optional(),
   userId: z.string(),
   userDisplayName: z.string(),
   checkedAt: z.string(),
@@ -350,3 +385,44 @@ export const FoodTempCheckSchema = z.object({
   checkDate: z.string()
 });
 export type FoodTempCheck = z.infer<typeof FoodTempCheckSchema>;
+
+export const EquipmentTypeSchema = z.enum(['Fridge', 'Freezer', 'Other']);
+export type EquipmentType = z.infer<typeof EquipmentTypeSchema>;
+
+// A fridge/freezer drawn as a labelled box on the kitchen floor plan.
+// x/y/w/h are percentages (0-100) of the floor plan canvas, not pixels,
+// so the box stays correctly placed and sized regardless of the
+// rendered canvas size. w/h default to a sensible box shape if unset
+// (older records created before boxes had a size).
+export const EquipmentSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: EquipmentTypeSchema,
+  minC: z.number(),
+  maxC: z.number(),
+  x: z.number().min(0).max(100),
+  y: z.number().min(0).max(100),
+  w: z.number().min(2).max(100).optional(),
+  h: z.number().min(2).max(100).optional(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional()
+});
+export type Equipment = z.infer<typeof EquipmentSchema>;
+
+// Unlike FoodTempCheck, out-of-range equipment readings ARE recorded —
+// a warm fridge usually means a fault needing a repair callout, so it's
+// worth a timestamped record even before it's fixed.
+export const EquipmentTempCheckSchema = z.object({
+  id: z.string(),
+  equipmentId: z.string(),
+  equipmentName: z.string(),
+  temperatureC: z.number(),
+  minC: z.number(),
+  maxC: z.number(),
+  pass: z.boolean(),
+  userId: z.string(),
+  userDisplayName: z.string(),
+  checkedAt: z.string(),
+  checkDate: z.string()
+});
+export type EquipmentTempCheck = z.infer<typeof EquipmentTempCheckSchema>;

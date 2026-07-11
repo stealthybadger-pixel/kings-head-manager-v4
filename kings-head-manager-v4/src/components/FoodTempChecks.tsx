@@ -6,8 +6,8 @@ import { useAuth } from '../hooks/useAuth';
 import { useStore } from '../store/useStore';
 import { FoodCheckType } from '../types';
 
-function tileKey(dishId: string, checkType: FoodCheckType) {
-  return `${dishId}|${checkType}`;
+function tileKey(itemId: string, checkType: FoodCheckType) {
+  return `${itemId}|${checkType}`;
 }
 
 export const FoodTempChecks: React.FC = () => {
@@ -21,12 +21,13 @@ export const FoodTempChecks: React.FC = () => {
 
   const [activeTile, setActiveTile] = useState<FoodTempChecklistItem | null>(null);
   const [tempInput, setTempInput] = useState('');
-  const [notesInput, setNotesInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   // Tiles auto-populate from tags set on recipes/ingredients (see
   // utils/tempChecks.ts) — this is an available pool to tap into as
   // needed during a shift, not a mandatory checklist you have to clear.
+  // Each tile is the item actually being probed, deduped across every
+  // live dish that uses it.
   const checklist = useMemo(
     () => buildFoodTempChecklist(dishes, recipes, ingredients),
     [dishes, recipes, ingredients]
@@ -35,7 +36,7 @@ export const FoodTempChecks: React.FC = () => {
   const latestByTile = useMemo(() => {
     const map = new Map<string, typeof todaysChecks[number]>();
     for (const check of todaysChecks) {
-      const key = tileKey(check.dishId, check.checkType);
+      const key = tileKey(check.itemId, check.checkType);
       const existing = map.get(key);
       if (!existing || check.checkedAt > existing.checkedAt) map.set(key, check);
     }
@@ -45,7 +46,6 @@ export const FoodTempChecks: React.FC = () => {
   const openTile = (item: FoodTempChecklistItem) => {
     setActiveTile(item);
     setTempInput('');
-    setNotesInput('');
   };
 
   const closeModal = () => setActiveTile(null);
@@ -53,26 +53,29 @@ export const FoodTempChecks: React.FC = () => {
   const parsedTemp = parseFloat(tempInput);
   const hasValidTemp = tempInput.trim() !== '' && !Number.isNaN(parsedTemp);
   const requiredMinC = activeTile ? FOOD_TEMP_THRESHOLDS[activeTile.checkType] : 0;
-  const willPass = hasValidTemp && parsedTemp >= requiredMinC;
+  const atTemp = hasValidTemp && parsedTemp >= requiredMinC;
 
+  // Only passing readings get recorded — if it's under temp, the item
+  // goes back to cook/reheat further and gets re-probed, rather than
+  // logging a failed attempt. Record stays disabled until it passes.
   const handleRecord = async () => {
-    if (!activeTile || !hasValidTemp || !appUser) return;
+    if (!activeTile || !atTemp || !appUser) return;
     setSubmitting(true);
     try {
       await recordCheck.mutateAsync({
-        dishId: activeTile.dishId,
-        dishName: activeTile.dishName,
+        itemId: activeTile.itemId,
+        itemName: activeTile.itemName,
+        itemType: activeTile.itemType,
         checkType: activeTile.checkType,
         temperatureC: parsedTemp,
         requiredMinC,
-        pass: willPass,
-        correctiveNotes: willPass ? undefined : (notesInput.trim() || undefined),
+        pass: true,
         userId: appUser.uid,
         userDisplayName: appUser.displayName,
         checkedAt: new Date().toISOString(),
         checkDate: todayCheckDate()
       });
-      showToast(`${activeTile.dishName} — ${activeTile.checkType} recorded (${willPass ? 'Pass' : 'Fail'})`, willPass ? 'success' : 'error');
+      showToast(`${activeTile.itemName} — ${activeTile.checkType} recorded (Pass)`, 'success');
       closeModal();
     } catch (err: any) {
       showToast(err?.message || 'Could not record the check', 'error');
@@ -105,24 +108,26 @@ export const FoodTempChecks: React.FC = () => {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {checklist.map((item) => {
-              const key = tileKey(item.dishId, item.checkType);
+              const key = tileKey(item.itemId, item.checkType);
               const check = latestByTile.get(key);
+              const dishSummary = item.dishNames.length > 2
+                ? `${item.dishNames.slice(0, 2).join(', ')} +${item.dishNames.length - 2} more`
+                : item.dishNames.join(', ');
               return (
                 <button
                   key={key}
                   onClick={() => openTile(item)}
                   className="flex items-center justify-between gap-3 bg-surface p-4 border border-outline-variant rounded-sm shadow-sm text-left hover:bg-surface-container-low transition-colors"
                 >
-                  <div>
-                    <p className="text-sm font-semibold text-on-surface">{item.dishName}</p>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-on-surface truncate">{item.itemName}</p>
                     <p className="text-xs text-outline">{item.checkType}</p>
+                    {item.itemType !== 'dish' && (
+                      <p className="text-[10px] text-outline truncate mt-0.5">Used in: {dishSummary}</p>
+                    )}
                   </div>
                   {check ? (
-                    check.pass ? (
-                      <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
-                    ) : (
-                      <XCircle className="h-5 w-5 text-red-500 shrink-0" />
-                    )
+                    <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
                   ) : (
                     <span className="text-[10px] font-bold label-caps tracking-widest text-outline shrink-0">Tap to check</span>
                   )}
@@ -141,7 +146,7 @@ export const FoodTempChecks: React.FC = () => {
           >
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm font-semibold text-on-surface">{activeTile.dishName}</p>
+                <p className="text-sm font-semibold text-on-surface">{activeTile.itemName}</p>
                 <p className="text-xs text-outline">{activeTile.checkType} — min {requiredMinC}&deg;C</p>
               </div>
               <button onClick={closeModal} className="p-1 min-w-[32px] min-h-[32px] flex items-center justify-center">
@@ -166,27 +171,17 @@ export const FoodTempChecks: React.FC = () => {
             </div>
 
             {hasValidTemp && (
-              <div className={`flex items-center gap-2 p-2.5 rounded-sm ${willPass ? 'bg-emerald-950/95 text-emerald-100' : 'bg-red-950/95 text-red-100'}`}>
-                {willPass ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <XCircle className="h-4 w-4 shrink-0" />}
-                <span className="text-xs font-semibold">{willPass ? 'Pass' : 'Fail'}</span>
-              </div>
-            )}
-
-            {hasValidTemp && !willPass && (
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold label-caps tracking-widest text-outline">Corrective action notes</label>
-                <textarea
-                  value={notesInput}
-                  onChange={(e) => setNotesInput(e.target.value)}
-                  rows={3}
-                  className="px-3 py-2 rounded-sm border border-outline-variant bg-surface-container-lowest text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"
-                />
+              <div className={`flex items-center gap-2 p-2.5 rounded-sm ${atTemp ? 'bg-emerald-950/95 text-emerald-100' : 'bg-amber-950/95 text-amber-100'}`}>
+                {atTemp ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <XCircle className="h-4 w-4 shrink-0" />}
+                <span className="text-xs font-semibold">
+                  {atTemp ? 'At temperature' : 'Not yet at temperature — return to cook/reheat and re-check'}
+                </span>
               </div>
             )}
 
             <button
               onClick={handleRecord}
-              disabled={!hasValidTemp || submitting}
+              disabled={!atTemp || submitting}
               className="h-11 flex items-center justify-center rounded-sm bg-primary text-on-primary text-sm font-semibold disabled:opacity-60"
             >
               {submitting ? 'Recording...' : 'Record'}

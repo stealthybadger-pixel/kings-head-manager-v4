@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useDishes, useIngredients, useRecipes, useDishMutations } from '../hooks/useKitchenData';
 import { useStore } from '../store/useStore';
 import { Search, Plus, Trash2, AlertTriangle, CheckCircle, TrendingUp, Radio, ArrowLeft, ExternalLink } from 'lucide-react';
-import { Allergen, AllergenSchema, Dish, DishItem, DishType, Ingredient, Recipe, Unit } from '../types';
+import { Allergen, AllergenSchema, Dish, DishItem, DishModifier, DishType, Ingredient, Recipe, Unit } from '../types';
 import { calculateIngredientCost, toBaseQuantity, calculatePlateCost as computePlateCost } from '../utils/costing';
 import { useIsMobile } from '../hooks/useIsMobile';
 
@@ -50,6 +50,11 @@ export const Service: React.FC = () => {
   // Search
   const [searchQuery, setSearchQuery] = useState('');
   const [itemSearchQuery, setItemSearchQuery] = useState('');
+  const [modifierSearchQuery, setModifierSearchQuery] = useState('');
+  // Which optional extras are toggled on for the live cost/GP preview —
+  // session-only, not saved to the dish (the extras themselves are saved;
+  // this is just "what if the customer adds these").
+  const [previewModifierIds, setPreviewModifierIds] = useState<Set<string>>(new Set());
   const [dishSort, setDishSort] = useState<'name' | 'date'>('name');
   const [liveFilter, setLiveFilter] = useState<'all' | 'live'>('all');
 
@@ -176,6 +181,41 @@ export const Service: React.FC = () => {
     }));
   };
 
+  // Add Optional Extra to Dish
+  const handleAddModifier = (item: { id: string; name: string; type: 'ingredient' | 'recipe' }) => {
+    const newModifier: DishModifier = {
+      id: `mod_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      name: item.name,
+      type: item.type,
+      ingredientId: item.type === 'ingredient' ? item.id : undefined,
+      subRecipeId: item.type === 'recipe' ? item.id : undefined,
+      quantity: 1,
+      unit: 'ea',
+      extraPrice: 0
+    };
+    setFormState(prev => ({ ...prev, modifiers: [...(prev.modifiers ?? []), newModifier] }));
+  };
+
+  const handleUpdateModifier = (id: string, patch: Partial<DishModifier>) => {
+    setFormState(prev => ({
+      ...prev,
+      modifiers: (prev.modifiers ?? []).map(m => m.id === id ? { ...m, ...patch } : m)
+    }));
+  };
+
+  const handleRemoveModifier = (id: string) => {
+    setFormState(prev => ({ ...prev, modifiers: (prev.modifiers ?? []).filter(m => m.id !== id) }));
+    setPreviewModifierIds(prev => { const next = new Set(prev); next.delete(id); return next; });
+  };
+
+  const toggleModifierPreview = (id: string) => {
+    setPreviewModifierIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
   // Helper cost calculations
   const getIngredientCost = (ingId: string, quantity: number, unit: Unit) => {
     const ing = ingredients.find(i => i.id === ingId);
@@ -226,6 +266,16 @@ export const Service: React.FC = () => {
     return cost;
   };
 
+  const getModifierCost = (modifier: DishModifier) => {
+    if (modifier.type === 'ingredient' && modifier.ingredientId) {
+      return getIngredientCost(modifier.ingredientId, modifier.quantity, modifier.unit as Unit);
+    }
+    if (modifier.type === 'recipe' && modifier.subRecipeId) {
+      return getRecipeCost(modifier.subRecipeId, modifier.quantity, modifier.unit as Unit);
+    }
+    return 0;
+  };
+
   // Financial values
   const plateCost = useMemo(() => {
     return computePlateCost(formState.items, ingredients, recipes);
@@ -241,7 +291,25 @@ export const Service: React.FC = () => {
     return plateCost / (1 - formState.targetGP / 100);
   }, [plateCost, formState.targetGP]);
 
-  const isMarginAlert = currentGP < formState.targetGP;
+  // Retail price gets rounded to the nearest £0.25 when set from the GP%
+  // slider, so the GP% recalculated from that rounded price almost never
+  // matches the exact integer target — it's typically a fraction of a
+  // point off from rounding, not a real margin shortfall. A small
+  // tolerance keeps the alert from firing on that rounding noise.
+  const GP_ALERT_TOLERANCE = 0.5;
+  const isMarginAlert = currentGP < formState.targetGP - GP_ALERT_TOLERANCE;
+
+  // Live preview of cost/price/GP with the toggled-on optional extras
+  // included — not saved anywhere, just a "what if" readout.
+  const previewExtras = useMemo(() => {
+    const selected = (formState.modifiers ?? []).filter(m => previewModifierIds.has(m.id));
+    const extraCost = selected.reduce((sum, m) => sum + getModifierCost(m), 0);
+    const extraPrice = selected.reduce((sum, m) => sum + m.extraPrice, 0);
+    const withCost = plateCost + extraCost;
+    const withPrice = formState.retailPrice + extraPrice;
+    const withGP = withPrice > 0 ? ((withPrice - withCost) / withPrice) * 100 : 0;
+    return { selected, extraCost, extraPrice, withCost, withPrice, withGP };
+  }, [formState.modifiers, formState.retailPrice, previewModifierIds, plateCost, ingredients, recipes]);
 
   const isLoading = loadingDishes || loadingIngs || loadingRecs;
 
@@ -691,6 +759,132 @@ export const Service: React.FC = () => {
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Optional Extras — add-ons priced separately so you don't need
+                a distinct live-menu entry per combination (e.g. bacon/egg
+                on a burger, chicken/anchovies on a Caesar). Tick the preview
+                checkbox to see cost/price/GP with that extra included. */}
+            <div className="border-t border-outline-variant pt-4 flex flex-col gap-3">
+              <label className="label-caps text-outline block">Optional Extras</label>
+
+              {(formState.modifiers ?? []).length > 0 && (
+                <div className="flex flex-col gap-2">
+                  {(formState.modifiers ?? []).map((mod) => {
+                    const cost = getModifierCost(mod);
+                    return (
+                      <div key={mod.id} className="flex items-center gap-2 bg-surface p-2 border border-outline-variant rounded-sm">
+                        <input
+                          type="checkbox"
+                          checked={previewModifierIds.has(mod.id)}
+                          onChange={() => toggleModifierPreview(mod.id)}
+                          title="Include in preview"
+                          className="h-4 w-4 shrink-0"
+                        />
+                        <span className="flex-1 text-xs font-semibold truncate">{mod.name}</span>
+                        <input
+                          type="number"
+                          value={mod.quantity}
+                          onChange={(e) => handleUpdateModifier(mod.id, { quantity: Math.max(0, parseFloat(e.target.value) || 0) })}
+                          className="w-16 px-2 py-1 border border-outline-variant text-xs data-tabular text-center"
+                        />
+                        <select
+                          value={mod.unit}
+                          onChange={(e) => handleUpdateModifier(mod.id, { unit: e.target.value as any })}
+                          className="w-16 px-1 py-1 border border-outline-variant bg-surface-container-lowest text-xs"
+                        >
+                          <option value="g">g</option>
+                          <option value="kg">kg</option>
+                          <option value="oz">oz</option>
+                          <option value="ml">ml</option>
+                          <option value="l">l</option>
+                          <option value="ea">ea</option>
+                        </select>
+                        <span className="w-16 text-right data-tabular text-xs text-outline">£{cost.toFixed(2)}</span>
+                        <div className="flex items-center gap-1 w-24">
+                          <span className="text-xs text-outline">+£</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={mod.extraPrice}
+                            onChange={(e) => handleUpdateModifier(mod.id, { extraPrice: Math.max(0, parseFloat(e.target.value) || 0) })}
+                            title="Extra charge to customer"
+                            className="w-16 px-2 py-1 border border-outline-variant text-xs data-tabular text-center"
+                          />
+                        </div>
+                        <button
+                          onClick={() => handleRemoveModifier(mod.id)}
+                          className="p-1 text-error hover:bg-error-container shrink-0"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="bg-surface p-3 border border-outline-variant rounded-sm flex flex-col gap-2">
+                <div className="relative flex items-center bg-surface-container-lowest border border-outline-variant rounded-sm px-3 py-1.5 focus-within:border-primary">
+                  <Search className="h-4 w-4 text-outline mr-2" />
+                  <input
+                    type="text"
+                    placeholder="Search ingredients or recipes to add as an extra..."
+                    value={modifierSearchQuery}
+                    onChange={(e) => setModifierSearchQuery(e.target.value)}
+                    className="flex-1 text-xs bg-transparent outline-none border-none focus:ring-0 p-0"
+                  />
+                </div>
+                {modifierSearchQuery.trim().length > 1 && (
+                  <div className="max-h-48 overflow-y-auto bg-surface-container-lowest border border-outline-variant divide-y divide-outline-variant rounded-sm">
+                    {ingredients
+                      .filter(i => i.name.toLowerCase().includes(modifierSearchQuery.toLowerCase()))
+                      .slice(0, 5)
+                      .map(ing => (
+                        <div
+                          key={ing.id}
+                          onClick={() => { handleAddModifier({ id: ing.id, name: ing.name, type: 'ingredient' }); setModifierSearchQuery(''); }}
+                          className="p-3 hover:bg-surface-container text-xs cursor-pointer flex justify-between font-semibold"
+                        >
+                          <span>{ing.name} <span className="text-[9px] text-outline uppercase font-mono ml-2">Ingredient</span></span>
+                          <span className="text-primary label-caps">+ Add</span>
+                        </div>
+                      ))}
+                    {recipes
+                      .filter(r => r.name.toLowerCase().includes(modifierSearchQuery.toLowerCase()))
+                      .slice(0, 5)
+                      .map(rec => (
+                        <div
+                          key={rec.id}
+                          onClick={() => { handleAddModifier({ id: rec.id, name: rec.name, type: 'recipe' }); setModifierSearchQuery(''); }}
+                          className="p-3 hover:bg-surface-container text-xs cursor-pointer flex justify-between font-semibold"
+                        >
+                          <span>{rec.name} <span className="text-[9px] text-outline uppercase font-mono ml-2">Recipe</span></span>
+                          <span className="text-primary label-caps">+ Add</span>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+
+              {previewExtras.selected.length > 0 && (
+                <div className="flex items-center gap-6 bg-primary/5 border border-primary/20 rounded-sm p-3">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] label-caps text-outline">With Extras: Cost</span>
+                    <span className="text-sm font-bold data-tabular">£{previewExtras.withCost.toFixed(2)}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] label-caps text-outline">With Extras: Price</span>
+                    <span className="text-sm font-bold data-tabular">£{previewExtras.withPrice.toFixed(2)}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] label-caps text-outline">With Extras: GP%</span>
+                    <span className={`text-sm font-bold data-tabular ${previewExtras.withGP < formState.targetGP ? 'text-error' : 'text-primary'}`}>
+                      {previewExtras.withGP.toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Allergens (derived from components) */}

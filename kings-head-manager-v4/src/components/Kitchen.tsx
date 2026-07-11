@@ -705,6 +705,7 @@ export const Kitchen: React.FC = () => {
                   <option value="">— No meat/fish protein —</option>
                   <option value="Cooked Core">Cooked Core (raw, cooked to order)</option>
                   <option value="Reheat">Reheat (already cooked, reheated for service)</option>
+                  <option value="None">Cooked in prep, served cold (no service-time check)</option>
                 </select>
               </div>
             </div>

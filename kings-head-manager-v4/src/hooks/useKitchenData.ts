@@ -10,7 +10,9 @@ import {
   StocktakeReport, StocktakeReportSchema,
   SupplierProduct, SupplierProductSchema,
   Supplier, SupplierSchema,
-  FoodTempCheck, FoodTempCheckSchema
+  FoodTempCheck, FoodTempCheckSchema,
+  Equipment, EquipmentSchema,
+  EquipmentTempCheck, EquipmentTempCheckSchema
 } from '../types';
 
 // Firestore's SDK is configured with `ignoreUndefinedProperties: true`
@@ -468,6 +470,23 @@ export const useFoodTempChecksToday = () => {
   });
 };
 
+export const useFoodTempChecksHistory = () => {
+  return useQuery<FoodTempCheck[]>({
+    queryKey: ['food_temp_checks', 'history'],
+    queryFn: async () => {
+      const snap = await getDocs(collection(db, 'food_temp_checks'));
+      const items: FoodTempCheck[] = [];
+      snap.forEach(d => {
+        const raw = { id: d.id, ...(d.data() as object) };
+        const result = FoodTempCheckSchema.safeParse(raw);
+        items.push(result.success ? result.data : raw as FoodTempCheck);
+      });
+      return items.sort((a, b) => b.checkedAt.localeCompare(a.checkedAt));
+    },
+    staleTime: 60 * 1000
+  });
+};
+
 export const useFoodTempCheckMutations = () => {
   const queryClient = useQueryClient();
 
@@ -481,8 +500,110 @@ export const useFoodTempCheckMutations = () => {
     },
     onSuccess: (fullItem) => {
       queryClient.invalidateQueries({ queryKey: ['food_temp_checks', fullItem.checkDate] });
+      queryClient.invalidateQueries({ queryKey: ['food_temp_checks', 'history'] });
     }
   });
 
   return { recordCheck };
 };
+
+// --- EQUIPMENT (floor plan) ---
+
+export const useEquipmentList = () => {
+  return useQuery<Equipment[]>({
+    queryKey: ['equipment'],
+    queryFn: () => fetchCollection<Equipment>('equipment', EquipmentSchema)
+  });
+};
+
+export const useEquipmentMutations = () => {
+  const queryClient = useQueryClient();
+
+  const addEquipment = useMutation({
+    mutationFn: async (equipment: Omit<Equipment, 'id'>) => {
+      const docRef = doc(collection(db, 'equipment'));
+      const fullItem = { id: docRef.id, ...equipment, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+      EquipmentSchema.parse(fullItem);
+      await setDoc(docRef, fullItem);
+      return fullItem;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['equipment'] })
+  });
+
+  const updateEquipment = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Equipment> }) => {
+      const docRef = doc(db, 'equipment', id);
+      const { id: _, createdAt: __, ...updatePayload } = data as any;
+      await updateDoc(docRef, withDeleteFieldForUndefined({ ...updatePayload, updatedAt: new Date().toISOString() }));
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['equipment'] })
+  });
+
+  const deleteEquipment = useMutation({
+    mutationFn: async (id: string) => {
+      await deleteDoc(doc(db, 'equipment', id));
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['equipment'] })
+  });
+
+  return { addEquipment, updateEquipment, deleteEquipment };
+};
+
+export const useEquipmentChecksToday = () => {
+  const checkDate = todayCheckDate();
+  return useQuery<EquipmentTempCheck[]>({
+    queryKey: ['equipment_temp_checks', checkDate],
+    queryFn: async () => {
+      const q = query(collection(db, 'equipment_temp_checks'), where('checkDate', '==', checkDate));
+      const snap = await getDocs(q);
+      const items: EquipmentTempCheck[] = [];
+      snap.forEach(d => {
+        const raw = { id: d.id, ...(d.data() as object) };
+        const result = EquipmentTempCheckSchema.safeParse(raw);
+        items.push(result.success ? result.data : raw as EquipmentTempCheck);
+      });
+      return items;
+    },
+    staleTime: 30 * 1000
+  });
+};
+
+export const useEquipmentChecksHistory = () => {
+  return useQuery<EquipmentTempCheck[]>({
+    queryKey: ['equipment_temp_checks', 'history'],
+    queryFn: async () => {
+      const snap = await getDocs(collection(db, 'equipment_temp_checks'));
+      const items: EquipmentTempCheck[] = [];
+      snap.forEach(d => {
+        const raw = { id: d.id, ...(d.data() as object) };
+        const result = EquipmentTempCheckSchema.safeParse(raw);
+        items.push(result.success ? result.data : raw as EquipmentTempCheck);
+      });
+      return items.sort((a, b) => b.checkedAt.localeCompare(a.checkedAt));
+    },
+    staleTime: 60 * 1000
+  });
+};
+
+export const useEquipmentCheckMutations = () => {
+  const queryClient = useQueryClient();
+
+  // Unlike food checks, out-of-range readings ARE recorded here — see
+  // EquipmentTempCheckSchema.
+  const recordCheck = useMutation({
+    mutationFn: async (check: Omit<EquipmentTempCheck, 'id'>) => {
+      const docRef = doc(collection(db, 'equipment_temp_checks'));
+      const fullItem = { id: docRef.id, ...check };
+      EquipmentTempCheckSchema.parse(fullItem);
+      await setDoc(docRef, fullItem);
+      return fullItem;
+    },
+    onSuccess: (fullItem) => {
+      queryClient.invalidateQueries({ queryKey: ['equipment_temp_checks', fullItem.checkDate] });
+      queryClient.invalidateQueries({ queryKey: ['equipment_temp_checks', 'history'] });
+    }
+  });
+
+  return { recordCheck };
+};
+
