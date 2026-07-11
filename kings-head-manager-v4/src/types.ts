@@ -290,3 +290,15 @@ export const SupplierProductSchema = z.object({
   importedAt: z.string().optional()
 });
 export type SupplierProduct = z.infer<typeof SupplierProductSchema>;
+
+export const UserRoleSchema = z.enum(['manager', 'staff']);
+export type UserRole = z.infer<typeof UserRoleSchema>;
+
+export const AppUserSchema = z.object({
+  uid: z.string(),
+  email: z.string(),
+  displayName: z.string(),
+  role: UserRoleSchema,
+  createdAt: z.string().optional()
+});
+export type AppUser = z.infer<typeof AppUserSchema>;

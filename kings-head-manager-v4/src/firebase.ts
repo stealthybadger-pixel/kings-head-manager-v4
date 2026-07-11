@@ -1,5 +1,6 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp, deleteApp } from "firebase/app";
 import { initializeFirestore } from "firebase/firestore";
+import { getAuth, createUserWithEmailAndPassword, signOut } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBx_7Raw_xgM2dQWBmUU29W9ggbcmVmo_Y",
@@ -14,3 +15,21 @@ const app = initializeApp(firebaseConfig);
 export const db = initializeFirestore(app, {
   ignoreUndefinedProperties: true
 });
+export const auth = getAuth(app);
+
+// A throwaway secondary Firebase app instance, used only when a manager
+// creates a new staff account. createUserWithEmailAndPassword signs in as
+// the new user on whatever app instance it's called against — running it
+// here instead of on the primary `auth` keeps the manager's own session
+// intact.
+export async function createUserWithoutSigningIn(email: string, password: string) {
+  const secondaryApp = initializeApp(firebaseConfig, `secondary-${Date.now()}`);
+  try {
+    const secondaryAuth = getAuth(secondaryApp);
+    const credential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+    await signOut(secondaryAuth);
+    return credential.user.uid;
+  } finally {
+    await deleteApp(secondaryApp);
+  }
+}

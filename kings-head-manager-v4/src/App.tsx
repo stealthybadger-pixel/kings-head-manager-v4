@@ -16,7 +16,9 @@ import {
   ChevronDown,
   UtensilsCrossed,
   MonitorPlay,
-  Menu
+  Menu,
+  Users,
+  LogOut
 } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import Pantry from './components/Pantry';
@@ -28,10 +30,13 @@ import Suppliers from './components/Suppliers';
 import InvoiceScanner from './components/InvoiceScanner';
 import Help from './components/Help';
 import FrontOfHouse from './components/FrontOfHouse';
+import Team from './components/Team';
+import Login from './components/Login';
 import { useStore } from './store/useStore';
 import { useIsMobile } from './hooks/useIsMobile';
+import { useAuth } from './hooks/useAuth';
 
-export type ViewType = 'dashboard' | 'pantry' | 'catalog' | 'kitchen' | 'service' | 'stock' | 'suppliers' | 'invoice' | 'settings' | 'foh';
+export type ViewType = 'dashboard' | 'pantry' | 'catalog' | 'kitchen' | 'service' | 'stock' | 'suppliers' | 'invoice' | 'settings' | 'foh' | 'team';
 
 // Views rendered on the floor during a shift — get the primary mobile tab bar slots.
 const MOBILE_TAB_ITEMS = [
@@ -54,10 +59,11 @@ const MOBILE_MORE_ITEMS = [
 const VIEW_TITLES: Record<ViewType, string> = {
   dashboard: 'Dashboard', pantry: 'Pantry', catalog: 'Catalog', kitchen: 'Recipes',
   service: 'Dishes', stock: 'Stock', suppliers: 'Suppliers', invoice: 'Invoices',
-  settings: 'Help', foh: 'Front of House'
+  settings: 'Help', foh: 'Front of House', team: 'Team'
 };
 
 const App: React.FC = () => {
+  const { firebaseUser, appUser, loading, logout } = useAuth();
   const currentView = useStore((state) => state.currentView);
   const setCurrentView = useStore((state) => state.setView);
   const toasts = useStore((state) => state.toasts);
@@ -66,6 +72,8 @@ const App: React.FC = () => {
   const [kitchenOpen, setKitchenOpen] = useState<boolean>(true);
   const isMobile = useIsMobile();
   const [showMoreSheet, setShowMoreSheet] = useState(false);
+
+  const isManager = appUser?.role === 'manager';
 
   const topItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -83,8 +91,26 @@ const App: React.FC = () => {
     { id: 'stock', label: 'Stock', icon: Boxes },
     { id: 'invoice', label: 'Invoices', icon: ScanLine },
     { id: 'suppliers', label: 'Suppliers', icon: Truck },
+    ...(isManager ? [{ id: 'team', label: 'Team', icon: Users }] as const : []),
     { id: 'settings', label: 'Help', icon: HelpCircle },
   ] as const;
+
+  const mobileMoreItems = [
+    ...MOBILE_MORE_ITEMS,
+    ...(isManager ? [{ id: 'team', label: 'Team', icon: Users }] as const : []),
+  ] as const;
+
+  if (loading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-surface-container-lowest">
+        <span className="text-xs font-bold label-caps tracking-widest text-outline">Loading...</span>
+      </div>
+    );
+  }
+
+  if (!firebaseUser) {
+    return <Login />;
+  }
 
   const viewContent = (
     <>
@@ -97,12 +123,13 @@ const App: React.FC = () => {
       {currentView === 'invoice' && <InvoiceScanner />}
       {currentView === 'foh' && <FrontOfHouse />}
       {currentView === 'suppliers' && <Suppliers />}
+      {currentView === 'team' && (isManager ? <Team /> : <Dashboard />)}
       {currentView === 'settings' && <Help />}
     </>
   );
 
   if (isMobile) {
-    const isMoreActive = MOBILE_MORE_ITEMS.some((i) => i.id === currentView);
+    const isMoreActive = mobileMoreItems.some((i) => i.id === currentView);
     return (
       <div className="flex flex-col h-[100dvh] w-screen bg-background overflow-hidden text-on-surface font-sans">
         {/* Slim top bar */}
@@ -161,7 +188,7 @@ const App: React.FC = () => {
                   <X className="h-5 w-5 text-outline" />
                 </button>
               </div>
-              {MOBILE_MORE_ITEMS.map((item) => {
+              {mobileMoreItems.map((item) => {
                 const IconComponent = item.icon;
                 const isActive = currentView === item.id;
                 return (
@@ -177,6 +204,13 @@ const App: React.FC = () => {
                   </button>
                 );
               })}
+              <button
+                onClick={() => { logout(); setShowMoreSheet(false); }}
+                className="w-full flex items-center gap-4 px-4 min-h-[44px] py-3 text-on-surface"
+              >
+                <LogOut className="h-5 w-5 flex-shrink-0" />
+                <span className="text-sm">Sign out {appUser ? `(${appUser.displayName})` : ''}</span>
+              </button>
             </div>
           </div>
         )}
@@ -312,12 +346,21 @@ const App: React.FC = () => {
           })}
         </div>
 
-        {/* Version Footer */}
-        <div className="h-12 flex items-center justify-center border-t border-outline-variant flex-shrink-0">
-          <span className="text-[9px] font-mono font-bold text-outline uppercase tracking-widest">
-            {navCollapsed ? 'v4' : 'Version 4.0.0'}
-          </span>
-        </div>
+        {/* User / Logout Footer */}
+        <button
+          onClick={() => logout()}
+          className={`h-12 flex items-center border-t border-outline-variant flex-shrink-0 text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors ${
+            navCollapsed ? 'justify-center' : 'px-6 gap-3'
+          }`}
+          title="Sign out"
+        >
+          <LogOut className="h-4 w-4 flex-shrink-0" />
+          {!navCollapsed && (
+            <span className="text-xs font-semibold truncate">
+              {appUser ? `${appUser.displayName} · Sign out` : 'Sign out'}
+            </span>
+          )}
+        </button>
       </nav>
 
       {/* 2. MAIN WORKSPACE CONTAINER */}
@@ -328,7 +371,11 @@ const App: React.FC = () => {
             {currentView.replace('-', ' ')}
           </h1>
           <div className="flex items-center gap-4">
-            {/* EPOS status hidden */}
+            {appUser && (
+              <span className="text-[10px] font-bold label-caps tracking-widest text-outline">
+                {appUser.displayName} · {appUser.role}
+              </span>
+            )}
           </div>
         </header>
 

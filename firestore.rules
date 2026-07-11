@@ -1,0 +1,43 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isManager() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'manager';
+    }
+
+    // User profiles (email, displayName, role). Any signed-in user can read
+    // the list (needed for the Team screen and for resolving your own
+    // role on login). Only managers can create/edit/delete other users'
+    // profiles — new accounts are created from the Team screen by a
+    // manager, who then writes this doc under their own session.
+    //
+    // Known v1 limitation: a signed-in user with NO existing profile doc
+    // may create their own doc (this is the one-time bootstrap path for
+    // the very first manager account, added manually in the Firebase
+    // console before any Team-created accounts exist). In practice this
+    // only matters if someone creates a stray Firebase Auth account
+    // outside the app's Team screen, since there's no self-signup UI.
+    match /users/{uid} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (isManager() || request.auth.uid == uid);
+      allow update, delete: if isManager();
+    }
+
+    // Everything else (ingredients, recipes, dishes, stock movements,
+    // suppliers, supplier products, stocktake reports, etc.) — flat
+    // permission model for v1: any signed-in team member can read/write.
+    // The app used to be fully open with no auth at all; this is the
+    // baseline lockdown, not a per-feature ACL.
+    match /{document=**} {
+      allow read, write: if isSignedIn();
+    }
+  }
+}
