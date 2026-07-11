@@ -497,9 +497,22 @@ export const Dashboard: React.FC = () => {
             </div>
 
             {incompleteIngredients > 0 && (
-              <div className="bg-error-container border border-error p-3 text-on-error-container flex gap-2 items-center text-xs">
-                <AlertCircle className="h-4 w-4 text-error" />
-                <span>You have {incompleteIngredients} temporary stubs that require supplier pricing.</span>
+              <div className="bg-error-container border border-error p-3 text-on-error-container flex flex-col gap-2 text-xs">
+                <div className="flex gap-2 items-center">
+                  <AlertCircle className="h-4 w-4 text-error shrink-0" />
+                  <span>You have {incompleteIngredients} temporary stubs that require supplier pricing:</span>
+                </div>
+                <div className="flex flex-col gap-1 pl-6">
+                  {ingredients.filter(i => i.incomplete).map(i => (
+                    <button
+                      key={i.id}
+                      onClick={() => navigateToPantryWithIngredient(i.id)}
+                      className="text-left font-semibold underline hover:no-underline w-fit"
+                    >
+                      {i.name}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>

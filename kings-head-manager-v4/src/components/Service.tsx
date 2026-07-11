@@ -9,6 +9,13 @@ import { useIsMobile } from '../hooks/useIsMobile';
 const DISH_TYPES: DishType[] = ['Starter', 'Main', 'Side', 'Dessert', 'Drink', 'Other'];
 const ALL_ALLERGENS = AllergenSchema.options as Allergen[];
 
+// Retail price gets rounded to the nearest £0.25 when set from the GP%
+// slider, so the GP% recalculated from that rounded price almost never
+// matches the exact integer target — it's typically a fraction of a
+// point off from rounding, not a real margin shortfall. A small
+// tolerance keeps the red-flag alert from firing on that rounding noise.
+const GP_ALERT_TOLERANCE = 0.5;
+
 function getDishAllergens(
   items: DishItem[],
   ingredients: Ingredient[],
@@ -291,12 +298,6 @@ export const Service: React.FC = () => {
     return plateCost / (1 - formState.targetGP / 100);
   }, [plateCost, formState.targetGP]);
 
-  // Retail price gets rounded to the nearest £0.25 when set from the GP%
-  // slider, so the GP% recalculated from that rounded price almost never
-  // matches the exact integer target — it's typically a fraction of a
-  // point off from rounding, not a real margin shortfall. A small
-  // tolerance keeps the alert from firing on that rounding noise.
-  const GP_ALERT_TOLERANCE = 0.5;
   const isMarginAlert = currentGP < formState.targetGP - GP_ALERT_TOLERANCE;
 
   // Live preview of cost/price/GP with the toggled-on optional extras
@@ -419,7 +420,7 @@ export const Service: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                <div className={`data-tabular text-sm font-bold shrink-0 ${gp < targetGP ? 'text-error' : 'text-primary'}`}>
+                <div className={`data-tabular text-sm font-bold shrink-0 ${gp < targetGP - GP_ALERT_TOLERANCE ? 'text-error' : 'text-primary'}`}>
                   {gp.toFixed(1)}% GP
                 </div>
               </div>
@@ -879,7 +880,7 @@ export const Service: React.FC = () => {
                   </div>
                   <div className="flex flex-col">
                     <span className="text-[10px] label-caps text-outline">With Extras: GP%</span>
-                    <span className={`text-sm font-bold data-tabular ${previewExtras.withGP < formState.targetGP ? 'text-error' : 'text-primary'}`}>
+                    <span className={`text-sm font-bold data-tabular ${previewExtras.withGP < formState.targetGP - GP_ALERT_TOLERANCE ? 'text-error' : 'text-primary'}`}>
                       {previewExtras.withGP.toFixed(1)}%
                     </span>
                   </div>
