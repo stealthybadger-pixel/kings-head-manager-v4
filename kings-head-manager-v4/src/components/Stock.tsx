@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { useIngredients, useRecipes, useDishes, useStockMutations, useStockMovements, useStocktakeReports, useStocktakeMutations, useRecipeMutations } from '../hooks/useKitchenData';
+import { useIngredients, useRecipes, useDishes, useStockMutations, useStockMovements, useStocktakeReports, useStocktakeMutations, useRecipeMutations, useFoodTempChecksHistory, useEquipmentChecksHistory, todayCheckDate } from '../hooks/useKitchenData';
 import { useStore } from '../store/useStore';
 import { useBleScale, isWebBluetoothSupported } from '../hooks/useBleScale';
 import { Search, Scale, FileText, CheckCircle2, X, Filter, Printer, Mail, ChevronDown, ChevronRight, BookOpen, ChefHat } from 'lucide-react';
@@ -206,6 +206,8 @@ export const Stock: React.FC = () => {
   const { data: stocktakeReports = [] } = useStocktakeReports();
   const { saveReport } = useStocktakeMutations();
   const { updateRecipe } = useRecipeMutations();
+  const { data: foodTempChecks = [] } = useFoodTempChecksHistory();
+  const { data: equipmentTempChecks = [] } = useEquipmentChecksHistory();
 
   const scaleConnected = useStore((state) => state.scaleConnected);
   const showToast = useStore((state) => state.showToast);
@@ -576,6 +578,56 @@ export const Stock: React.FC = () => {
     window.location.href = `mailto:${recipients.join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
 
+  // Today's food + equipment temp checks, merged and sorted for the daily
+  // HACCP log — same print/email pattern as the stock reports above.
+  const todaysComplianceRows = useMemo(() => {
+    const today = todayCheckDate();
+    const food = foodTempChecks
+      .filter(r => r.checkDate === today)
+      .map(r => ({ time: r.checkedAt, item: r.itemName, detail: `${r.checkType} (min ${r.requiredMinC}°C)`, temp: r.temperatureC, pass: r.pass, user: r.userDisplayName }));
+    const equipment = equipmentTempChecks
+      .filter(r => r.checkDate === today)
+      .map(r => ({ time: r.checkedAt, item: r.equipmentName, detail: `Equipment (${r.minC}°C to ${r.maxC}°C)`, temp: r.temperatureC, pass: r.pass, user: r.userDisplayName }));
+    return [...food, ...equipment].sort((a, b) => a.time.localeCompare(b.time));
+  }, [foodTempChecks, equipmentTempChecks]);
+
+  const handlePrintComplianceReport = () => {
+    const today = todayCheckDate();
+    const rows = todaysComplianceRows.map(r => `<tr>
+      <td>${new Date(r.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+      <td>${r.item}</td>
+      <td>${r.detail}</td>
+      <td style="text-align:right">${r.temp}&deg;C</td>
+      <td>${r.pass ? 'Pass' : 'Fail'}</td>
+      <td>${r.user}</td>
+    </tr>`).join('');
+
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(`<!DOCTYPE html><html><head><title>Compliance Temp Log ${today}</title>
+      <style>body{font-family:sans-serif;font-size:12px;padding:20px}h1{font-size:16px}table{width:100%;border-collapse:collapse;margin-top:8px}th,td{border:1px solid #ccc;padding:6px 8px}th{background:#f5f5f5;text-align:left}</style>
+      </head><body>
+      <h1>Compliance Temperature Log — ${today}</h1>
+      <p>${todaysComplianceRows.length} checks recorded</p>
+      <table><thead><tr><th>Time</th><th>Item</th><th>Check</th><th style="text-align:right">Temp</th><th>Result</th><th>Checked By</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="6">No checks recorded today.</td></tr>'}</tbody>
+      </table>
+      </body></html>`);
+    win.document.close();
+    win.print();
+  };
+
+  const handleEmailComplianceReport = () => {
+    const recipients = getReportRecipients();
+    const today = todayCheckDate();
+    const lines = todaysComplianceRows
+      .map(r => `  ${new Date(r.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} — ${r.item} — ${r.detail} — ${r.temp}°C — ${r.pass ? 'Pass' : 'Fail'} — ${r.user}`)
+      .join('\n');
+    const subject = `Compliance Temperature Log — ${today}`;
+    const body = `Compliance Temperature Log: ${today}\n${todaysComplianceRows.length} checks recorded\n\n${lines || '  No checks recorded today.'}`;
+    window.location.href = `mailto:${recipients.join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
+
   const handleSaveSingleAdjustment = async (ing: Ingredient) => {
     const typedVal = editingCounts[ing.id];
     if (typedVal === undefined) return;
@@ -926,6 +978,22 @@ export const Stock: React.FC = () => {
                 >
                   <Printer className="h-3.5 w-3.5" />
                   Generate Report
+                </button>
+                <button
+                  onClick={handlePrintComplianceReport}
+                  title="Print today's food + equipment temperature checks"
+                  className="h-8 px-3 border border-outline-variant text-[10px] font-bold label-caps rounded-sm hover:bg-surface-container flex items-center gap-1.5"
+                >
+                  <Printer className="h-3.5 w-3.5" />
+                  Compliance Log
+                </button>
+                <button
+                  onClick={handleEmailComplianceReport}
+                  title="Email today's food + equipment temperature checks"
+                  className="h-8 px-3 border border-outline-variant text-[10px] font-bold label-caps rounded-sm hover:bg-surface-container flex items-center gap-1.5"
+                >
+                  <Mail className="h-3.5 w-3.5" />
+                  Email Compliance Log
                 </button>
                 <button onClick={() => setShowReports(false)} className="p-1 text-outline hover:text-on-surface">
                   <X className="h-4 w-4" />

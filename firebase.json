@@ -2,6 +2,9 @@
   "firestore": {
     "rules": "firestore.rules"
   },
+  "storage": {
+    "rules": "storage.rules"
+  },
   "hosting": {
     "public": "kings-head-manager-v4/dist",
     "ignore": [

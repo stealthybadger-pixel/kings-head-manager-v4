@@ -895,6 +895,24 @@ export const Pantry: React.FC = () => {
                 </div>
               )}
 
+              {(formState.category === 'Meat' || formState.category === 'Fish') && (
+                <div>
+                  <label className="label-caps text-outline block mb-2">Food Temp Check</label>
+                  <select
+                    value={formState.tempCheckType || ''}
+                    onChange={(e) => setFormState(prev => ({ ...prev, tempCheckType: (e.target.value || undefined) as any }))}
+                    className="w-full px-3 py-2 border border-outline-variant rounded-sm text-sm"
+                  >
+                    <option value="">— Not used raw in a dish —</option>
+                    <option value="Cooked Core">Cooked Core (used raw, cooked to order)</option>
+                    <option value="Reheat">Reheat (already cooked before use)</option>
+                  </select>
+                  <span className="text-[10px] text-outline mt-1 block">
+                    Only needed if this ingredient is added directly to a dish rather than via a recipe.
+                  </span>
+                </div>
+              )}
+
               <div>
                 <label className="label-caps text-outline block mb-2">Waste Percentage (%)</label>
                 <input

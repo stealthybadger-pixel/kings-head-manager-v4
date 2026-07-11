@@ -1,6 +1,7 @@
 import { initializeApp, deleteApp } from "firebase/app";
 import { initializeFirestore } from "firebase/firestore";
 import { getAuth, createUserWithEmailAndPassword, signOut } from "firebase/auth";
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBx_7Raw_xgM2dQWBmUU29W9ggbcmVmo_Y",
@@ -16,6 +17,7 @@ export const db = initializeFirestore(app, {
   ignoreUndefinedProperties: true
 });
 export const auth = getAuth(app);
+export const storage = getStorage(app);
 
 // A throwaway secondary Firebase app instance, used only when a manager
 // creates a new staff account. createUserWithEmailAndPassword signs in as

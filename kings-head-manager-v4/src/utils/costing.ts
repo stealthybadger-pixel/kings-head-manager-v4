@@ -28,13 +28,20 @@ export const calculateIngredientCost = (
 ): number => {
   // Child cut of a whole-item breakdown (e.g. Chicken Supreme from Whole
   // Chicken): has no supplier pricing of its own. Cost is the parent's rate
-  // for the same nominal quantity, inflated by the yield loss — buying
+  // for the same nominal weight, inflated by the yield loss — buying
   // enough parent to get 1kg of this cut costs (parent rate ÷ yield%).
   if (ingredient.parentIngredientId && ingredient.childYieldPercent && allIngredients) {
     const parent = allIngredients.find(i => i.id === ingredient.parentIngredientId);
     if (parent) {
-      const parentCostForQty = calculateIngredientCost(parent, quantity, unit, allIngredients);
-      return parentCostForQty / (ingredient.childYieldPercent / 100);
+      // Resolve the requested quantity to a weight in grams using the
+      // CHILD's own pieceWeight (not the parent's) when the unit is 'ea' —
+      // e.g. 1 Chicken Supreme is 180g, not a whole chicken's weight. The
+      // parent is always then costed by weight, never by "each".
+      const weightGrams = getBaseUnit(unit) === 'ea'
+        ? toBaseQuantity(quantity, unit) * (ingredient.pieceWeight || ingredient.eaWeight || 1)
+        : toBaseQuantity(quantity, unit);
+      const parentCostForWeight = calculateIngredientCost(parent, weightGrams, 'g', allIngredients);
+      return parentCostForWeight / (ingredient.childYieldPercent / 100);
     }
   }
 
