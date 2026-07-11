@@ -18,7 +18,10 @@ import {
   MonitorPlay,
   Menu,
   Users,
-  LogOut
+  LogOut,
+  ShieldCheck,
+  Thermometer,
+  Refrigerator
 } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import Pantry from './components/Pantry';
@@ -32,11 +35,13 @@ import Help from './components/Help';
 import FrontOfHouse from './components/FrontOfHouse';
 import Team from './components/Team';
 import Login from './components/Login';
+import FoodTempChecks from './components/FoodTempChecks';
+import EquipmentTempChecks from './components/EquipmentTempChecks';
 import { useStore } from './store/useStore';
 import { useIsMobile } from './hooks/useIsMobile';
 import { useAuth } from './hooks/useAuth';
 
-export type ViewType = 'dashboard' | 'pantry' | 'catalog' | 'kitchen' | 'service' | 'stock' | 'suppliers' | 'invoice' | 'settings' | 'foh' | 'team';
+export type ViewType = 'dashboard' | 'pantry' | 'catalog' | 'kitchen' | 'service' | 'stock' | 'suppliers' | 'invoice' | 'settings' | 'foh' | 'team' | 'food-temp' | 'equipment-temp';
 
 // Views rendered on the floor during a shift — get the primary mobile tab bar slots.
 const MOBILE_TAB_ITEMS = [
@@ -53,13 +58,16 @@ const MOBILE_MORE_ITEMS = [
   { id: 'kitchen', label: 'Recipes', icon: ChefHat },
   { id: 'invoice', label: 'Invoices', icon: ScanLine },
   { id: 'suppliers', label: 'Suppliers', icon: Truck },
+  { id: 'food-temp', label: 'Food Temp Checks', icon: Thermometer },
+  { id: 'equipment-temp', label: 'Equipment Temp Checks', icon: Refrigerator },
   { id: 'settings', label: 'Help', icon: HelpCircle },
 ] as const;
 
 const VIEW_TITLES: Record<ViewType, string> = {
   dashboard: 'Dashboard', pantry: 'Pantry', catalog: 'Catalog', kitchen: 'Recipes',
   service: 'Dishes', stock: 'Stock', suppliers: 'Suppliers', invoice: 'Invoices',
-  settings: 'Help', foh: 'Front of House', team: 'Team'
+  settings: 'Help', foh: 'Front of House', team: 'Team',
+  'food-temp': 'Food Temp Checks', 'equipment-temp': 'Equipment Temp Checks'
 };
 
 const App: React.FC = () => {
@@ -70,6 +78,7 @@ const App: React.FC = () => {
   const dismissToast = useStore((state) => state.dismissToast);
   const [navCollapsed, setNavCollapsed] = useState<boolean>(true);
   const [kitchenOpen, setKitchenOpen] = useState<boolean>(true);
+  const [complianceOpen, setComplianceOpen] = useState<boolean>(true);
   const isMobile = useIsMobile();
   const [showMoreSheet, setShowMoreSheet] = useState(false);
 
@@ -84,6 +93,11 @@ const App: React.FC = () => {
     { id: 'catalog', label: 'Supplier Catalogue', icon: BookOpen },
     { id: 'kitchen', label: 'Recipes', icon: ChefHat },
     { id: 'service', label: 'Dishes', icon: Utensils },
+  ] as const;
+
+  const complianceItems = [
+    { id: 'food-temp', label: 'Food Temp Checks', icon: Thermometer },
+    { id: 'equipment-temp', label: 'Equipment Temp Checks', icon: Refrigerator },
   ] as const;
 
   const bottomItems = [
@@ -124,6 +138,8 @@ const App: React.FC = () => {
       {currentView === 'foh' && <FrontOfHouse />}
       {currentView === 'suppliers' && <Suppliers />}
       {currentView === 'team' && (isManager ? <Team /> : <Dashboard />)}
+      {currentView === 'food-temp' && <FoodTempChecks />}
+      {currentView === 'equipment-temp' && <EquipmentTempChecks />}
       {currentView === 'settings' && <Help />}
     </>
   );
@@ -307,6 +323,38 @@ const App: React.FC = () => {
           </button>
 
           {(kitchenOpen || navCollapsed) && kitchenItems.map((item) => {
+            const IconComponent = item.icon;
+            const isActive = currentView === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setCurrentView(item.id)}
+                className={`relative h-10 flex items-center transition-colors duration-150 ${
+                  isActive ? 'bg-surface-container-high text-primary font-semibold' : 'text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface'
+                } ${navCollapsed ? 'justify-center' : 'pl-10 pr-6 gap-3'}`}
+              >
+                {isActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary" />}
+                <IconComponent className="h-5 w-5 flex-shrink-0" />
+                {!navCollapsed && <span className="text-sm font-sans tracking-wide truncate">{item.label}</span>}
+              </button>
+            );
+          })}
+
+          {/* Compliance group */}
+          <button
+            onClick={() => { if (!navCollapsed) setComplianceOpen(o => !o); }}
+            className={`relative h-10 flex items-center transition-colors duration-150 mt-1 text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface ${navCollapsed ? 'justify-center' : 'px-6 gap-3'}`}
+          >
+            <ShieldCheck className="h-5 w-5 flex-shrink-0 text-outline" />
+            {!navCollapsed && (
+              <>
+                <span className="text-[10px] font-bold label-caps tracking-widest text-outline flex-1">Compliance</span>
+                <ChevronDown className={`h-3.5 w-3.5 text-outline transition-transform duration-200 ${complianceOpen ? '' : '-rotate-90'}`} />
+              </>
+            )}
+          </button>
+
+          {(complianceOpen || navCollapsed) && complianceItems.map((item) => {
             const IconComponent = item.icon;
             const isActive = currentView === item.id;
             return (
