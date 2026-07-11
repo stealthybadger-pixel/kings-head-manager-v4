@@ -690,6 +690,25 @@ export const Kitchen: React.FC = () => {
               </div>
             </div>
 
+            {/* Food Temp Check — set once on recipes that resolve a meat/fish
+                protein to a known cooked state (e.g. "12 Hour Cooked Pork
+                Belly" -> Reheat). Dishes using this recipe inherit the check
+                automatically; see utils/tempChecks.ts. */}
+            <div className="grid grid-cols-3 gap-6">
+              <div>
+                <label className="label-caps text-outline block mb-2">Food Temp Check</label>
+                <select
+                  value={formState.tempCheckType || ''}
+                  onChange={(e) => setFormState(prev => ({ ...prev, tempCheckType: (e.target.value || undefined) as any }))}
+                  className="w-full px-3 py-2 border border-outline-variant rounded-sm text-sm"
+                >
+                  <option value="">— No meat/fish protein —</option>
+                  <option value="Cooked Core">Cooked Core (raw, cooked to order)</option>
+                  <option value="Reheat">Reheat (already cooked, reheated for service)</option>
+                </select>
+              </div>
+            </div>
+
             {/* Portions — only relevant for recipes that yield discrete units
                 (bread rolls, cheesecake slices). Weight-based preps like a
                 pickled veg or a sauce shouldn't show a portion count at all,

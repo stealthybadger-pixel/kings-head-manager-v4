@@ -9,7 +9,8 @@ import {
   StockMovement, StockMovementSchema,
   StocktakeReport, StocktakeReportSchema,
   SupplierProduct, SupplierProductSchema,
-  Supplier, SupplierSchema
+  Supplier, SupplierSchema,
+  FoodTempCheck, FoodTempCheckSchema
 } from '../types';
 
 // Firestore's SDK is configured with `ignoreUndefinedProperties: true`
@@ -434,4 +435,54 @@ export const useAllSupplierProducts = () => {
     },
     staleTime: 5 * 60 * 1000
   });
+};
+
+// --- FOOD TEMP CHECKS ---
+
+// Local-time YYYY-MM-DD, used to scope "today's" checklist without a
+// timezone-fiddly range query against a timestamp field.
+export function todayCheckDate(): string {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+export const useFoodTempChecksToday = () => {
+  const checkDate = todayCheckDate();
+  return useQuery<FoodTempCheck[]>({
+    queryKey: ['food_temp_checks', checkDate],
+    queryFn: async () => {
+      const q = query(collection(db, 'food_temp_checks'), where('checkDate', '==', checkDate));
+      const snap = await getDocs(q);
+      const items: FoodTempCheck[] = [];
+      snap.forEach(d => {
+        const raw = { id: d.id, ...(d.data() as object) };
+        const result = FoodTempCheckSchema.safeParse(raw);
+        items.push(result.success ? result.data : raw as FoodTempCheck);
+      });
+      return items;
+    },
+    staleTime: 30 * 1000
+  });
+};
+
+export const useFoodTempCheckMutations = () => {
+  const queryClient = useQueryClient();
+
+  const recordCheck = useMutation({
+    mutationFn: async (check: Omit<FoodTempCheck, 'id'>) => {
+      const docRef = doc(collection(db, 'food_temp_checks'));
+      const fullItem = { id: docRef.id, ...check };
+      FoodTempCheckSchema.parse(fullItem);
+      await setDoc(docRef, fullItem);
+      return fullItem;
+    },
+    onSuccess: (fullItem) => {
+      queryClient.invalidateQueries({ queryKey: ['food_temp_checks', fullItem.checkDate] });
+    }
+  });
+
+  return { recordCheck };
 };

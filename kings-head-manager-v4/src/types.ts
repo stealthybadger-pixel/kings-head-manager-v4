@@ -44,6 +44,19 @@ export const AllergenSchema = z.enum([
 ]);
 export type Allergen = z.infer<typeof AllergenSchema>;
 
+// Classifies the food-safety temperature check a raw or pre-cooked
+// meat/fish item needs. Set once on the Ingredient or Recipe that
+// represents the resolved cooking state (e.g. "12 Hour Cooked Pork
+// Belly" recipe -> Reheat), then dishes inherit it automatically by
+// walking their component tree — see resolveDishTempChecks in
+// utils/tempChecks.ts. Hot Hold is not part of this enum because it's
+// a service-holding property of the dish itself, not a protein state.
+export const TempCheckTypeSchema = z.enum(['Cooked Core', 'Reheat']);
+export type TempCheckType = z.infer<typeof TempCheckTypeSchema>;
+
+export const FoodCheckTypeSchema = z.enum(['Cooked Core', 'Reheat', 'Hot Hold']);
+export type FoodCheckType = z.infer<typeof FoodCheckTypeSchema>;
+
 // Container Tare Weight Profile
 export const ContainerProfileSchema = z.object({
   id: z.string(),
@@ -109,6 +122,9 @@ export const IngredientSchema = z.preprocess((val: any) => {
   // absorbed rather than tracked as its own child.
   parentIngredientId: z.string().optional(),
   childYieldPercent: z.number().positive().max(100).optional(),
+  // Set on raw meat/fish ingredients used directly in a dish (not via a
+  // recipe) — e.g. a steak added straight to a dish. See TempCheckTypeSchema.
+  tempCheckType: TempCheckTypeSchema.optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional()
 }));
@@ -159,6 +175,13 @@ export const RecipeSchema = z.object({
   stockLevel: z.number().optional(),
   items: z.array(RecipeItemSchema),
   instructions: z.string(),
+  // Set on recipes that resolve a meat/fish protein to a known cooked
+  // state — e.g. "12 Hour Cooked Pork Belly" -> Reheat, "Pan-Seared
+  // Chicken Breast" -> Cooked Core. When set, dish temp-check resolution
+  // stops here rather than recursing into this recipe's own ingredients
+  // (the cooking process already changed the raw/cooked state). See
+  // TempCheckTypeSchema and utils/tempChecks.ts.
+  tempCheckType: TempCheckTypeSchema.optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional()
 });
@@ -219,6 +242,10 @@ export const DishSchema = z.preprocess((val: any) => {
   items: z.array(DishItemSchema),
   isLive: z.boolean().optional(),
   dishType: z.enum(['Starter', 'Main', 'Side', 'Dessert', 'Drink', 'Other']).optional(),
+  // Hot Hold is a service-holding property (e.g. soup kept warm in a
+  // bain-marie), not derivable from ingredient/recipe raw-cooked state
+  // like Cooked Core / Reheat are — so it's a manual per-dish flag.
+  requiresHotHoldCheck: z.boolean().optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional()
 }));
@@ -302,3 +329,24 @@ export const AppUserSchema = z.object({
   createdAt: z.string().optional()
 });
 export type AppUser = z.infer<typeof AppUserSchema>;
+
+// A single recorded food probe reading against one dish's required check.
+// requiredMinC is snapshotted at record time (not looked up live) so
+// historical records stay accurate if thresholds change later.
+export const FoodTempCheckSchema = z.object({
+  id: z.string(),
+  dishId: z.string(),
+  dishName: z.string(),
+  checkType: FoodCheckTypeSchema,
+  temperatureC: z.number(),
+  requiredMinC: z.number(),
+  pass: z.boolean(),
+  correctiveNotes: z.string().optional(),
+  userId: z.string(),
+  userDisplayName: z.string(),
+  checkedAt: z.string(),
+  // ISO date (YYYY-MM-DD) the check was logged against, in local time —
+  // used to scope "today's" checklist without a timezone-fiddly range query.
+  checkDate: z.string()
+});
+export type FoodTempCheck = z.infer<typeof FoodTempCheckSchema>;

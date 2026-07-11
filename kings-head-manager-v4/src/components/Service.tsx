@@ -440,6 +440,19 @@ export const Service: React.FC = () => {
               </div>
             </div>
 
+            {/* Hot Hold — service-holding check (e.g. soup kept warm in a
+                bain-marie). Not derivable from ingredients like Cooked Core
+                / Reheat are, so it's a manual per-dish flag. */}
+            <label className="flex items-center gap-2 text-xs font-semibold text-on-surface cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={!!formState.requiresHotHoldCheck}
+                onChange={(e) => setFormState(prev => ({ ...prev, requiresHotHoldCheck: e.target.checked || undefined }))}
+                className="h-4 w-4"
+              />
+              Requires a Hot Hold temperature check (held warm for service)
+            </label>
+
             {/* Sliders */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
               <div>
