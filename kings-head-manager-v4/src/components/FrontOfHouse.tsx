@@ -101,6 +101,55 @@ function getDishAllergens(
   return allergens;
 }
 
+// Same traversal as getDishAllergens, but attributes each allergen back to
+// the specific top-level dish component (ingredient or recipe) that
+// contains it — e.g. "Mash Potato: Milk" — rather than only a dish-level
+// yes/no. Nested sub-recipe allergens are rolled up under whichever
+// top-level component pulled them in.
+function getDishComponentAllergens(
+  dish: Dish,
+  ingredientMap: Map<string, Ingredient>,
+  recipeMap: Map<string, Recipe>
+): { name: string; allergens: Allergen[] }[] {
+  function collectFromRecipe(recipe: Recipe, depth = 0): Set<Allergen> {
+    const set = new Set<Allergen>();
+    if (depth > 5) return set;
+    for (const item of (recipe.items ?? [])) {
+      if (item.type === 'ingredient' && item.ingredientId) {
+        const ing = ingredientMap.get(item.ingredientId);
+        if (ing) (ing.allergens ?? []).forEach(a => set.add(a));
+      } else if (item.type === 'recipe' && item.subRecipeId) {
+        const sub = recipeMap.get(item.subRecipeId);
+        if (sub) collectFromRecipe(sub, depth + 1).forEach(a => set.add(a));
+      }
+    }
+    return set;
+  }
+
+  const result: { name: string; allergens: Allergen[] }[] = [];
+  try {
+    for (const item of (dish.items ?? [])) {
+      if (item.type === 'ingredient' && item.ingredientId) {
+        const ing = ingredientMap.get(item.ingredientId);
+        if (ing) {
+          const allergs = ALL_ALLERGENS.filter(a => (ing.allergens ?? []).includes(a));
+          if (allergs.length > 0) result.push({ name: ing.name, allergens: allergs });
+        }
+      } else if (item.type === 'recipe' && item.subRecipeId) {
+        const recipe = recipeMap.get(item.subRecipeId);
+        if (recipe) {
+          const set = collectFromRecipe(recipe);
+          const allergs = ALL_ALLERGENS.filter(a => set.has(a));
+          if (allergs.length > 0) result.push({ name: recipe.name, allergens: allergs });
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[FOH] component allergen compute error', e);
+  }
+  return result;
+}
+
 const FrontOfHouse: React.FC = () => {
   const { data: dishes = [], isLoading: loadingDishes } = useDishes();
   const { data: ingredients = [], isLoading: loadingIngs } = useIngredients();
@@ -108,6 +157,7 @@ const FrontOfHouse: React.FC = () => {
 
   const [activeAllergens, setActiveAllergens] = useState<Set<Allergen>>(new Set());
   const [highlightMode, setHighlightMode] = useState<'grey' | 'show'>('grey');
+  const [detailDishId, setDetailDishId] = useState<string | null>(null);
 
   const ingredientMap = useMemo(
     () => new Map(ingredients.map(i => [i.id, i])),
@@ -130,6 +180,16 @@ const FrontOfHouse: React.FC = () => {
     }
     return map;
   }, [liveDishes, ingredientMap, recipeMap]);
+
+  const dishComponentAllergenMap = useMemo(() => {
+    const map = new Map<string, { name: string; allergens: Allergen[] }[]>();
+    for (const dish of liveDishes) {
+      map.set(dish.id, getDishComponentAllergens(dish, ingredientMap, recipeMap));
+    }
+    return map;
+  }, [liveDishes, ingredientMap, recipeMap]);
+
+  const detailDish = detailDishId ? liveDishes.find(d => d.id === detailDishId) ?? null : null;
 
   function toggleAllergen(allergen: Allergen) {
     setActiveAllergens(prev => {
@@ -228,9 +288,10 @@ const FrontOfHouse: React.FC = () => {
               const presentActive = ALL_ALLERGENS.filter(a => activeAllergens.has(a) && dishAllgs.has(a));
 
               return (
-                <div
+                <button
                   key={dish.id}
-                  className={`relative flex flex-col justify-between p-3 min-h-[110px] rounded-lg border-2 bg-surface transition-all duration-200 ${
+                  onClick={() => setDetailDishId(dish.id)}
+                  className={`relative flex flex-col justify-between p-3 min-h-[110px] rounded-lg border-2 bg-surface transition-all duration-200 text-left ${
                     greyed ? 'opacity-30 grayscale border-outline-variant' : getTileBorder((dish as any).dishType)
                   }`}
                 >
@@ -271,12 +332,71 @@ const FrontOfHouse: React.FC = () => {
                       </div>
                     )}
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
         )}
       </div>
+
+      {/* Tap-to-drill-down: which specific component(s) contain the allergen(s) */}
+      {detailDish && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4"
+          onClick={() => setDetailDishId(null)}
+        >
+          <div
+            className="w-full max-w-sm bg-surface border border-outline-variant rounded-lg p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-start gap-3 mb-4">
+              <div>
+                <h2 className="text-sm font-bold text-on-surface">{detailDish.name}</h2>
+                <p className="text-xs text-outline mt-0.5">£{(detailDish.retailPrice ?? 0).toFixed(2)}</p>
+              </div>
+              <button
+                onClick={() => setDetailDishId(null)}
+                className="text-xs text-outline hover:text-on-surface border border-outline-variant hover:border-outline px-2 py-1 transition-colors flex-shrink-0"
+              >
+                Close
+              </button>
+            </div>
+
+            {(() => {
+              const components = dishComponentAllergenMap.get(detailDish.id) ?? [];
+              if (components.length === 0) {
+                return <p className="text-xs text-outline">No allergens detected in any component of this dish.</p>;
+              }
+              return (
+                <div className="flex flex-col gap-2">
+                  {activeAllergens.size > 0 && (
+                    <p className="text-[10px] text-error uppercase tracking-wide font-semibold mb-1">
+                      Highlighting: {Array.from(activeAllergens).map(a => ALLERGEN_LABELS[a]).join(', ')}
+                    </p>
+                  )}
+                  {components.map((comp, idx) => {
+                    const matchesFilter = activeAllergens.size > 0 && comp.allergens.some(a => activeAllergens.has(a));
+                    return (
+                      <div
+                        key={idx}
+                        className={`p-2.5 rounded border text-xs ${
+                          matchesFilter
+                            ? 'bg-error-container border-error text-on-error-container'
+                            : 'bg-surface-container-lowest border-outline-variant text-on-surface'
+                        }`}
+                      >
+                        <span className="font-semibold">{comp.name}</span>
+                        <span className="text-outline"> — </span>
+                        {comp.allergens.map(a => `${ALLERGEN_ICONS[a]} ${ALLERGEN_LABELS[a]}`).join(', ')}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
