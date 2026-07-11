@@ -149,6 +149,8 @@ export const Pantry: React.FC = () => {
   // Form edit state (active item copy)
   const [isEditing, setIsEditing] = useState(false);
   const [isNew, setIsNew] = useState(false);
+  const [newChildName, setNewChildName] = useState('');
+  const [newChildYield, setNewChildYield] = useState('');
   const [formState, setFormState] = useState<Omit<Ingredient, 'id'> & { id?: string }>({
     name: '',
     category: 'Dry Store',
@@ -311,6 +313,67 @@ export const Pantry: React.FC = () => {
     } catch (err: any) {
       console.error(err);
       showToast(err.message || "Failed to save ingredient", "error");
+    }
+  };
+
+  // Whole-item breakdown ("child ingredients") — cuts of the currently open
+  // ingredient, each a real, independently-selectable Ingredient document
+  // that derives its cost from this parent rather than being priced itself.
+  const childIngredients = useMemo(() => {
+    if (!formState.id) return [];
+    return ingredients.filter(i => i.parentIngredientId === formState.id);
+  }, [ingredients, formState.id]);
+
+  const handleAddChildCut = async () => {
+    const yieldPct = parseFloat(newChildYield);
+    if (!newChildName.trim()) {
+      showToast("Enter a name for the new cut", "error");
+      return;
+    }
+    if (!yieldPct || yieldPct <= 0 || yieldPct > 100) {
+      showToast("Enter a yield % between 1 and 100", "error");
+      return;
+    }
+    if (!formState.id) {
+      showToast("Save this ingredient first, then add cuts", "error");
+      return;
+    }
+    try {
+      await addIngredient.mutateAsync({
+        name: newChildName.trim(),
+        category: formState.category,
+        wastePercent: 0,
+        kcalPer100: formState.kcalPer100 || 0,
+        stockLevel: 0,
+        allergens: formState.allergens || [],
+        suppliers: [],
+        parentIngredientId: formState.id,
+        childYieldPercent: yieldPct
+      });
+      showToast(`Added "${newChildName.trim()}" as a child cut`, "success");
+      setNewChildName('');
+      setNewChildYield('');
+    } catch (err: any) {
+      showToast(err.message || "Failed to add child cut", "error");
+    }
+  };
+
+  const handleUpdateChildYield = async (childId: string, yieldPct: number) => {
+    if (!yieldPct || yieldPct <= 0 || yieldPct > 100) return;
+    try {
+      await updateIngredient.mutateAsync({ id: childId, data: { childYieldPercent: yieldPct } });
+    } catch (err: any) {
+      showToast(err.message || "Failed to update yield %", "error");
+    }
+  };
+
+  const handleRemoveChildCut = async (child: Ingredient) => {
+    if (!confirm(`Remove "${child.name}" as a child cut? This deletes it as an ingredient entirely.`)) return;
+    try {
+      await deleteIngredient.mutateAsync(child.id);
+      showToast(`Removed "${child.name}"`, "success");
+    } catch (err: any) {
+      showToast(err.message || "Failed to remove child cut", "error");
     }
   };
 
@@ -648,15 +711,16 @@ export const Pantry: React.FC = () => {
         <div className="flex-1 overflow-y-auto divide-y divide-outline-variant">
           {filteredIngredients.map((ing, idx) => {
             const preferred = ing.suppliers?.find(s => s.isPreferred) || ing.suppliers?.[0];
+            const parent = ing.parentIngredientId ? ingredients.find(i => i.id === ing.parentIngredientId) : undefined;
             return (
-              <div 
-                key={ing.id} 
+              <div
+                key={ing.id}
                 onClick={() => selectIngredient(ing.id)}
                 className={`p-4 hover:bg-surface-container cursor-pointer flex justify-between items-center transition-colors ${
-                  selectedId === ing.id 
-                    ? 'bg-surface-container' 
-                    : idx % 2 === 0 
-                      ? 'bg-transparent' 
+                  selectedId === ing.id
+                    ? 'bg-surface-container'
+                    : idx % 2 === 0
+                      ? 'bg-transparent'
                       : 'bg-black/[0.0075]'
                 }`}
               >
@@ -664,10 +728,18 @@ export const Pantry: React.FC = () => {
                   <div className="font-semibold text-sm text-on-surface">{ing.name}</div>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-xs text-on-surface-variant">{ing.category}</span>
-                    {preferred && <span className={supplierBadgeClass(preferred.name)}>{preferred.name}</span>}
+                    {parent ? (
+                      <span className="text-[9px] bg-secondary-container text-primary px-1.5 py-0.5 rounded-sm font-semibold">
+                        ↳ {ing.childYieldPercent}% of {parent.name}
+                      </span>
+                    ) : (
+                      preferred && <span className={supplierBadgeClass(preferred.name)}>{preferred.name}</span>
+                    )}
                   </div>
                 </div>
-                {preferred && (
+                {parent ? (
+                  <div className="data-tabular text-xs text-outline">derived</div>
+                ) : preferred && (
                   <div className="data-tabular text-sm text-primary font-bold">
                     £{preferred.packCost.toFixed(2)} / {preferred.packSize} {preferred.packUnit}
                   </div>
@@ -744,6 +816,45 @@ export const Pantry: React.FC = () => {
                 </button>
               </div>
             </div>
+
+            {/* Child-cut banner: this ingredient is a yield-based cut of a
+                whole-item parent (e.g. Chicken Supreme from Whole Chicken).
+                Its cost is always derived from the parent, not priced here. */}
+            {formState.parentIngredientId && (() => {
+              const parent = ingredients.find(i => i.id === formState.parentIngredientId);
+              return (
+                <div className="bg-secondary-container border border-[#90a8ff] p-4 rounded-sm mb-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="flex-1 text-xs text-on-surface">
+                    This is a child cut of{' '}
+                    <button
+                      onClick={() => parent && selectIngredient(parent.id)}
+                      className="font-bold text-primary hover:underline bg-transparent border-none p-0 cursor-pointer"
+                    >
+                      {parent?.name || 'Unknown Ingredient'}
+                    </button>
+                    . Its cost is automatically derived from the parent's price — it has no supplier pricing of its own.
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <label className="text-[10px] label-caps text-outline">Yield %</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      step={1}
+                      value={formState.childYieldPercent ?? ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setFormState(prev => ({
+                          ...prev,
+                          childYieldPercent: val === '' ? undefined : Math.max(1, Math.min(100, parseFloat(val) || 1))
+                        }));
+                      }}
+                      className="w-20 px-2 py-1.5 border border-outline-variant rounded-sm text-sm data-tabular text-center bg-surface"
+                    />
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Inputs Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
@@ -861,6 +972,85 @@ export const Pantry: React.FC = () => {
               </div>
             </div>
 
+            {/* Breakdown: define whole-item child cuts on this ingredient's
+                own page (e.g. Whole Chicken → Chicken Supreme, Chicken Leg).
+                Only for top-level ingredients — a child can't itself have
+                children, and only makes sense once the ingredient exists. */}
+            {!formState.parentIngredientId && !isNew && (
+              <div className="mt-4 border-t border-outline-variant pt-6">
+                <h3 className="label-caps text-on-surface font-bold mb-1">Breakdown (Whole-Item Cuts)</h3>
+                <p className="text-[10px] text-outline mb-4">
+                  Define this ingredient's child cuts and what % of its weight each yields (e.g. Whole Chicken → Supreme 30%, Leg 25%). Yields don't need to sum to 100% — the remainder is trim/carcass waste. Each cut becomes its own selectable ingredient in recipes/dishes, costed automatically from this parent's price.
+                </p>
+
+                {childIngredients.length > 0 && (
+                  <div className="flex flex-col gap-2 mb-4">
+                    {childIngredients.map(child => (
+                      <div key={child.id} className="flex items-center gap-3 bg-surface p-3 border border-outline-variant rounded-sm">
+                        <button
+                          onClick={() => selectIngredient(child.id)}
+                          className="flex-1 text-left text-sm font-semibold text-primary hover:underline bg-transparent border-none p-0 cursor-pointer truncate"
+                        >
+                          {child.name}
+                        </button>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <input
+                            type="number"
+                            min={1}
+                            max={100}
+                            defaultValue={child.childYieldPercent}
+                            onBlur={(e) => {
+                              const val = parseFloat(e.target.value);
+                              if (val !== child.childYieldPercent) handleUpdateChildYield(child.id, val);
+                            }}
+                            className="w-16 px-2 py-1 border border-outline-variant rounded-sm text-xs data-tabular text-center"
+                          />
+                          <span className="text-xs text-outline">%</span>
+                        </div>
+                        <button
+                          onClick={() => handleRemoveChildCut(child)}
+                          className="p-1 text-error hover:bg-error-container rounded-sm flex-shrink-0"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex flex-col sm:flex-row gap-2 bg-surface p-3 border border-outline-variant rounded-sm">
+                  <input
+                    type="text"
+                    value={newChildName}
+                    onChange={(e) => setNewChildName(e.target.value)}
+                    placeholder="e.g. Chicken Supreme"
+                    className="flex-1 px-3 py-1.5 border border-outline-variant rounded-sm text-sm"
+                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={newChildYield}
+                      onChange={(e) => setNewChildYield(e.target.value)}
+                      placeholder="Yield %"
+                      className="w-24 px-3 py-1.5 border border-outline-variant rounded-sm text-sm data-tabular"
+                    />
+                    <button
+                      onClick={handleAddChildCut}
+                      disabled={addIngredient.isPending}
+                      className="h-9 px-4 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90 disabled:opacity-50 flex-shrink-0"
+                    >
+                      + Add Cut
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Child cuts derive their cost from the parent — no supplier
+                pricing section or catalog-price-comparison for them. */}
+            {!formState.parentIngredientId && <>
             {cheaperCatalogOption && (
               <div className="bg-success-container border border-success p-4 rounded-sm text-on-success-container flex items-center justify-between text-xs mt-4">
                 <div className="flex items-center gap-2">
@@ -1026,6 +1216,7 @@ export const Pantry: React.FC = () => {
                 </button>
               </div>
             </div>
+            </>}
           </>
         ) : (
           <div className="flex-1 flex flex-col justify-center items-center text-outline">
