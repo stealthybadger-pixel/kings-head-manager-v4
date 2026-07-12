@@ -75,6 +75,19 @@ function getContainerName(tareId: string | undefined): string {
   return CONTAINER_PROFILES.find(c => c.id === tareId)?.name || tareId;
 }
 
+// Report list rows need more than just the date to tell apart two stocktakes
+// committed the same day (e.g. an accidental early commit and its follow-up)
+// — falls back to the plain date for older reports saved before createdAt existed.
+function formatReportTimestamp(report: { date: string; createdAt?: string }): string {
+  if (!report.createdAt) return report.date;
+  const d = new Date(report.createdAt);
+  if (isNaN(d.getTime())) return report.date;
+  return d.toLocaleString(undefined, {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  });
+}
+
 interface ContainerReading {
   containerId: string;
   netGrams: number;
@@ -255,7 +268,7 @@ export const Stock: React.FC = () => {
   const { logMovement } = useStockMutations();
   const { data: wasteMovements = [] } = useStockMovements('waste');
   const { data: stocktakeReports = [] } = useStocktakeReports();
-  const { saveReport } = useStocktakeMutations();
+  const { saveReport, mergeReports } = useStocktakeMutations();
   const { data: stocktakeDraft, isLoading: isDraftLoading } = useStocktakeDraft();
   const { saveDraft, clearDraft } = useStocktakeDraftMutations();
   const { updateRecipe } = useRecipeMutations();
@@ -282,6 +295,10 @@ export const Stock: React.FC = () => {
   const [showEposImport, setShowEposImport] = useState(false);
   const [showWastageHistory, setShowWastageHistory] = useState(false);
   const [showReports, setShowReports] = useState(false);
+  // Merging fixes an accidental early "Commit Now" splitting one physical
+  // stocktake into two report records — combine their counts back into one.
+  const [mergeMode, setMergeMode] = useState(false);
+  const [selectedForMerge, setSelectedForMerge] = useState<Set<string>>(new Set());
   const [showReportConfig, setShowReportConfig] = useState(false);
   const [reportConfig, setReportConfig] = useState<ReportConfig>(DEFAULT_REPORT_CONFIG);
 
@@ -559,6 +576,10 @@ export const Stock: React.FC = () => {
 
   // ── Feature 3: commit stocktake + save report ──────────────────────────────
   const handleCommitStockTake = async () => {
+    const itemsCounted = Object.keys(stockCounts).length + Object.keys(recipeCounts).length;
+    if (!confirm(`Commit this stock take? ${itemsCounted} item${itemsCounted === 1 ? '' : 's'} counted so far will be finalized. This can't be undone — if you're not finished weighing, use "Pause & Exit" instead.`)) {
+      return;
+    }
     try {
       let adjustmentCount = 0;
       let totalValue = 0;
@@ -695,6 +716,62 @@ export const Stock: React.FC = () => {
       } catch (err: any) {
         showToast(err.message || 'Failed to discard paused stock take', 'error');
       }
+    }
+  };
+
+  // Combine several stocktake reports (e.g. an accidental early commit that
+  // split one physical count into two records) into a single report. Later
+  // reports (by createdAt/date) win on any overlapping ingredient, on the
+  // assumption an overlap means a re-weigh superseded the earlier figure.
+  // totalValue is recalculated from the merged counts rather than summed,
+  // since summing would double-count anything present in more than one source.
+  const mergeSelectedReports = async () => {
+    const toMerge = stocktakeReports.filter(r => selectedForMerge.has(r.id));
+    if (toMerge.length < 2) return;
+    const sorted = [...toMerge].sort((a, b) => (a.createdAt || a.date).localeCompare(b.createdAt || b.date));
+
+    const counts: Record<string, number> = {};
+    let wastageTotal = 0;
+    let wastageCount = 0;
+    let hasWastage = false;
+    let menuOnly = true;
+    for (const r of sorted) {
+      Object.assign(counts, r.counts);
+      if (r.wastageTotal !== undefined) { wastageTotal += r.wastageTotal; hasWastage = true; }
+      if (r.wastageCount !== undefined) wastageCount += r.wastageCount;
+      if (!r.menuOnly) menuOnly = false;
+    }
+
+    let totalValue = 0;
+    for (const [ingId, count] of Object.entries(counts)) {
+      const ing = ingredients.find(i => i.id === ingId);
+      if (ing) totalValue += calculateIngredientCost(ing, count, 'g', ingredients);
+    }
+
+    const itemsLabel = `${Object.keys(counts).length} items from ${sorted.length} reports`;
+    if (!confirm(`Merge ${sorted.length} reports (${sorted.map(r => formatReportTimestamp(r)).join(', ')}) into one? ${itemsLabel}. The ${sorted.length} original reports will be deleted and replaced by the merged one. This can't be undone.`)) {
+      return;
+    }
+
+    try {
+      await mergeReports.mutateAsync({
+        sourceIds: sorted.map(r => r.id),
+        merged: {
+          date: sorted[0].date,
+          counts,
+          totalValue,
+          itemCount: Object.keys(counts).length,
+          menuOnly,
+          type: 'stocktake',
+          wastageTotal: hasWastage ? wastageTotal : undefined,
+          wastageCount: hasWastage ? wastageCount : undefined
+        }
+      });
+      showToast(`Merged ${sorted.length} reports into one`, 'success');
+      setSelectedForMerge(new Set());
+      setMergeMode(false);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to merge reports', 'error');
     }
   };
 
@@ -1225,6 +1302,13 @@ export const Stock: React.FC = () => {
               <h2 className="font-bold text-on-surface">Stocktake Reports</h2>
               <div className="flex items-center gap-3">
                 <button
+                  onClick={() => { setMergeMode(m => !m); setSelectedForMerge(new Set()); }}
+                  title="Combine two or more reports (e.g. an accidental early commit) into one"
+                  className={`h-8 px-4 text-[10px] font-bold label-caps rounded-sm flex items-center gap-1.5 border ${mergeMode ? 'bg-primary text-white border-primary' : 'border-outline-variant text-outline hover:bg-surface-container'}`}
+                >
+                  {mergeMode ? 'Cancel Merge' : 'Merge Reports'}
+                </button>
+                <button
                   onClick={() => { setReportConfig(DEFAULT_REPORT_CONFIG); setShowReportConfig(true); }}
                   className="h-8 px-4 bg-primary text-white text-[10px] font-bold label-caps rounded-sm hover:bg-opacity-90 flex items-center gap-1.5"
                 >
@@ -1252,43 +1336,80 @@ export const Stock: React.FC = () => {
                 </button>
               </div>
             </div>
+            {mergeMode && (
+              <div className="h-10 bg-primary/5 border-b border-primary/20 flex items-center px-6 text-xs text-primary flex-shrink-0">
+                Select two or more "Stock Take" reports to merge into one (snapshots can't be merged).
+              </div>
+            )}
             <div className="flex-1 overflow-y-auto divide-y divide-outline-variant">
               {stocktakeReports.length === 0 ? (
                 <div className="py-12 text-center text-outline text-xs">No reports yet. Commit a Stock Take to create one.</div>
               ) : (
-                stocktakeReports.map(report => (
-                  <div key={report.id} className="px-6 py-4 flex items-center justify-between hover:bg-surface-container-low">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-sm text-on-surface">{report.date}</span>
-                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-sm label-caps ${report.type === 'snapshot' ? 'bg-surface-container text-outline' : 'bg-primary/10 text-primary'}`}>
-                          {report.type === 'snapshot' ? 'Snapshot' : 'Stock Take'}
-                        </span>
+                stocktakeReports.map(report => {
+                  const isMergeable = report.type !== 'snapshot';
+                  const isSelected = selectedForMerge.has(report.id);
+                  return (
+                    <div key={report.id}
+                      onClick={() => {
+                        if (!mergeMode || !isMergeable) return;
+                        setSelectedForMerge(prev => {
+                          const next = new Set(prev);
+                          next.has(report.id) ? next.delete(report.id) : next.add(report.id);
+                          return next;
+                        });
+                      }}
+                      className={`px-6 py-4 flex items-center justify-between hover:bg-surface-container-low ${mergeMode && isMergeable ? 'cursor-pointer' : ''} ${isSelected ? 'bg-primary/5' : ''}`}>
+                      <div className="flex items-center gap-3">
+                        {mergeMode && (
+                          <input type="checkbox" checked={isSelected} disabled={!isMergeable}
+                            onChange={() => {}}
+                            className="h-4 w-4 disabled:opacity-30" />
+                        )}
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-sm text-on-surface">{formatReportTimestamp(report)}</span>
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-sm label-caps ${report.type === 'snapshot' ? 'bg-surface-container text-outline' : 'bg-primary/10 text-primary'}`}>
+                              {report.type === 'snapshot' ? 'Snapshot' : 'Stock Take'}
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-outline label-caps mt-0.5">
+                            {report.itemCount} items · £{report.totalValue.toFixed(2)}
+                            {report.menuOnly ? ' · Menu only' : ''}
+                            {report.wastageTotal !== undefined ? ` · Wastage: £${report.wastageTotal.toFixed(2)}` : ''}
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-[10px] text-outline label-caps mt-0.5">
-                        {report.itemCount} items · £{report.totalValue.toFixed(2)}
-                        {report.menuOnly ? ' · Menu only' : ''}
-                        {report.wastageTotal !== undefined ? ` · Wastage: £${report.wastageTotal.toFixed(2)}` : ''}
-                      </div>
+                      {!mergeMode && (
+                        <div className="flex gap-2">
+                          <button onClick={() => handlePrintReport(report)}
+                            title="Print report"
+                            className="h-8 px-3 border border-outline-variant text-xs font-bold label-caps rounded-sm hover:bg-surface-container flex items-center gap-1.5">
+                            <Printer className="h-3.5 w-3.5" /> Print
+                          </button>
+                          <button onClick={() => handleEmailReport(report)}
+                            title="Email report"
+                            className="h-8 px-3 border border-outline-variant text-xs font-bold label-caps rounded-sm hover:bg-surface-container flex items-center gap-1.5">
+                            <Mail className="h-3.5 w-3.5" /> Email
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => handlePrintReport(report)}
-                        title="Print report"
-                        className="h-8 px-3 border border-outline-variant text-xs font-bold label-caps rounded-sm hover:bg-surface-container flex items-center gap-1.5">
-                        <Printer className="h-3.5 w-3.5" /> Print
-                      </button>
-                      <button onClick={() => handleEmailReport(report)}
-                        title="Email report"
-                        className="h-8 px-3 border border-outline-variant text-xs font-bold label-caps rounded-sm hover:bg-surface-container flex items-center gap-1.5">
-                        <Mail className="h-3.5 w-3.5" /> Email
-                      </button>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
-            <div className="px-6 py-3 border-t border-outline-variant bg-surface flex-shrink-0">
-              <p className="text-[10px] text-outline">Email recipients are configured in <span className="font-bold">Help → Settings → Report Recipients</span>.</p>
+            <div className="px-6 py-3 border-t border-outline-variant bg-surface flex-shrink-0 flex items-center justify-between gap-3">
+              {mergeMode ? (
+                <>
+                  <span className="text-[10px] text-outline label-caps">{selectedForMerge.size} selected</span>
+                  <button onClick={mergeSelectedReports} disabled={selectedForMerge.size < 2 || mergeReports.isPending}
+                    className="h-8 px-4 bg-primary text-white text-[10px] font-bold label-caps rounded-sm hover:bg-opacity-90 disabled:opacity-40">
+                    {mergeReports.isPending ? 'Merging...' : `Merge ${selectedForMerge.size || ''} Into One`}
+                  </button>
+                </>
+              ) : (
+                <p className="text-[10px] text-outline">Email recipients are configured in <span className="font-bold">Help → Settings → Report Recipients</span>.</p>
+              )}
             </div>
           </div>
         </div>
