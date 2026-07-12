@@ -31,7 +31,7 @@ const DEFAULT_REPORT_CONFIG: ReportConfig = {
   includeWastage: true,
   scope: 'nonzero'
 };
-import { calculateIngredientCost } from '../utils/costing';
+import { calculateIngredientCost, toBaseQuantity } from '../utils/costing';
 
 // Recursively collect all ingredient IDs referenced by a set of recipe items
 function collectIngredientIds(items: RecipeItem[], allRecipes: Recipe[], visited = new Set<string>()): Set<string> {
@@ -91,6 +91,57 @@ function formatReportTimestamp(report: { date: string; createdAt?: string }): st
 interface ContainerReading {
   containerId: string;
   netGrams: number;
+}
+
+// Units offered for the stocktake entry/display selector — the full Unit type
+// minus 'portion' (meaningless outside a recipe). 'ml'/'l' use a deliberate
+// 1ml≈1g approximation (fine for water/milk/stock, off for things like oil or
+// double cream) rather than a real per-ingredient density — good enough was
+// the call here, not worth a new Ingredient field for. 'ea' is only offered
+// in the UI when the ingredient has a pieceWeight/eaWeight to convert with.
+type StocktakeEntryUnit = 'g' | 'kg' | 'oz' | 'ml' | 'l' | 'ea';
+
+// stockCounts always stays in grams internally (matching how ing.stockLevel and
+// every costing call elsewhere in the app already assumes grams) — these two
+// helpers are the only place a chosen display/entry unit ever touches that,
+// so scale readings, manual entry, and the read-only display all convert the
+// same way with no risk of the base unit drifting.
+function gramsToUnit(grams: number, unit: StocktakeEntryUnit, ing: Ingredient): number {
+  if (unit === 'g' || unit === 'ml') return grams;
+  if (unit === 'kg' || unit === 'l') return grams / 1000;
+  if (unit === 'oz') return grams / (toBaseQuantity(1, 'oz'));
+  // 'ea'
+  const pieceWeight = ing.pieceWeight || ing.eaWeight || 1;
+  return grams / pieceWeight;
+}
+function unitToGrams(value: number, unit: StocktakeEntryUnit, ing: Ingredient): number {
+  if (unit === 'ea') {
+    const pieceWeight = ing.pieceWeight || ing.eaWeight || 1;
+    return value * pieceWeight;
+  }
+  // toBaseQuantity already treats kg/l as *1000 and g/ml/oz correctly —
+  // exactly the 1ml≈1g mapping we want for ml/l here too.
+  return toBaseQuantity(value, unit);
+}
+function canUseEachUnit(ing: Ingredient): boolean {
+  return !!(ing.pieceWeight || ing.eaWeight);
+}
+// Defaults to whatever unit the preferred supplier actually packages it in
+// (falling back to 'g', the plain physical reading a scale gives) — 'ea'
+// only if the ingredient can actually convert each<->grams.
+function defaultStocktakeUnit(ing: Ingredient): StocktakeEntryUnit {
+  const pref = ing.suppliers?.find(s => s.isPreferred) || ing.suppliers?.[0];
+  const packUnit = pref?.packUnit;
+  if (packUnit === 'ea') return canUseEachUnit(ing) ? 'ea' : 'g';
+  if (packUnit === 'g' || packUnit === 'kg' || packUnit === 'oz' || packUnit === 'ml' || packUnit === 'l') return packUnit;
+  return 'g';
+}
+// Whole grams/ml don't need decimals; kg/l/oz/each read better rounded to
+// something sane rather than showing float noise from unit conversion.
+function formatUnitValue(value: number, unit: StocktakeEntryUnit): string {
+  if (unit === 'g' || unit === 'ml') return String(Math.round(value));
+  if (unit === 'ea') return value.toFixed(value % 1 === 0 ? 0 : 1);
+  return value.toFixed(2);
 }
 
 // Reads the live scale weight directly from the store so only this small status bar
@@ -199,18 +250,22 @@ interface StocktakeIngredientRowProps {
   readings: ContainerReading[];
   onAddReading: (ingredientId: string, tareId: string) => void;
   onRemoveReading: (ingredientId: string, index: number) => void;
+  unit: StocktakeEntryUnit;
+  onUnitChange: (ingredientId: string, unit: StocktakeEntryUnit) => void;
 }
 
 const StocktakeIngredientRow = React.memo(function StocktakeIngredientRow({
-  ing, isAlternateRow, scaleConnected, tareId, onTareChange, isEditing, countValue, onCountChange, onStartEdit, onStopEdit, readings, onAddReading, onRemoveReading
+  ing, isAlternateRow, scaleConnected, tareId, onTareChange, isEditing, countValue, onCountChange, onStartEdit, onStopEdit, readings, onAddReading, onRemoveReading, unit, onUnitChange
 }: StocktakeIngredientRowProps) {
+  const gramsValue = countValue !== undefined ? countValue : (ing.stockLevel || 0);
+  const displayValue = gramsToUnit(gramsValue, unit, ing);
   return (
     <div className={`flex flex-col gap-2 p-3 sm:p-4 border border-outline-variant rounded-sm ${isAlternateRow ? 'bg-black/[0.0075]' : 'bg-transparent'}`}>
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <span className="font-semibold text-sm text-on-surface truncate block">{ing.name}</span>
           <div className="text-[10px] text-outline uppercase tracking-wider mt-0.5">
-            {ing.category} • Current: {ing.stockLevel ?? 0}
+            {ing.category} • Current: {formatUnitValue(gramsToUnit(ing.stockLevel ?? 0, unit, ing), unit)}{unit}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -228,15 +283,25 @@ const StocktakeIngredientRow = React.memo(function StocktakeIngredientRow({
               </button>
             </>
           )}
+          <select value={unit} onChange={e => onUnitChange(ing.id, e.target.value as StocktakeEntryUnit)}
+            title="Unit for entering and displaying this item's count"
+            className="px-1.5 py-2 border border-outline-variant bg-surface-container-lowest text-[11px] rounded-sm w-14">
+            <option value="g">g</option>
+            <option value="kg">kg</option>
+            <option value="oz">oz</option>
+            <option value="ml">ml</option>
+            <option value="l">l</option>
+            {canUseEachUnit(ing) && <option value="ea">ea</option>}
+          </select>
           {isEditing ? (
-            <input type="number" autoFocus value={countValue !== undefined ? countValue : (ing.stockLevel || '')}
-              onChange={e => onCountChange(ing.id, parseFloat(e.target.value) || 0)}
+            <input type="number" autoFocus value={displayValue}
+              onChange={e => onCountChange(ing.id, unitToGrams(parseFloat(e.target.value) || 0, unit, ing))}
               onBlur={onStopEdit}
               className="w-24 sm:w-28 px-3 py-2 border border-primary text-center data-tabular text-sm font-bold bg-surface-container-lowest" />
           ) : (
             <button onClick={() => onStartEdit(ing.id)}
               className="w-24 sm:w-28 px-3 py-2 border border-outline-variant text-center data-tabular text-sm font-bold bg-surface-container-lowest rounded-sm">
-              {countValue !== undefined ? countValue : (ing.stockLevel || 0)}
+              {formatUnitValue(displayValue, unit)}
             </button>
           )}
         </div>
@@ -253,7 +318,7 @@ const StocktakeIngredientRow = React.memo(function StocktakeIngredientRow({
             </span>
           ))}
           <span className="text-[10px] font-bold text-primary ml-1">
-            {readings.length} container{readings.length > 1 ? 's' : ''} added
+            {readings.length} container{readings.length > 1 ? 's' : ''} added · total {formatUnitValue(displayValue, unit)}{unit}
           </span>
         </div>
       )}
@@ -331,6 +396,11 @@ export const Stock: React.FC = () => {
   // latest list synchronously without depending on (and re-creating) on every reading.
   const [itemReadings, setItemReadings] = useState<Record<string, ContainerReading[]>>({});
   const itemReadingsRef = useRef<Record<string, ContainerReading[]>>({});
+  // Per-ingredient entry/display unit (g/kg/oz/ea) — see gramsToUnit/unitToGrams.
+  // stockCounts itself always stays in grams; this only changes what's shown
+  // and how a typed number gets interpreted.
+  const [itemUnits, setItemUnits] = useState<Record<string, StocktakeEntryUnit>>({});
+  const itemUnitsRef = useRef<Record<string, StocktakeEntryUnit>>({});
   // Mirror stockCounts/recipeCounts/itemTareIds into refs too, so the autosave
   // helper below can always build an accurate draft snapshot synchronously
   // right after a change, without waiting on React's next render.
@@ -360,6 +430,9 @@ export const Stock: React.FC = () => {
       setItemTareIds(stocktakeDraft.itemTareIds);
       itemReadingsRef.current = stocktakeDraft.itemReadings;
       setItemReadings(stocktakeDraft.itemReadings);
+      const restoredUnits = (stocktakeDraft.itemUnits || {}) as Record<string, StocktakeEntryUnit>;
+      itemUnitsRef.current = restoredUnits;
+      setItemUnits(restoredUnits);
       if (stocktakeDraft.menuOnlyMode) setMenuOnlyMode(true);
       setResumedDraftInfo({ updatedAt: stocktakeDraft.updatedAt, updatedByName: stocktakeDraft.updatedByName });
     }
@@ -470,6 +543,7 @@ export const Stock: React.FC = () => {
       recipeCounts: recipeCountsRef.current,
       itemTareIds: itemTareIdsRef.current,
       itemReadings: itemReadingsRef.current,
+      itemUnits: itemUnitsRef.current,
       menuOnlyMode,
       updatedAt: new Date().toISOString(),
       updatedByName: appUser?.displayName || appUser?.email || undefined
@@ -485,6 +559,14 @@ export const Stock: React.FC = () => {
     itemTareIdsRef.current = { ...itemTareIdsRef.current, [key]: tareId };
     setItemTareIds(itemTareIdsRef.current);
   }, []);
+  // Switching the display/entry unit doesn't change the underlying grams value
+  // (stockCounts is untouched) — it only changes how that value is shown and
+  // how the next typed number gets interpreted.
+  const handleUnitChange = useCallback((id: string, unit: StocktakeEntryUnit) => {
+    itemUnitsRef.current = { ...itemUnitsRef.current, [id]: unit };
+    setItemUnits(itemUnitsRef.current);
+    persistDraftNow();
+  }, [persistDraftNow]);
   // Manually typing a count overrides any accumulated container readings for that item —
   // once someone types a number directly it's a manual total, not a sum of weigh-ins.
   const handleIngredientCountChange = useCallback((id: string, value: number) => {
@@ -654,6 +736,8 @@ export const Stock: React.FC = () => {
       setItemTareIds({});
       itemReadingsRef.current = {};
       setItemReadings({});
+      itemUnitsRef.current = {};
+      setItemUnits({});
       setStocktakeSearch('');
       setEditingCountKey(null);
       setResumedDraftInfo(null);
@@ -675,6 +759,7 @@ export const Stock: React.FC = () => {
         recipeCounts,
         itemTareIds,
         itemReadings: itemReadingsRef.current,
+        itemUnits: itemUnitsRef.current,
         menuOnlyMode,
         updatedAt: new Date().toISOString(),
         updatedByName: appUser?.displayName || appUser?.email || undefined
@@ -689,6 +774,8 @@ export const Stock: React.FC = () => {
       setItemTareIds({});
       itemReadingsRef.current = {};
       setItemReadings({});
+      itemUnitsRef.current = {};
+      setItemUnits({});
       setStocktakeSearch('');
       setEditingCountKey(null);
       setResumedDraftInfo(null);
@@ -710,6 +797,8 @@ export const Stock: React.FC = () => {
     setItemTareIds({});
     itemReadingsRef.current = {};
     setItemReadings({});
+    itemUnitsRef.current = {};
+    setItemUnits({});
     setStocktakeSearch('');
     setEditingCountKey(null);
     setResumedDraftInfo(null);
@@ -1676,6 +1765,8 @@ export const Stock: React.FC = () => {
                             readings={itemReadings[row.ing.id] || []}
                             onAddReading={handleAddIngredientReading}
                             onRemoveReading={handleRemoveIngredientReading}
+                            unit={itemUnits[row.ing.id] ?? defaultStocktakeUnit(row.ing)}
+                            onUnitChange={handleUnitChange}
                           />
                         )}
                       </div>
