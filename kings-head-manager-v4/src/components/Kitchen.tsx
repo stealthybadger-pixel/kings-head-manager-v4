@@ -1,7 +1,9 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { useRecipes, useIngredients, useRecipeMutations, useIngredientMutations, useDishes } from '../hooks/useKitchenData';
 import { useStore } from '../store/useStore';
-import { Search, Plus, Trash2, Camera, AlertCircle, Check, HelpCircle, ExternalLink, Upload, RefreshCw, X, Link2, Unlink } from 'lucide-react';
+import { useIsMobile } from '../hooks/useIsMobile';
+import { useAuth } from '../hooks/useAuth';
+import { Search, Plus, Trash2, Camera, AlertCircle, Check, HelpCircle, ExternalLink, Upload, RefreshCw, X, Link2, Unlink, ArrowLeft } from 'lucide-react';
 import { Recipe, RecipeItem, Ingredient, Unit } from '../types';
 import { calculatePlateCost } from '../utils/costing';
 
@@ -97,6 +99,9 @@ export const Kitchen: React.FC = () => {
   const selectRecipe = useStore((state) => state.selectRecipe);
   const showToast = useStore((state) => state.showToast);
   const navigateToPantryWithIngredient = useStore((state) => state.navigateToPantryWithIngredient);
+  const isMobile = useIsMobile();
+  const { appUser } = useAuth();
+  const isManager = appUser?.role === 'manager';
 
   // Directory Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -431,8 +436,8 @@ export const Kitchen: React.FC = () => {
   return (
     <div className="flex h-full w-full bg-surface-container-lowest">
       
-      {/* 1. LEFT PANEL: RECIPES DIRECTORY (35%) */}
-      <div className="w-[35%] border-r border-outline-variant h-full flex flex-col bg-surface-container-lowest">
+      {/* 1. LEFT PANEL: RECIPES DIRECTORY (35% desktop / full-width mobile list) */}
+      <div className={`${isMobile ? (isEditing ? 'hidden' : 'w-full') : 'w-[35%]'} border-r border-outline-variant h-full flex flex-col bg-surface-container-lowest`}>
         <div className="p-4 border-b border-outline-variant bg-surface flex flex-col gap-3">
           <div className="flex justify-between items-center flex-wrap gap-2">
             <span className="label-caps text-outline font-bold">Kitchen Library</span>
@@ -451,21 +456,25 @@ export const Kitchen: React.FC = () => {
                   Recent
                 </button>
               </div>
-              <button
-                onClick={() => setShowScanner(true)}
-                className="h-8 px-3 border border-outline text-[10px] label-caps font-bold rounded-sm bg-surface hover:bg-surface-container-low flex items-center gap-1"
-              >
-                <Camera className="h-3.5 w-3.5" />
-                Scan
-              </button>
-              <button
-                onClick={handleStartNew}
-                title="Create new recipe"
-                className="h-8 px-3 bg-primary text-white flex items-center justify-center gap-1 rounded-sm hover:bg-opacity-90 text-[10px] font-bold label-caps"
-              >
-                <Plus className="h-4 w-4" />
-                New Recipe
-              </button>
+              {isManager && (
+                <>
+                  <button
+                    onClick={() => setShowScanner(true)}
+                    className="h-8 px-3 border border-outline text-[10px] label-caps font-bold rounded-sm bg-surface hover:bg-surface-container-low flex items-center gap-1"
+                  >
+                    <Camera className="h-3.5 w-3.5" />
+                    Scan
+                  </button>
+                  <button
+                    onClick={handleStartNew}
+                    title="Create new recipe"
+                    className="h-8 px-3 bg-primary text-white flex items-center justify-center gap-1 rounded-sm hover:bg-opacity-90 text-[10px] font-bold label-caps"
+                  >
+                    <Plus className="h-4 w-4" />
+                    New Recipe
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -549,10 +558,18 @@ export const Kitchen: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. RIGHT PANEL: RECIPE WORKSPACE (65%) */}
-      <div className="flex-1 h-full p-8 overflow-y-auto bg-surface-container-lowest flex flex-col gap-6">
+      {/* 2. RIGHT PANEL: RECIPE WORKSPACE (65% desktop / full-width mobile detail view) */}
+      <div className={`${isMobile ? (isEditing ? 'w-full' : 'hidden') : 'flex-1'} h-full p-4 sm:p-8 overflow-y-auto bg-surface-container-lowest flex flex-col gap-6`}>
         {isEditing ? (
           <>
+            {isMobile && (
+              <button
+                onClick={() => { selectRecipe(null); setIsEditing(false); setIsNew(false); }}
+                className="flex items-center gap-1.5 text-xs font-bold label-caps text-outline -mb-2 min-h-[44px]"
+              >
+                <ArrowLeft className="h-4 w-4" /> Back to list
+              </button>
+            )}
             <div className="flex justify-between items-center border-b border-outline-variant pb-4">
               <div>
                 <h2 className="headline-sm font-semibold">{isNew ? 'New Recipe Formulation' : formState.name}</h2>
@@ -561,8 +578,11 @@ export const Kitchen: React.FC = () => {
                   <span className="text-xs text-primary font-bold data-tabular">£{totalCost.toFixed(2)}</span>
                 </div>
               </div>
-              <div className="flex gap-4">
-                {!isNew && (
+              <div className="flex items-center gap-4">
+                {!isManager && (
+                  <span className="text-[10px] text-outline label-caps">View &amp; scale only — ask a manager to save changes</span>
+                )}
+                {isManager && !isNew && (
                   <>
                     <button
                       onClick={async () => {
@@ -602,20 +622,22 @@ export const Kitchen: React.FC = () => {
                     </button>
                   </>
                 )}
-                <button 
-                  onClick={handleSave}
-                  disabled={isSaving}
-                  className={`h-10 px-6 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90 flex items-center gap-2 ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  {isSaving ? (
-                    <>
-                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    'Save Formulation'
-                  )}
-                </button>
+                {isManager && (
+                  <button
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className={`h-10 px-6 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90 flex items-center gap-2 ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {isSaving ? (
+                      <>
+                        <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Formulation'
+                    )}
+                  </button>
+                )}
               </div>
             </div>
 
