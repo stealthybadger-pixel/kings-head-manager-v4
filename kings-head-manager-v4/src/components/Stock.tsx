@@ -431,7 +431,8 @@ export const Stock: React.FC = () => {
   }, [ingredients, activeLocation, dryStoreSubCategory, menuOnlyMode, menuIngredientIds, stocktakeSearch]);
 
   // Recipes prepped in batches (e.g. Mash Potato) that are directly used as a component
-  // of a currently-live dish — these get their own stock-take line alongside raw ingredients.
+  // of a currently-live dish — used to restrict the stock-take list to menu-relevant
+  // recipes when "Menu Items Only" is on, same as menuIngredientIds does for ingredients.
   const liveRecipeIds = useMemo(() => {
     const ids = new Set<string>();
     for (const dish of dishes.filter(d => (d as any).isLive)) {
@@ -444,13 +445,16 @@ export const Stock: React.FC = () => {
 
   const stocktakeRecipes = useMemo(() => {
     if (activeLocation !== 'All' && activeLocation !== 'Prep') return [];
-    let base = recipes.filter(r => liveRecipeIds.has(r.id));
+    // With "Menu Items Only" off, every prep recipe is countable — matches how
+    // ingredients behave in that mode. On, only ones tied to a live dish show,
+    // same as before.
+    let base = menuOnlyMode ? recipes.filter(r => liveRecipeIds.has(r.id)) : recipes;
     if (stocktakeSearch.trim()) {
       const q = stocktakeSearch.trim().toLowerCase();
       base = base.filter(r => r.name.toLowerCase().includes(q));
     }
     return base;
-  }, [recipes, liveRecipeIds, activeLocation, stocktakeSearch]);
+  }, [recipes, liveRecipeIds, activeLocation, stocktakeSearch, menuOnlyMode]);
 
   // Stable row-callback handlers — passed as props to memoized rows so their identity
   // never changes across renders, which is required for React.memo to actually skip re-renders.
