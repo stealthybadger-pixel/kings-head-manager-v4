@@ -269,7 +269,23 @@ export const useStocktakeMutations = () => {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['stocktake_reports'] })
   });
-  return { saveReport };
+  // Combines several reports (e.g. one stocktake accidentally committed in
+  // pieces) into a single new report, then removes the originals — done as
+  // one atomic batch so a failure partway never leaves duplicates or a gap.
+  const mergeReports = useMutation({
+    mutationFn: async ({ sourceIds, merged }: { sourceIds: string[]; merged: Omit<StocktakeReport, 'id'> }) => {
+      const batch = writeBatch(db);
+      const newRef = doc(collection(db, 'stocktake_reports'));
+      batch.set(newRef, { id: newRef.id, ...merged, createdAt: new Date().toISOString() });
+      for (const id of sourceIds) {
+        batch.delete(doc(db, 'stocktake_reports', id));
+      }
+      await batch.commit();
+      return newRef.id;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['stocktake_reports'] })
+  });
+  return { saveReport, mergeReports };
 };
 
 const STOCKTAKE_DRAFT_ID = 'current';
