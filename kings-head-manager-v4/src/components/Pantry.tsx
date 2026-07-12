@@ -5,6 +5,7 @@ import { useStore } from '../store/useStore';
 import { Search, Plus, Trash2, AlertCircle, FileText, CheckCircle2, ListTodo, Check, ArrowRight, ArrowLeft } from 'lucide-react';
 import { Ingredient, IngredientCategory, SupplierName, Unit, Allergen, IngredientSupplier } from '../types';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { useAuth } from '../hooks/useAuth';
 import { inferIngredientDefaults, DRY_STORE_SUBCATEGORIES } from '../utils/ingredientAutofill';
 import { getBaseRate, getBaseUnit } from '../utils/costing';
 
@@ -132,6 +133,8 @@ export const Pantry: React.FC = () => {
   const isMobile = useIsMobile();
   const showToast = useStore((state) => state.showToast);
   const navigateToCatalogWithSearch = useStore((state) => state.navigateToCatalogWithSearch);
+  const { appUser } = useAuth();
+  const isManager = appUser?.role === 'manager';
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -668,19 +671,23 @@ export const Pantry: React.FC = () => {
                   Recent
                 </button>
               </div>
-              <button
-                onClick={() => setShowMenuAuditor(true)}
-                className="h-8 px-3 border border-outline text-[10px] label-caps font-bold rounded-sm bg-surface hover:bg-surface-container-low"
-              >
-                Auditor
-              </button>
-              <button
-                onClick={handleStartNew}
-                title="Create new ingredient"
-                className="h-8 w-8 bg-primary text-white flex items-center justify-center rounded-sm hover:bg-opacity-90"
-              >
-                <Plus className="h-4 w-4" />
-              </button>
+              {isManager && (
+                <>
+                  <button
+                    onClick={() => setShowMenuAuditor(true)}
+                    className="h-8 px-3 border border-outline text-[10px] label-caps font-bold rounded-sm bg-surface hover:bg-surface-container-low"
+                  >
+                    Auditor
+                  </button>
+                  <button
+                    onClick={handleStartNew}
+                    title="Create new ingredient"
+                    className="h-8 w-8 bg-primary text-white flex items-center justify-center rounded-sm hover:bg-opacity-90"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -780,9 +787,12 @@ export const Pantry: React.FC = () => {
                   )}
                 </div>
               </div>
-              <div className="flex gap-4">
-                {!isNew && (
-                  <button 
+              <div className="flex items-center gap-4">
+                {!isManager && (
+                  <span className="text-[10px] text-outline label-caps">View only — ask a manager to save changes</span>
+                )}
+                {isManager && !isNew && (
+                  <button
                     onClick={async () => {
                       if (confirm("Delete this ingredient permanently?")) {
                         try {
@@ -800,20 +810,22 @@ export const Pantry: React.FC = () => {
                     Delete
                   </button>
                 )}
-                <button 
-                  onClick={handleSave}
-                  disabled={isSaving}
-                  className={`h-10 px-6 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90 flex items-center gap-2 ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  {isSaving ? (
-                    <>
-                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    'Save Profile'
-                  )}
-                </button>
+                {isManager && (
+                  <button
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className={`h-10 px-6 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90 flex items-center gap-2 ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {isSaving ? (
+                      <>
+                        <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Profile'
+                    )}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1224,15 +1236,17 @@ export const Pantry: React.FC = () => {
                 </div>
               )}
 
-              <div className="mt-4 flex justify-end">
-                <button
-                  onClick={handleSave}
-                  disabled={isSaving}
-                  className={`h-10 px-6 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90 flex items-center gap-2 ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  {isSaving ? 'Saving…' : 'Save Changes'}
-                </button>
-              </div>
+              {isManager && (
+                <div className="mt-4 flex justify-end">
+                  <button
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className={`h-10 px-6 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90 flex items-center gap-2 ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {isSaving ? 'Saving…' : 'Save Changes'}
+                  </button>
+                </div>
+              )}
             </div>
             </>}
           </>

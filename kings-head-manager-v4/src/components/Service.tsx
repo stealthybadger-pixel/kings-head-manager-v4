@@ -5,6 +5,7 @@ import { Search, Plus, Trash2, AlertTriangle, CheckCircle, TrendingUp, Radio, Ar
 import { Allergen, AllergenSchema, Dish, DishItem, DishModifier, DishType, Ingredient, Recipe, Unit } from '../types';
 import { calculateIngredientCost, toBaseQuantity, calculatePlateCost as computePlateCost } from '../utils/costing';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { useAuth } from '../hooks/useAuth';
 
 const DISH_TYPES: DishType[] = ['Starter', 'Main', 'Side', 'Dessert', 'Drink', 'Other'];
 const ALL_ALLERGENS = AllergenSchema.options as Allergen[];
@@ -53,6 +54,8 @@ export const Service: React.FC = () => {
   const navigateToPantryWithIngredient = useStore((state) => state.navigateToPantryWithIngredient);
   const navigateToKitchenWithRecipe = useStore((state) => state.navigateToKitchenWithRecipe);
   const isMobile = useIsMobile();
+  const { appUser } = useAuth();
+  const isManager = appUser?.role === 'manager';
 
   // Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -345,14 +348,16 @@ export const Service: React.FC = () => {
                   Recent
                 </button>
               </div>
-              <button
-                onClick={handleStartNew}
-                title="Create new dish"
-                className="h-8 px-3 bg-primary text-white flex items-center justify-center gap-1 rounded-sm hover:bg-opacity-90 text-[10px] font-bold label-caps"
-              >
-                <Plus className="h-4 w-4" />
-                New Dish
-              </button>
+              {isManager && (
+                <button
+                  onClick={handleStartNew}
+                  title="Create new dish"
+                  className="h-8 px-3 bg-primary text-white flex items-center justify-center gap-1 rounded-sm hover:bg-opacity-90 text-[10px] font-bold label-caps"
+                >
+                  <Plus className="h-4 w-4" />
+                  New Dish
+                </button>
+              )}
             </div>
           </div>
 
@@ -406,10 +411,12 @@ export const Service: React.FC = () => {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (!isManager) return;
                       updateDish.mutate({ id: dish.id, data: { isLive: !dish.isLive } });
                     }}
-                    title={dish.isLive ? 'Remove from live menu' : 'Add to live menu'}
-                    className={`shrink-0 p-1 rounded-full transition-colors ${dish.isLive ? 'text-emerald-400' : 'text-outline hover:text-on-surface-variant'}`}
+                    disabled={!isManager}
+                    title={isManager ? (dish.isLive ? 'Remove from live menu' : 'Add to live menu') : 'Only managers can change live menu status'}
+                    className={`shrink-0 p-1 rounded-full transition-colors ${dish.isLive ? 'text-emerald-400' : 'text-outline hover:text-on-surface-variant'} ${!isManager ? 'cursor-not-allowed opacity-70' : ''}`}
                   >
                     <Radio className="h-4 w-4" />
                   </button>
@@ -446,9 +453,12 @@ export const Service: React.FC = () => {
                 <h2 className="headline-sm font-semibold">{isNew ? 'New Dish Profile' : formState.name}</h2>
                 <span className="text-xs text-outline label-caps">Plate Cost Calculator</span>
               </div>
-              <div className="flex gap-4">
-                {!isNew && (
-                  <button 
+              <div className="flex items-center gap-4">
+                {!isManager && (
+                  <span className="text-[10px] text-outline label-caps">View only — ask a manager to save changes</span>
+                )}
+                {isManager && !isNew && (
+                  <button
                     onClick={async () => {
                       if (confirm("Delete this dish permanently?")) {
                         try {
@@ -466,20 +476,22 @@ export const Service: React.FC = () => {
                     Delete
                   </button>
                 )}
-                <button 
-                  onClick={handleSave}
-                  disabled={isSaving}
-                  className={`h-10 px-6 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90 flex items-center gap-2 ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  {isSaving ? (
-                    <>
-                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    'Save Dish'
-                  )}
-                </button>
+                {isManager && (
+                  <button
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className={`h-10 px-6 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90 flex items-center gap-2 ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {isSaving ? (
+                      <>
+                        <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Dish'
+                    )}
+                  </button>
+                )}
               </div>
             </div>
 

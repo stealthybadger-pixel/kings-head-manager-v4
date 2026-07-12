@@ -31,12 +31,62 @@ service cloud.firestore {
       allow update, delete: if isManager();
     }
 
-    // Everything else (ingredients, recipes, dishes, stock movements,
-    // suppliers, supplier products, stocktake reports, etc.) — flat
-    // permission model for v1: any signed-in team member can read/write.
-    // The app used to be fully open with no auth at all; this is the
-    // baseline lockdown, not a per-feature ACL.
-    match /{document=**} {
+    // Master data — recipes, ingredients, dishes, and everything that
+    // feeds costing/menu structure. Any signed-in team member can read
+    // (staff need to browse/scale recipes, look up allergens, etc.) but
+    // only managers can create/edit/delete, so staff can't silently
+    // change a recipe formulation or dish pricing.
+    match /ingredients/{id} {
+      allow read: if isSignedIn();
+      allow write: if isManager();
+    }
+    match /recipes/{id} {
+      allow read: if isSignedIn();
+      allow write: if isManager();
+    }
+    match /dishes/{id} {
+      allow read: if isSignedIn();
+      allow write: if isManager();
+    }
+    match /container_profiles/{id} {
+      allow read: if isSignedIn();
+      allow write: if isManager();
+    }
+    match /suppliers/{id} {
+      allow read: if isSignedIn();
+      allow write: if isManager();
+    }
+    match /supplierProducts/{id} {
+      allow read: if isSignedIn();
+      allow write: if isManager();
+    }
+    match /scrapeLog/{id} {
+      allow read: if isSignedIn();
+      allow write: if isManager();
+    }
+    // Floor plan equipment boxes (position/name/range) — editing the
+    // layout is manager-only in the UI ("Edit Layout" mode); enforced
+    // here too so staff can't reposition/rename/delete equipment, only
+    // record readings against it (see equipment_temp_checks below).
+    match /equipment/{id} {
+      allow read: if isSignedIn();
+      allow write: if isManager();
+    }
+
+    // Day-to-day operational records — any signed-in team member (staff
+    // or manager) can log these: stock counts/wastage, stocktakes, and
+    // food/equipment temperature checks. This is where staff actually
+    // do their job day to day, so it stays open to the whole team.
+    match /stock_movements/{id} {
+      allow read, write: if isSignedIn();
+    }
+    match /stocktake_reports/{id} {
+      allow read, write: if isSignedIn();
+    }
+    match /food_temp_checks/{id} {
+      allow read, write: if isSignedIn();
+    }
+    match /equipment_temp_checks/{id} {
       allow read, write: if isSignedIn();
     }
   }
