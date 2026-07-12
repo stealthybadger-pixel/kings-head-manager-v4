@@ -58,7 +58,6 @@ const MOBILE_TAB_ITEMS = [
 const MOBILE_MORE_ITEMS = [
   { id: 'catalog', label: 'Supplier Catalogue', icon: BookOpen },
   { id: 'kitchen', label: 'Recipes', icon: ChefHat },
-  { id: 'invoice', label: 'Invoices', icon: ScanLine },
   { id: 'suppliers', label: 'Suppliers', icon: Truck },
   { id: 'food-temp', label: 'Food Temp Checks', icon: Thermometer },
   { id: 'equipment-temp', label: 'Equipment Temp Checks', icon: Refrigerator },
@@ -108,7 +107,7 @@ const App: React.FC = () => {
   const bottomItems = [
     { id: 'foh', label: 'Front of House', icon: MonitorPlay },
     { id: 'stock', label: 'Stock', icon: Boxes },
-    { id: 'invoice', label: 'Invoices', icon: ScanLine },
+    ...(isManager ? [{ id: 'invoice', label: 'Invoices', icon: ScanLine }] as const : []),
     { id: 'suppliers', label: 'Suppliers', icon: Truck },
     ...(isManager ? [{ id: 'team', label: 'Team', icon: Users }] as const : []),
     { id: 'settings', label: 'Help', icon: HelpCircle },
@@ -116,6 +115,7 @@ const App: React.FC = () => {
 
   const mobileMoreItems = [
     ...MOBILE_MORE_ITEMS,
+    ...(isManager ? [{ id: 'invoice', label: 'Invoices', icon: ScanLine }] as const : []),
     ...(isManager ? [{ id: 'team', label: 'Team', icon: Users }] as const : []),
   ] as const;
 
@@ -139,7 +139,7 @@ const App: React.FC = () => {
       {currentView === 'kitchen' && <Kitchen />}
       {currentView === 'service' && <Service />}
       {currentView === 'stock' && <Stock />}
-      {currentView === 'invoice' && <InvoiceScanner />}
+      {currentView === 'invoice' && (isManager ? <InvoiceScanner /> : <Dashboard />)}
       {currentView === 'foh' && <FrontOfHouse />}
       {currentView === 'suppliers' && <Suppliers />}
       {currentView === 'team' && (isManager ? <Team /> : <Dashboard />)}

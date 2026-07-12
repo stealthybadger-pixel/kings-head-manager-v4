@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { supplierBadgeClass } from '../utils/supplierColors';
 import { useSupplierSearchQuery, useSupplierProductsBySupplier, useIngredients, useIngredientMutations, useSupplierProductMutations, useSuppliers } from '../hooks/useKitchenData';
 import { useStore } from '../store/useStore';
+import { useAuth } from '../hooks/useAuth';
 import { 
   Search, 
   TrendingDown, 
@@ -18,6 +19,9 @@ import { inferCategory, CATEGORY_KEYWORDS, inferIngredientDefaults } from '../ut
 import { getBaseRate, getBaseUnit } from '../utils/costing';
 
 export const Catalog: React.FC = () => {
+  const { appUser } = useAuth();
+  const isManager = appUser?.role === 'manager';
+
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
@@ -156,7 +160,7 @@ export const Catalog: React.FC = () => {
 
   // Action: Apply the catalog product as the preferred supplier for the ingredient
   const handleApplyCheaperOption = async (prod: typeof processedProducts[0], ing: Ingredient, makePreferred = true) => {
-    if (!ing) return;
+    if (!isManager || !ing) return;
     
     // Build the new supplier record
     const newSupplierRecord: IngredientSupplier = {
@@ -205,6 +209,7 @@ export const Catalog: React.FC = () => {
 
   // Action: Create a brand new pantry ingredient from a catalog product
   const handleCreateIngredientFromProduct = async (prod: SupplierProduct) => {
+    if (!isManager) return;
     const name = prod.originalName || prod.name.replace(/\s*\(Box\)|\s*\(Tray\)|\s*\(Case\)|\s*\(Sachet\)/gi, '');
     const guess = inferIngredientDefaults(name);
 
@@ -394,7 +399,7 @@ export const Catalog: React.FC = () => {
         {selectedProduct ? (
           <div className="flex flex-col gap-6">
             {/* Catalog Product Header Card */}
-            {isEditingProduct ? (
+            {isEditingProduct && isManager ? (
               <div className="bg-surface border border-[#c8a96e] p-6 rounded-sm space-y-4">
                 <span className="text-xs font-mono font-bold text-primary uppercase tracking-wider block">
                   Edit Supplier Product Record
@@ -464,7 +469,7 @@ export const Catalog: React.FC = () => {
                   </button>
                   <button
                     onClick={async () => {
-                      if (!editFormState) return;
+                      if (!isManager || !editFormState) return;
                       try {
                         const up = editFormState.packSize > 0 ? editFormState.packCost / editFormState.packSize : 0;
                         await updateSupplierProduct.mutateAsync({
@@ -496,15 +501,17 @@ export const Catalog: React.FC = () => {
                   <span className="text-xs font-mono font-bold text-primary uppercase tracking-wider block">
                     Supplier Product Record
                   </span>
-                  <button
-                    onClick={() => {
-                      setEditFormState(selectedProduct);
-                      setIsEditingProduct(true);
-                    }}
-                    className="text-xs text-primary font-bold hover:underline bg-transparent border-none p-0 cursor-pointer"
-                  >
-                    Edit Price/Details
-                  </button>
+                  {isManager && (
+                    <button
+                      onClick={() => {
+                        setEditFormState(selectedProduct);
+                        setIsEditingProduct(true);
+                      }}
+                      className="text-xs text-primary font-bold hover:underline bg-transparent border-none p-0 cursor-pointer"
+                    >
+                      Edit Price/Details
+                    </button>
+                  )}
                 </div>
                 <h2 className="headline-sm text-on-surface font-semibold mt-1">
                   {selectedProduct.name}
@@ -538,12 +545,14 @@ export const Catalog: React.FC = () => {
                       <span className="text-[10px] label-caps text-emerald-700 block">Linked Pantry Item</span>
                       <span className="text-md font-bold text-emerald-900">{selectedProduct.matchedIngredient.name}</span>
                     </div>
-                    <button
-                      onClick={() => setLinkingProductId(selectedProduct.id)}
-                      className="text-[10px] text-emerald-700 border border-emerald-500/30 hover:bg-emerald-500/10 px-2 py-1 label-caps font-bold rounded-sm"
-                    >
-                      Remap Link
-                    </button>
+                    {isManager && (
+                      <button
+                        onClick={() => setLinkingProductId(selectedProduct.id)}
+                        className="text-[10px] text-emerald-700 border border-emerald-500/30 hover:bg-emerald-500/10 px-2 py-1 label-caps font-bold rounded-sm"
+                      >
+                        Remap Link
+                      </button>
+                    )}
                   </div>
 
                   {/* Comparisons */}
@@ -588,20 +597,24 @@ export const Catalog: React.FC = () => {
                   </div>
 
                   {/* Save/Use Action Buttons */}
-                  <div className="flex flex-col gap-2 mt-2">
-                    <button
-                      onClick={() => handleApplyCheaperOption(selectedProduct, selectedProduct.matchedIngredient!, true)}
-                      className="w-full h-11 bg-primary text-on-primary label-caps font-bold text-xs rounded-sm hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
-                    >
-                      Set as Preferred Supplier Package
-                    </button>
-                    <button
-                      onClick={() => handleApplyCheaperOption(selectedProduct, selectedProduct.matchedIngredient!, false)}
-                      className="w-full h-11 border border-primary text-primary hover:bg-surface-container label-caps font-bold text-xs rounded-sm transition-opacity flex items-center justify-center gap-2"
-                    >
-                      Add as Supplier Option
-                    </button>
-                  </div>
+                  {isManager ? (
+                    <div className="flex flex-col gap-2 mt-2">
+                      <button
+                        onClick={() => handleApplyCheaperOption(selectedProduct, selectedProduct.matchedIngredient!, true)}
+                        className="w-full h-11 bg-primary text-on-primary label-caps font-bold text-xs rounded-sm hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                      >
+                        Set as Preferred Supplier Package
+                      </button>
+                      <button
+                        onClick={() => handleApplyCheaperOption(selectedProduct, selectedProduct.matchedIngredient!, false)}
+                        className="w-full h-11 border border-primary text-primary hover:bg-surface-container label-caps font-bold text-xs rounded-sm transition-opacity flex items-center justify-center gap-2"
+                      >
+                        Add as Supplier Option
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-[10px] text-outline label-caps mt-2">View only — ask a manager to update pricing</span>
+                  )}
                 </div>
               ) : (
                 /* Unlinked View */
@@ -614,29 +627,35 @@ export const Catalog: React.FC = () => {
                     </p>
                   </div>
 
-                  <div className="flex flex-col gap-2 border-t border-outline-variant pt-4">
-                    <button
-                      onClick={() => handleCreateIngredientFromProduct(selectedProduct)}
-                      className="w-full h-10 border border-primary text-primary hover:bg-surface-container label-caps font-bold text-xs rounded-sm flex items-center justify-center gap-1.5"
-                    >
-                      <PlusCircle className="h-4 w-4" />
-                      Create Pantry Ingredient
-                    </button>
-                    
-                    <button
-                      onClick={() => setLinkingProductId(selectedProduct.id)}
-                      className="w-full h-10 border border-outline text-outline hover:text-on-surface hover:border-on-surface label-caps font-bold text-xs rounded-sm flex items-center justify-center gap-1.5"
-                    >
-                      <LinkIcon className="h-4 w-4" />
-                      Link to Existing Ingredient
-                    </button>
-                  </div>
+                  {isManager ? (
+                    <div className="flex flex-col gap-2 border-t border-outline-variant pt-4">
+                      <button
+                        onClick={() => handleCreateIngredientFromProduct(selectedProduct)}
+                        className="w-full h-10 border border-primary text-primary hover:bg-surface-container label-caps font-bold text-xs rounded-sm flex items-center justify-center gap-1.5"
+                      >
+                        <PlusCircle className="h-4 w-4" />
+                        Create Pantry Ingredient
+                      </button>
+
+                      <button
+                        onClick={() => setLinkingProductId(selectedProduct.id)}
+                        className="w-full h-10 border border-outline text-outline hover:text-on-surface hover:border-on-surface label-caps font-bold text-xs rounded-sm flex items-center justify-center gap-1.5"
+                      >
+                        <LinkIcon className="h-4 w-4" />
+                        Link to Existing Ingredient
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-[10px] text-outline label-caps border-t border-outline-variant pt-4 block">
+                      View only — ask a manager to link or create pantry items
+                    </span>
+                  )}
                 </div>
               )}
             </div>
 
             {/* Manual Linking Dialog (if triggered) */}
-            {linkingProductId === selectedProduct.id && (
+            {isManager && linkingProductId === selectedProduct.id && (
               <div className="bg-surface border border-primary p-6 rounded-sm">
                 <h3 className="text-sm font-bold text-on-surface mb-3">Link Product to Master Ingredient</h3>
                 <div className="flex flex-col gap-3">
