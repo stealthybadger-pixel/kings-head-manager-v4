@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { useIngredients, useRecipes, useDishes, useStockMutations, useStockMovements, useStocktakeReports, useStocktakeMutations, useRecipeMutations, useFoodTempChecksHistory, useEquipmentChecksHistory, todayCheckDate } from '../hooks/useKitchenData';
+import { useIngredients, useRecipes, useDishes, useStockMutations, useStockMovements, useStocktakeReports, useStocktakeMutations, useRecipeMutations, useIngredientMutations, useFoodTempChecksHistory, useEquipmentChecksHistory, todayCheckDate } from '../hooks/useKitchenData';
 import { useStore } from '../store/useStore';
 import { useBleScale, isWebBluetoothSupported } from '../hooks/useBleScale';
 import { Search, Scale, FileText, CheckCircle2, X, Filter, Printer, Mail, ChevronDown, ChevronRight, BookOpen, ChefHat } from 'lucide-react';
@@ -69,6 +69,16 @@ function getTareWeight(tareId: string | undefined): number {
   return CONTAINER_PROFILES.find(c => c.id === tareId)?.tareWeight || 0;
 }
 
+function getContainerName(tareId: string | undefined): string {
+  if (!tareId || tareId === 'none') return 'No tub';
+  return CONTAINER_PROFILES.find(c => c.id === tareId)?.name || tareId;
+}
+
+interface ContainerReading {
+  containerId: string;
+  netGrams: number;
+}
+
 // Reads the live scale weight directly from the store so only this small status bar
 // re-renders on each throttled BLE tick — the rest of the Stock Take modal (item list
 // etc.) never subscribes to scaleWeightGrams and so never re-renders from scale ticks.
@@ -93,50 +103,70 @@ interface StocktakeRecipeRowProps {
   onCountChange: (recipeId: string, value: number) => void;
   onStartEdit: (recipeId: string) => void;
   onStopEdit: () => void;
-  onFillFromScale: (recipeId: string, tareId: string) => void;
+  readings: ContainerReading[];
+  onAddReading: (recipeId: string, tareId: string) => void;
+  onRemoveReading: (recipeId: string, index: number) => void;
 }
 
 const StocktakeRecipeRow = React.memo(function StocktakeRecipeRow({
-  rec, scaleConnected, tareId, onTareChange, isEditing, countValue, onCountChange, onStartEdit, onStopEdit, onFillFromScale
+  rec, scaleConnected, tareId, onTareChange, isEditing, countValue, onCountChange, onStartEdit, onStopEdit, readings, onAddReading, onRemoveReading
 }: StocktakeRecipeRowProps) {
   return (
-    <div className="flex items-center justify-between gap-2 p-3 sm:p-4 border border-primary/30 bg-secondary-container/20 rounded-sm">
-      <div className="min-w-0">
-        <span className="font-semibold text-sm text-on-surface truncate flex items-center gap-1.5">
-          <ChefHat className="h-3.5 w-3.5 text-primary flex-shrink-0" /> {rec.name}
-        </span>
-        <div className="text-[10px] text-outline uppercase tracking-wider mt-0.5">
-          Prep Recipe • Current: {rec.stockLevel ?? 0} {rec.batchUnit}
+    <div className="flex flex-col gap-2 p-3 sm:p-4 border border-primary/30 bg-secondary-container/20 rounded-sm">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <span className="font-semibold text-sm text-on-surface truncate flex items-center gap-1.5">
+            <ChefHat className="h-3.5 w-3.5 text-primary flex-shrink-0" /> {rec.name}
+          </span>
+          <div className="text-[10px] text-outline uppercase tracking-wider mt-0.5">
+            Prep Recipe • Current: {rec.stockLevel ?? 0} {rec.batchUnit}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {scaleConnected && (
+            <>
+              <select value={tareId} onChange={e => onTareChange(rec.id, e.target.value)}
+                className="px-2 py-2 border border-outline-variant bg-surface-container-lowest text-[11px] rounded-sm max-w-[110px] sm:max-w-none">
+                <option value="none">No tub</option>
+                {CONTAINER_PROFILES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <button onClick={() => onAddReading(rec.id, tareId)}
+                title="Add container reading (net of tare) to running total"
+                className="h-10 w-10 flex-shrink-0 border border-outline flex items-center justify-center rounded-sm bg-surface hover:bg-surface-container">
+                <Scale className="h-4 w-4" />
+              </button>
+            </>
+          )}
+          {isEditing ? (
+            <input type="number" autoFocus value={countValue !== undefined ? countValue : (rec.stockLevel || '')}
+              onChange={e => onCountChange(rec.id, parseFloat(e.target.value) || 0)}
+              onBlur={onStopEdit}
+              className="w-24 sm:w-28 px-3 py-2 border border-primary text-center data-tabular text-sm font-bold bg-surface-container-lowest" />
+          ) : (
+            <button onClick={() => onStartEdit(rec.id)}
+              className="w-24 sm:w-28 px-3 py-2 border border-outline-variant text-center data-tabular text-sm font-bold bg-surface-container-lowest rounded-sm">
+              {countValue !== undefined ? countValue : (rec.stockLevel || 0)}
+            </button>
+          )}
+          <span className="text-xs text-outline w-8">{rec.batchUnit}</span>
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        {scaleConnected && (
-          <>
-            <select value={tareId} onChange={e => onTareChange(rec.id, e.target.value)}
-              className="px-2 py-2 border border-outline-variant bg-surface-container-lowest text-[11px] rounded-sm max-w-[110px] sm:max-w-none">
-              <option value="none">No tub</option>
-              {CONTAINER_PROFILES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-            <button onClick={() => onFillFromScale(rec.id, tareId)}
-              title="Fill from scale (after tare)"
-              className="h-10 w-10 flex-shrink-0 border border-outline flex items-center justify-center rounded-sm bg-surface hover:bg-surface-container">
-              <Scale className="h-4 w-4" />
-            </button>
-          </>
-        )}
-        {isEditing ? (
-          <input type="number" autoFocus value={countValue !== undefined ? countValue : (rec.stockLevel || '')}
-            onChange={e => onCountChange(rec.id, parseFloat(e.target.value) || 0)}
-            onBlur={onStopEdit}
-            className="w-24 sm:w-28 px-3 py-2 border border-primary text-center data-tabular text-sm font-bold bg-surface-container-lowest" />
-        ) : (
-          <button onClick={() => onStartEdit(rec.id)}
-            className="w-24 sm:w-28 px-3 py-2 border border-outline-variant text-center data-tabular text-sm font-bold bg-surface-container-lowest rounded-sm">
-            {countValue !== undefined ? countValue : (rec.stockLevel || 0)}
-          </button>
-        )}
-        <span className="text-xs text-outline w-8">{rec.batchUnit}</span>
-      </div>
+      {readings.length > 0 && (
+        <div className="flex items-center gap-1.5 flex-wrap pl-5">
+          {readings.map((r, i) => (
+            <span key={i} className="inline-flex items-center gap-1 text-[10px] bg-surface border border-outline-variant rounded-full pl-2 pr-1 py-0.5">
+              {getContainerName(r.containerId)} {r.netGrams}g
+              <button onClick={() => onRemoveReading(rec.id, i)} title="Remove this reading"
+                className="h-3.5 w-3.5 flex items-center justify-center rounded-full hover:bg-error-container text-outline hover:text-error">
+                <X className="h-2.5 w-2.5" />
+              </button>
+            </span>
+          ))}
+          <span className="text-[10px] font-bold text-primary ml-1">
+            {readings.length} container{readings.length > 1 ? 's' : ''} added
+          </span>
+        </div>
+      )}
     </div>
   );
 });
@@ -152,47 +182,67 @@ interface StocktakeIngredientRowProps {
   onCountChange: (ingredientId: string, value: number) => void;
   onStartEdit: (ingredientId: string) => void;
   onStopEdit: () => void;
-  onFillFromScale: (ingredientId: string, tareId: string) => void;
+  readings: ContainerReading[];
+  onAddReading: (ingredientId: string, tareId: string) => void;
+  onRemoveReading: (ingredientId: string, index: number) => void;
 }
 
 const StocktakeIngredientRow = React.memo(function StocktakeIngredientRow({
-  ing, isAlternateRow, scaleConnected, tareId, onTareChange, isEditing, countValue, onCountChange, onStartEdit, onStopEdit, onFillFromScale
+  ing, isAlternateRow, scaleConnected, tareId, onTareChange, isEditing, countValue, onCountChange, onStartEdit, onStopEdit, readings, onAddReading, onRemoveReading
 }: StocktakeIngredientRowProps) {
   return (
-    <div className={`flex items-center justify-between gap-2 p-3 sm:p-4 border border-outline-variant rounded-sm ${isAlternateRow ? 'bg-black/[0.0075]' : 'bg-transparent'}`}>
-      <div className="min-w-0">
-        <span className="font-semibold text-sm text-on-surface truncate block">{ing.name}</span>
-        <div className="text-[10px] text-outline uppercase tracking-wider mt-0.5">
-          {ing.category} • Current: {ing.stockLevel ?? 0}
+    <div className={`flex flex-col gap-2 p-3 sm:p-4 border border-outline-variant rounded-sm ${isAlternateRow ? 'bg-black/[0.0075]' : 'bg-transparent'}`}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <span className="font-semibold text-sm text-on-surface truncate block">{ing.name}</span>
+          <div className="text-[10px] text-outline uppercase tracking-wider mt-0.5">
+            {ing.category} • Current: {ing.stockLevel ?? 0}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {scaleConnected && (
+            <>
+              <select value={tareId} onChange={e => onTareChange(ing.id, e.target.value)}
+                className="px-2 py-2 border border-outline-variant bg-surface-container-lowest text-[11px] rounded-sm max-w-[110px] sm:max-w-none">
+                <option value="none">No tub</option>
+                {CONTAINER_PROFILES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <button onClick={() => onAddReading(ing.id, tareId)}
+                title="Add container reading (net of tare) to running total"
+                className="h-10 w-10 flex-shrink-0 border border-outline flex items-center justify-center rounded-sm bg-surface hover:bg-surface-container">
+                <Scale className="h-4 w-4" />
+              </button>
+            </>
+          )}
+          {isEditing ? (
+            <input type="number" autoFocus value={countValue !== undefined ? countValue : (ing.stockLevel || '')}
+              onChange={e => onCountChange(ing.id, parseFloat(e.target.value) || 0)}
+              onBlur={onStopEdit}
+              className="w-24 sm:w-28 px-3 py-2 border border-primary text-center data-tabular text-sm font-bold bg-surface-container-lowest" />
+          ) : (
+            <button onClick={() => onStartEdit(ing.id)}
+              className="w-24 sm:w-28 px-3 py-2 border border-outline-variant text-center data-tabular text-sm font-bold bg-surface-container-lowest rounded-sm">
+              {countValue !== undefined ? countValue : (ing.stockLevel || 0)}
+            </button>
+          )}
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        {scaleConnected && (
-          <>
-            <select value={tareId} onChange={e => onTareChange(ing.id, e.target.value)}
-              className="px-2 py-2 border border-outline-variant bg-surface-container-lowest text-[11px] rounded-sm max-w-[110px] sm:max-w-none">
-              <option value="none">No tub</option>
-              {CONTAINER_PROFILES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-            <button onClick={() => onFillFromScale(ing.id, tareId)}
-              title="Fill net weight (after tare)"
-              className="h-10 w-10 flex-shrink-0 border border-outline flex items-center justify-center rounded-sm bg-surface hover:bg-surface-container">
-              <Scale className="h-4 w-4" />
-            </button>
-          </>
-        )}
-        {isEditing ? (
-          <input type="number" autoFocus value={countValue !== undefined ? countValue : (ing.stockLevel || '')}
-            onChange={e => onCountChange(ing.id, parseFloat(e.target.value) || 0)}
-            onBlur={onStopEdit}
-            className="w-24 sm:w-28 px-3 py-2 border border-primary text-center data-tabular text-sm font-bold bg-surface-container-lowest" />
-        ) : (
-          <button onClick={() => onStartEdit(ing.id)}
-            className="w-24 sm:w-28 px-3 py-2 border border-outline-variant text-center data-tabular text-sm font-bold bg-surface-container-lowest rounded-sm">
-            {countValue !== undefined ? countValue : (ing.stockLevel || 0)}
-          </button>
-        )}
-      </div>
+      {readings.length > 0 && (
+        <div className="flex items-center gap-1.5 flex-wrap pl-0.5">
+          {readings.map((r, i) => (
+            <span key={i} className="inline-flex items-center gap-1 text-[10px] bg-secondary-container/40 border border-outline-variant rounded-full pl-2 pr-1 py-0.5">
+              {getContainerName(r.containerId)} {r.netGrams}g
+              <button onClick={() => onRemoveReading(ing.id, i)} title="Remove this reading"
+                className="h-3.5 w-3.5 flex items-center justify-center rounded-full hover:bg-error-container text-outline hover:text-error">
+                <X className="h-2.5 w-2.5" />
+              </button>
+            </span>
+          ))}
+          <span className="text-[10px] font-bold text-primary ml-1">
+            {readings.length} container{readings.length > 1 ? 's' : ''} added
+          </span>
+        </div>
+      )}
     </div>
   );
 });
@@ -206,6 +256,7 @@ export const Stock: React.FC = () => {
   const { data: stocktakeReports = [] } = useStocktakeReports();
   const { saveReport } = useStocktakeMutations();
   const { updateRecipe } = useRecipeMutations();
+  const { updateIngredient } = useIngredientMutations();
   const { data: foodTempChecks = [] } = useFoodTempChecksHistory();
   const { data: equipmentTempChecks = [] } = useEquipmentChecksHistory();
 
@@ -252,6 +303,13 @@ export const Stock: React.FC = () => {
   const [stockCounts, setStockCounts] = useState<Record<string, number>>({});
   const [recipeCounts, setRecipeCounts] = useState<Record<string, number>>({});
   const [itemTareIds, setItemTareIds] = useState<Record<string, string>>({});
+  // Per-item list of individual container weigh-ins that sum to stockCounts/recipeCounts —
+  // lets a chef add several containers of the same item as a running total instead of one
+  // overwrite-only reading. Keyed the same as stockCounts (ingredient id) or itemTareIds
+  // (`recipe-${id}`) for recipes. Mirrored into a ref so add/remove handlers can read the
+  // latest list synchronously without depending on (and re-creating) on every reading.
+  const [itemReadings, setItemReadings] = useState<Record<string, ContainerReading[]>>({});
+  const itemReadingsRef = useRef<Record<string, ContainerReading[]>>({});
   const [menuOnlyMode, setMenuOnlyMode] = useState(false);
   const [stocktakeSearch, setStocktakeSearch] = useState('');
   const [editingCountKey, setEditingCountKey] = useState<string | null>(null);
@@ -348,25 +406,62 @@ export const Stock: React.FC = () => {
   const handleTareChange = useCallback((key: string, tareId: string) => {
     setItemTareIds(prev => ({ ...prev, [key]: tareId }));
   }, []);
+  // Manually typing a count overrides any accumulated container readings for that item —
+  // once someone types a number directly it's a manual total, not a sum of weigh-ins.
   const handleIngredientCountChange = useCallback((id: string, value: number) => {
+    itemReadingsRef.current = { ...itemReadingsRef.current, [id]: [] };
+    setItemReadings(itemReadingsRef.current);
     setStockCounts(prev => ({ ...prev, [id]: value }));
   }, []);
   const handleRecipeCountChange = useCallback((id: string, value: number) => {
+    const key = `recipe-${id}`;
+    itemReadingsRef.current = { ...itemReadingsRef.current, [key]: [] };
+    setItemReadings(itemReadingsRef.current);
     setRecipeCounts(prev => ({ ...prev, [id]: value }));
   }, []);
   const handleStartEdit = useCallback((key: string) => setEditingCountKey(key), []);
   const handleStopEdit = useCallback(() => setEditingCountKey(null), []);
-  const handleFillIngredientFromScale = useCallback((id: string, tareId: string) => {
+
+  // Adds one container's net weight (scale reading minus its tare) to the ingredient's
+  // running total, rather than overwriting — lets a chef weigh several tubs of the same
+  // item in sequence. itemReadingsRef is read/written synchronously so the summed total
+  // is always correct even if this fires again before a re-render lands.
+  const handleAddIngredientReading = useCallback((id: string, tareId: string) => {
     const rawGrams = useStore.getState().scaleWeightGrams;
     const net = Math.max(0, rawGrams - getTareWeight(tareId));
-    setStockCounts(prev => ({ ...prev, [id]: net }));
+    const list = [...(itemReadingsRef.current[id] || []), { containerId: tareId, netGrams: net }];
+    itemReadingsRef.current = { ...itemReadingsRef.current, [id]: list };
+    setItemReadings(itemReadingsRef.current);
+    setStockCounts(prev => ({ ...prev, [id]: list.reduce((s, r) => s + r.netGrams, 0) }));
   }, []);
-  const handleFillRecipeFromScale = useCallback((id: string, tareId: string) => {
+  const handleRemoveIngredientReading = useCallback((id: string, index: number) => {
+    const list = (itemReadingsRef.current[id] || []).filter((_, i) => i !== index);
+    itemReadingsRef.current = { ...itemReadingsRef.current, [id]: list };
+    setItemReadings(itemReadingsRef.current);
+    setStockCounts(prev => ({ ...prev, [id]: list.reduce((s, r) => s + r.netGrams, 0) }));
+  }, []);
+
+  const handleAddRecipeReading = useCallback((id: string, tareId: string) => {
+    const key = `recipe-${id}`;
     const rec = recipes.find(r => r.id === id);
     const rawGrams = useStore.getState().scaleWeightGrams;
-    const netGrams = Math.max(0, rawGrams - getTareWeight(tareId));
-    const netInBatchUnit = rec && (rec.batchUnit === 'kg' || rec.batchUnit === 'l') ? netGrams / 1000 : netGrams;
-    setRecipeCounts(prev => ({ ...prev, [id]: netInBatchUnit }));
+    const net = Math.max(0, rawGrams - getTareWeight(tareId));
+    const list = [...(itemReadingsRef.current[key] || []), { containerId: tareId, netGrams: net }];
+    itemReadingsRef.current = { ...itemReadingsRef.current, [key]: list };
+    setItemReadings(itemReadingsRef.current);
+    const totalGrams = list.reduce((s, r) => s + r.netGrams, 0);
+    const totalInBatchUnit = rec && (rec.batchUnit === 'kg' || rec.batchUnit === 'l') ? totalGrams / 1000 : totalGrams;
+    setRecipeCounts(prev => ({ ...prev, [id]: totalInBatchUnit }));
+  }, [recipes]);
+  const handleRemoveRecipeReading = useCallback((id: string, index: number) => {
+    const key = `recipe-${id}`;
+    const rec = recipes.find(r => r.id === id);
+    const list = (itemReadingsRef.current[key] || []).filter((_, i) => i !== index);
+    itemReadingsRef.current = { ...itemReadingsRef.current, [key]: list };
+    setItemReadings(itemReadingsRef.current);
+    const totalGrams = list.reduce((s, r) => s + r.netGrams, 0);
+    const totalInBatchUnit = rec && (rec.batchUnit === 'kg' || rec.batchUnit === 'l') ? totalGrams / 1000 : totalGrams;
+    setRecipeCounts(prev => ({ ...prev, [id]: totalInBatchUnit }));
   }, [recipes]);
 
   const isSaving = logMovement.isPending || saveReport.isPending;
@@ -414,6 +509,15 @@ export const Stock: React.FC = () => {
           });
           adjustmentCount++;
         }
+
+        // Remember whichever container was used for the most recent scale
+        // reading on this ingredient, so next stocktake pre-selects it —
+        // only once it's actually committed, so an added-then-undone
+        // reading never overwrites what's remembered.
+        const lastReading = itemReadingsRef.current[ingId]?.slice(-1)[0];
+        if (lastReading && lastReading.containerId !== 'none' && lastReading.containerId !== ing.defaultContainerId) {
+          await updateIngredient.mutateAsync({ id: ingId, data: { defaultContainerId: lastReading.containerId } });
+        }
       }
 
       // Save the report snapshot
@@ -442,6 +546,8 @@ export const Stock: React.FC = () => {
       setShowStockTake(false);
       setStockCounts({});
       setRecipeCounts({});
+      itemReadingsRef.current = {};
+      setItemReadings({});
       setStocktakeSearch('');
       setEditingCountKey(null);
     } catch (err: any) {
@@ -1271,21 +1377,25 @@ export const Stock: React.FC = () => {
                             onCountChange={handleRecipeCountChange}
                             onStartEdit={(id) => handleStartEdit(`recipe-${id}`)}
                             onStopEdit={handleStopEdit}
-                            onFillFromScale={handleFillRecipeFromScale}
+                            readings={itemReadings[`recipe-${row.rec.id}`] || []}
+                            onAddReading={handleAddRecipeReading}
+                            onRemoveReading={handleRemoveRecipeReading}
                           />
                         ) : (
                           <StocktakeIngredientRow
                             ing={row.ing}
                             isAlternateRow={row.isAlternateRow}
                             scaleConnected={scaleConnected}
-                            tareId={itemTareIds[row.ing.id] || 'none'}
+                            tareId={itemTareIds[row.ing.id] ?? (row.ing.defaultContainerId || 'none')}
                             onTareChange={handleTareChange}
                             isEditing={editingCountKey === `ing-${row.ing.id}`}
                             countValue={stockCounts[row.ing.id]}
                             onCountChange={handleIngredientCountChange}
                             onStartEdit={(id) => handleStartEdit(`ing-${id}`)}
                             onStopEdit={handleStopEdit}
-                            onFillFromScale={handleFillIngredientFromScale}
+                            readings={itemReadings[row.ing.id] || []}
+                            onAddReading={handleAddIngredientReading}
+                            onRemoveReading={handleRemoveIngredientReading}
                           />
                         )}
                       </div>
@@ -1300,7 +1410,7 @@ export const Stock: React.FC = () => {
                 {Object.keys(stockCounts).length} items counted
               </span>
               <div className="flex gap-3 w-full sm:w-auto order-1 sm:order-2">
-                <button onClick={() => { setShowStockTake(false); setStockCounts({}); setRecipeCounts({}); setStocktakeSearch(''); setEditingCountKey(null); }}
+                <button onClick={() => { setShowStockTake(false); setStockCounts({}); setRecipeCounts({}); itemReadingsRef.current = {}; setItemReadings({}); setStocktakeSearch(''); setEditingCountKey(null); }}
                   className="h-10 px-4 flex-1 sm:flex-none border border-outline text-xs font-bold label-caps rounded-sm hover:bg-surface-container">
                   Cancel
                 </button>
