@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, deleteField, writeBatch, query, where, limit } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, setDoc, deleteDoc, updateDoc, deleteField, writeBatch, query, where, limit } from 'firebase/firestore';
 import { db } from '../firebase';
 import {
   Ingredient, IngredientSchema,
@@ -8,6 +8,7 @@ import {
   ContainerProfile, ContainerProfileSchema,
   StockMovement, StockMovementSchema,
   StocktakeReport, StocktakeReportSchema,
+  StocktakeDraft, StocktakeDraftSchema,
   SupplierProduct, SupplierProductSchema,
   Supplier, SupplierSchema,
   FoodTempCheck, FoodTempCheckSchema,
@@ -269,6 +270,42 @@ export const useStocktakeMutations = () => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['stocktake_reports'] })
   });
   return { saveReport };
+};
+
+const STOCKTAKE_DRAFT_ID = 'current';
+
+// The one in-progress stocktake, if any — a chef can pause (exit the modal)
+// and resume it later, possibly on a different device, without losing
+// progress or splitting one count into two separate reports.
+export const useStocktakeDraft = () => {
+  return useQuery<StocktakeDraft | null>({
+    queryKey: ['stocktake_draft'],
+    queryFn: async () => {
+      const snap = await getDoc(doc(db, 'stocktake_drafts', STOCKTAKE_DRAFT_ID));
+      if (!snap.exists()) return null;
+      const raw = { id: snap.id, ...snap.data() };
+      const result = StocktakeDraftSchema.safeParse(raw);
+      return result.success ? result.data : (raw as StocktakeDraft);
+    },
+    staleTime: 0
+  });
+};
+
+export const useStocktakeDraftMutations = () => {
+  const queryClient = useQueryClient();
+  const saveDraft = useMutation({
+    mutationFn: async (draft: Omit<StocktakeDraft, 'id'>) => {
+      await setDoc(doc(db, 'stocktake_drafts', STOCKTAKE_DRAFT_ID), draft);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['stocktake_draft'] })
+  });
+  const clearDraft = useMutation({
+    mutationFn: async () => {
+      await deleteDoc(doc(db, 'stocktake_drafts', STOCKTAKE_DRAFT_ID));
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['stocktake_draft'] })
+  });
+  return { saveDraft, clearDraft };
 };
 
 export const searchSupplierProducts = async (searchTerm: string, supplier: string): Promise<SupplierProduct[]> => {

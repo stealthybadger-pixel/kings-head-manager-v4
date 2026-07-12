@@ -83,6 +83,11 @@ service cloud.firestore {
     match /stocktake_reports/{id} {
       allow read, write: if isSignedIn();
     }
+    // Single in-progress stocktake draft (paused, not yet committed) — same
+    // access tier as stocktake_reports since it's the same operational flow.
+    match /stocktake_drafts/{id} {
+      allow read, write: if isSignedIn();
+    }
     match /food_temp_checks/{id} {
       allow read, write: if isSignedIn();
     }

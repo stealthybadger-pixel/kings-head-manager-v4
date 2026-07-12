@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { useIngredients, useRecipes, useDishes, useStockMutations, useStockMovements, useStocktakeReports, useStocktakeMutations, useRecipeMutations, useIngredientMutations, useFoodTempChecksHistory, useEquipmentChecksHistory, todayCheckDate } from '../hooks/useKitchenData';
+import { useIngredients, useRecipes, useDishes, useStockMutations, useStockMovements, useStocktakeReports, useStocktakeMutations, useStocktakeDraft, useStocktakeDraftMutations, useRecipeMutations, useIngredientMutations, useFoodTempChecksHistory, useEquipmentChecksHistory, todayCheckDate } from '../hooks/useKitchenData';
 import { useStore } from '../store/useStore';
+import { useAuth } from '../hooks/useAuth';
 import { useBleScale, isWebBluetoothSupported } from '../hooks/useBleScale';
-import { Search, Scale, FileText, CheckCircle2, X, Filter, Printer, Mail, ChevronDown, ChevronRight, BookOpen, ChefHat } from 'lucide-react';
+import { Search, Scale, FileText, CheckCircle2, X, Filter, Printer, Mail, ChevronDown, ChevronRight, BookOpen, ChefHat, PauseCircle } from 'lucide-react';
 import { Ingredient, Recipe, RecipeItem, StocktakeReport, Unit } from '../types';
 import { DRY_STORE_SUBCATEGORIES } from '../utils/ingredientAutofill';
 
@@ -255,10 +256,13 @@ export const Stock: React.FC = () => {
   const { data: wasteMovements = [] } = useStockMovements('waste');
   const { data: stocktakeReports = [] } = useStocktakeReports();
   const { saveReport } = useStocktakeMutations();
+  const { data: stocktakeDraft, isLoading: isDraftLoading } = useStocktakeDraft();
+  const { saveDraft, clearDraft } = useStocktakeDraftMutations();
   const { updateRecipe } = useRecipeMutations();
   const { updateIngredient } = useIngredientMutations();
   const { data: foodTempChecks = [] } = useFoodTempChecksHistory();
   const { data: equipmentTempChecks = [] } = useEquipmentChecksHistory();
+  const { appUser } = useAuth();
 
   const scaleConnected = useStore((state) => state.scaleConnected);
   const showToast = useStore((state) => state.showToast);
@@ -313,6 +317,27 @@ export const Stock: React.FC = () => {
   const [menuOnlyMode, setMenuOnlyMode] = useState(false);
   const [stocktakeSearch, setStocktakeSearch] = useState('');
   const [editingCountKey, setEditingCountKey] = useState<string | null>(null);
+  // Whether the counts currently in state came from resuming a paused draft
+  // (rather than starting fresh) — drives the "Resuming stocktake..." banner.
+  const [resumedDraftInfo, setResumedDraftInfo] = useState<{ updatedAt: string; updatedByName?: string } | null>(null);
+  const draftHydratedRef = useRef(false);
+
+  // On opening Stock Take, if there's a paused draft on Firestore, load it into
+  // local state exactly once so a chef can resume counting where they (or someone
+  // on a different device) left off, rather than starting over from ing.stockLevel.
+  useEffect(() => {
+    if (!showStockTake || draftHydratedRef.current || isDraftLoading) return;
+    draftHydratedRef.current = true;
+    if (stocktakeDraft) {
+      setStockCounts(stocktakeDraft.stockCounts);
+      setRecipeCounts(stocktakeDraft.recipeCounts);
+      setItemTareIds(stocktakeDraft.itemTareIds);
+      itemReadingsRef.current = stocktakeDraft.itemReadings;
+      setItemReadings(stocktakeDraft.itemReadings);
+      if (stocktakeDraft.menuOnlyMode) setMenuOnlyMode(true);
+      setResumedDraftInfo({ updatedAt: stocktakeDraft.updatedAt, updatedByName: stocktakeDraft.updatedByName });
+    }
+  }, [showStockTake, stocktakeDraft, isDraftLoading]);
 
   // EPOS
   const [eposFile, setEposFile] = useState<File | null>(null);
@@ -537,6 +562,12 @@ export const Stock: React.FC = () => {
         adjustmentCount++;
       }
 
+      // Clear any paused draft now that it's been fully committed — if none
+      // existed this is a harmless no-op delete.
+      if (stocktakeDraft) {
+        await clearDraft.mutateAsync();
+      }
+
       showToast(
         adjustmentCount > 0
           ? `Stock take committed — ${adjustmentCount} adjustments saved`
@@ -550,8 +581,62 @@ export const Stock: React.FC = () => {
       setItemReadings({});
       setStocktakeSearch('');
       setEditingCountKey(null);
+      setResumedDraftInfo(null);
+      draftHydratedRef.current = false;
     } catch (err: any) {
       showToast(err.message || 'Failed to commit stock take', 'error');
+    }
+  };
+
+  // Save current progress to Firestore as a draft and exit the modal — lets a
+  // chef step away mid-count (or hand the tablet to someone else) and resume
+  // later exactly where they left off, on any device, instead of being stuck
+  // in the modal until the whole stocktake is finished or losing everything
+  // via Cancel.
+  const handlePauseStockTake = async () => {
+    try {
+      await saveDraft.mutateAsync({
+        stockCounts,
+        recipeCounts,
+        itemTareIds,
+        itemReadings: itemReadingsRef.current,
+        menuOnlyMode,
+        updatedAt: new Date().toISOString(),
+        updatedByName: appUser?.displayName || appUser?.email || undefined
+      });
+      showToast('Stock take paused — resume any time from Stock Take', 'success');
+      setShowStockTake(false);
+      setStockCounts({});
+      setRecipeCounts({});
+      itemReadingsRef.current = {};
+      setItemReadings({});
+      setStocktakeSearch('');
+      setEditingCountKey(null);
+      setResumedDraftInfo(null);
+      draftHydratedRef.current = false;
+    } catch (err: any) {
+      showToast(err.message || 'Failed to pause stock take', 'error');
+    }
+  };
+
+  // Discard everything — both the in-progress local counts and any paused
+  // draft on Firestore, so Cancel always means "throw this stocktake away."
+  const handleCancelStockTake = async () => {
+    setShowStockTake(false);
+    setStockCounts({});
+    setRecipeCounts({});
+    itemReadingsRef.current = {};
+    setItemReadings({});
+    setStocktakeSearch('');
+    setEditingCountKey(null);
+    setResumedDraftInfo(null);
+    draftHydratedRef.current = false;
+    if (stocktakeDraft) {
+      try {
+        await clearDraft.mutateAsync();
+      } catch (err: any) {
+        showToast(err.message || 'Failed to discard paused stock take', 'error');
+      }
     }
   };
 
@@ -840,8 +925,11 @@ export const Stock: React.FC = () => {
             Log Waste
           </button>
           <button onClick={() => setShowStockTake(true)}
-            className="h-10 px-6 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90">
-            Stock Take
+            className="relative h-10 px-6 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90">
+            {stocktakeDraft ? 'Resume Stock Take' : 'Stock Take'}
+            {stocktakeDraft && (
+              <span className="absolute -top-1.5 -right-1.5 h-3 w-3 rounded-full bg-amber-400 border-2 border-surface-container-lowest" title="A paused stock take is waiting to be resumed" />
+            )}
           </button>
         </div>
       </div>
@@ -1323,6 +1411,15 @@ export const Stock: React.FC = () => {
               </div>
             </div>
 
+            {resumedDraftInfo && (
+              <div className="h-10 bg-amber-500/10 border-b border-amber-500/30 flex items-center px-6 text-xs text-amber-700 flex-shrink-0 gap-2">
+                <PauseCircle className="h-3.5 w-3.5" />
+                Resuming a stock take paused {new Date(resumedDraftInfo.updatedAt).toLocaleString()}
+                {resumedDraftInfo.updatedByName ? ` by ${resumedDraftInfo.updatedByName}` : ''} —
+                {' '}{Object.keys(stockCounts).length + Object.keys(recipeCounts).length} items already counted.
+              </div>
+            )}
+
             {scaleConnected && <ScaleStatusBar />}
 
             <div className="border-b border-outline-variant bg-surface flex items-center px-6 gap-2 flex-shrink-0 overflow-x-auto h-12">
@@ -1410,9 +1507,16 @@ export const Stock: React.FC = () => {
                 {Object.keys(stockCounts).length} items counted
               </span>
               <div className="flex gap-3 w-full sm:w-auto order-1 sm:order-2">
-                <button onClick={() => { setShowStockTake(false); setStockCounts({}); setRecipeCounts({}); itemReadingsRef.current = {}; setItemReadings({}); setStocktakeSearch(''); setEditingCountKey(null); }}
+                <button onClick={handleCancelStockTake}
+                  title="Discard this stocktake completely, including any paused progress"
                   className="h-10 px-4 flex-1 sm:flex-none border border-outline text-xs font-bold label-caps rounded-sm hover:bg-surface-container">
                   Cancel
+                </button>
+                <button onClick={handlePauseStockTake} disabled={saveDraft.isPending}
+                  title="Save progress and exit — resume later from Stock Take"
+                  className="h-10 px-4 flex-1 sm:flex-none border border-outline text-xs font-bold label-caps rounded-sm hover:bg-surface-container flex items-center justify-center gap-1.5 whitespace-nowrap">
+                  <PauseCircle className="h-3.5 w-3.5" />
+                  {saveDraft.isPending ? 'Pausing...' : 'Pause & Exit'}
                 </button>
                 <button onClick={handleCommitStockTake} disabled={isSaving}
                   className="h-10 px-4 sm:px-6 flex-1 sm:flex-none bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90 disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap">
