@@ -687,6 +687,16 @@ export const Stock: React.FC = () => {
         counts[ingId] = count;
         totalValue += calculateIngredientCost(ing, count, 'g', ingredients);
         const delta = count - (ing.stockLevel || 0);
+
+        // Remember whichever container was used for the most recent scale
+        // reading on this ingredient, so next stocktake pre-selects it —
+        // only once it's actually committed, so an added-then-undone
+        // reading never overwrites what's remembered.
+        const lastReading = itemReadingsRef.current[ingId]?.slice(-1)[0];
+        const newDefaultContainerId = lastReading && lastReading.containerId !== 'none' && lastReading.containerId !== ing.defaultContainerId
+          ? lastReading.containerId
+          : undefined;
+
         if (delta !== 0) {
           await logMovement.mutateAsync({
             ingredientId: ingId,
@@ -696,15 +706,16 @@ export const Stock: React.FC = () => {
             costValue: 0
           });
           adjustmentCount++;
-        }
-
-        // Remember whichever container was used for the most recent scale
-        // reading on this ingredient, so next stocktake pre-selects it —
-        // only once it's actually committed, so an added-then-undone
-        // reading never overwrites what's remembered.
-        const lastReading = itemReadingsRef.current[ingId]?.slice(-1)[0];
-        if (lastReading && lastReading.containerId !== 'none' && lastReading.containerId !== ing.defaultContainerId) {
-          await updateIngredient.mutateAsync({ id: ingId, data: { defaultContainerId: lastReading.containerId } });
+          // logMovement only writes the audit trail — the ingredient's own
+          // stockLevel field has to be updated separately, or "Current:"
+          // everywhere else in the app (Pantry, Dashboard, this screen)
+          // stays frozen at whatever it was before this stocktake.
+          await updateIngredient.mutateAsync({
+            id: ingId,
+            data: { stockLevel: count, ...(newDefaultContainerId ? { defaultContainerId: newDefaultContainerId } : {}) }
+          });
+        } else if (newDefaultContainerId) {
+          await updateIngredient.mutateAsync({ id: ingId, data: { defaultContainerId: newDefaultContainerId } });
         }
       }
 
@@ -1068,6 +1079,11 @@ export const Stock: React.FC = () => {
           ingredientId: ing.id, type: 'adjustment', quantity: delta,
           date: new Date().toISOString().slice(0, 10), costValue: 0
         });
+        // logMovement only writes the audit trail entry — it never touches the
+        // ingredient's own stockLevel field, so without this the edit "saves"
+        // (toast + movement logged) but the displayed figure reverts to the
+        // stale value as soon as editingCounts clears.
+        await updateIngredient.mutateAsync({ id: ing.id, data: { stockLevel: newCount } });
         showToast(`Adjusted ${ing.name} to ${newCount}`, 'success');
         setEditingCounts(prev => { const n = { ...prev }; delete n[ing.id]; return n; });
         selectIngredient(null);
