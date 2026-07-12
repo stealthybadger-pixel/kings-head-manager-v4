@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { useIngredients, useIngredientMutations } from '../hooks/useKitchenData';
 import { useStore } from '../store/useStore';
-import { Upload, ScanLine, CheckCircle2, AlertTriangle, X, RefreshCw } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
+import { Upload, ScanLine, CheckCircle2, AlertTriangle, X, RefreshCw, ShieldAlert } from 'lucide-react';
 import { supplierBadgeClass } from '../utils/supplierColors';
 
 interface InvoiceLine {
@@ -66,6 +67,8 @@ Example output:
 }
 
 export const InvoiceScanner: React.FC = () => {
+  const { appUser } = useAuth();
+  const isManager = appUser?.role === 'manager';
   const { data: ingredients = [] } = useIngredients();
   const { updateIngredient } = useIngredientMutations();
   const showToast = useStore(s => s.showToast);
@@ -158,6 +161,18 @@ export const InvoiceScanner: React.FC = () => {
 
   const changedLines = lines.filter(l => l.diffPct !== undefined && Math.abs(l.diffPct) >= 5);
   const unchangedLines = lines.filter(l => l.diffPct === undefined || Math.abs(l.diffPct) < 5);
+
+  if (!isManager) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center gap-3 text-center p-8">
+        <ShieldAlert className="h-10 w-10 text-outline" />
+        <span className="font-bold text-on-surface text-sm">Manager access required</span>
+        <span className="text-xs text-outline max-w-xs">
+          Invoice scanning updates supplier pricing — ask a manager to scan invoices.
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full overflow-y-auto">
