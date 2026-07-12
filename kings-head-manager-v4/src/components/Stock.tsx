@@ -314,6 +314,12 @@ export const Stock: React.FC = () => {
   // latest list synchronously without depending on (and re-creating) on every reading.
   const [itemReadings, setItemReadings] = useState<Record<string, ContainerReading[]>>({});
   const itemReadingsRef = useRef<Record<string, ContainerReading[]>>({});
+  // Mirror stockCounts/recipeCounts/itemTareIds into refs too, so the autosave
+  // helper below can always build an accurate draft snapshot synchronously
+  // right after a change, without waiting on React's next render.
+  const stockCountsRef = useRef<Record<string, number>>({});
+  const recipeCountsRef = useRef<Record<string, number>>({});
+  const itemTareIdsRef = useRef<Record<string, string>>({});
   const [menuOnlyMode, setMenuOnlyMode] = useState(false);
   const [stocktakeSearch, setStocktakeSearch] = useState('');
   const [editingCountKey, setEditingCountKey] = useState<string | null>(null);
@@ -329,8 +335,11 @@ export const Stock: React.FC = () => {
     if (!showStockTake || draftHydratedRef.current || isDraftLoading) return;
     draftHydratedRef.current = true;
     if (stocktakeDraft) {
+      stockCountsRef.current = stocktakeDraft.stockCounts;
       setStockCounts(stocktakeDraft.stockCounts);
+      recipeCountsRef.current = stocktakeDraft.recipeCounts;
       setRecipeCounts(stocktakeDraft.recipeCounts);
+      itemTareIdsRef.current = stocktakeDraft.itemTareIds;
       setItemTareIds(stocktakeDraft.itemTareIds);
       itemReadingsRef.current = stocktakeDraft.itemReadings;
       setItemReadings(stocktakeDraft.itemReadings);
@@ -428,43 +437,76 @@ export const Stock: React.FC = () => {
 
   // Stable row-callback handlers — passed as props to memoized rows so their identity
   // never changes across renders, which is required for React.memo to actually skip re-renders.
+  // Fire-and-forget autosave to the Firestore draft after every reading/count
+  // change, not just on explicit "Pause & Exit" — so a dropped scale
+  // connection, a killed tab, or someone just walking away mid-count never
+  // loses more than the single most recent weigh-in. Reads the *Ref mirrors
+  // (always current) rather than React state, since this runs synchronously
+  // right after a change, before a re-render would land.
+  const persistDraftNow = useCallback(() => {
+    saveDraft.mutate({
+      stockCounts: stockCountsRef.current,
+      recipeCounts: recipeCountsRef.current,
+      itemTareIds: itemTareIdsRef.current,
+      itemReadings: itemReadingsRef.current,
+      menuOnlyMode,
+      updatedAt: new Date().toISOString(),
+      updatedByName: appUser?.displayName || appUser?.email || undefined
+    }, {
+      // Stay quiet on failure — a toast on every scale press would be more
+      // disruptive than useful. "Pause & Exit" still surfaces a save error
+      // loudly, and the next successful reading will autosave anyway.
+      onError: (err: any) => console.warn('Stocktake draft autosave failed:', err?.message || err)
+    });
+  }, [saveDraft, menuOnlyMode, appUser]);
+
   const handleTareChange = useCallback((key: string, tareId: string) => {
-    setItemTareIds(prev => ({ ...prev, [key]: tareId }));
+    itemTareIdsRef.current = { ...itemTareIdsRef.current, [key]: tareId };
+    setItemTareIds(itemTareIdsRef.current);
   }, []);
   // Manually typing a count overrides any accumulated container readings for that item —
   // once someone types a number directly it's a manual total, not a sum of weigh-ins.
   const handleIngredientCountChange = useCallback((id: string, value: number) => {
     itemReadingsRef.current = { ...itemReadingsRef.current, [id]: [] };
     setItemReadings(itemReadingsRef.current);
-    setStockCounts(prev => ({ ...prev, [id]: value }));
-  }, []);
+    stockCountsRef.current = { ...stockCountsRef.current, [id]: value };
+    setStockCounts(stockCountsRef.current);
+    persistDraftNow();
+  }, [persistDraftNow]);
   const handleRecipeCountChange = useCallback((id: string, value: number) => {
     const key = `recipe-${id}`;
     itemReadingsRef.current = { ...itemReadingsRef.current, [key]: [] };
     setItemReadings(itemReadingsRef.current);
-    setRecipeCounts(prev => ({ ...prev, [id]: value }));
-  }, []);
+    recipeCountsRef.current = { ...recipeCountsRef.current, [id]: value };
+    setRecipeCounts(recipeCountsRef.current);
+    persistDraftNow();
+  }, [persistDraftNow]);
   const handleStartEdit = useCallback((key: string) => setEditingCountKey(key), []);
   const handleStopEdit = useCallback(() => setEditingCountKey(null), []);
 
   // Adds one container's net weight (scale reading minus its tare) to the ingredient's
   // running total, rather than overwriting — lets a chef weigh several tubs of the same
   // item in sequence. itemReadingsRef is read/written synchronously so the summed total
-  // is always correct even if this fires again before a re-render lands.
+  // is always correct even if this fires again before a re-render lands. Autosaves to the
+  // draft immediately so this exact reading survives an interruption right after it's taken.
   const handleAddIngredientReading = useCallback((id: string, tareId: string) => {
     const rawGrams = useStore.getState().scaleWeightGrams;
     const net = Math.max(0, rawGrams - getTareWeight(tareId));
     const list = [...(itemReadingsRef.current[id] || []), { containerId: tareId, netGrams: net }];
     itemReadingsRef.current = { ...itemReadingsRef.current, [id]: list };
     setItemReadings(itemReadingsRef.current);
-    setStockCounts(prev => ({ ...prev, [id]: list.reduce((s, r) => s + r.netGrams, 0) }));
-  }, []);
+    stockCountsRef.current = { ...stockCountsRef.current, [id]: list.reduce((s, r) => s + r.netGrams, 0) };
+    setStockCounts(stockCountsRef.current);
+    persistDraftNow();
+  }, [persistDraftNow]);
   const handleRemoveIngredientReading = useCallback((id: string, index: number) => {
     const list = (itemReadingsRef.current[id] || []).filter((_, i) => i !== index);
     itemReadingsRef.current = { ...itemReadingsRef.current, [id]: list };
     setItemReadings(itemReadingsRef.current);
-    setStockCounts(prev => ({ ...prev, [id]: list.reduce((s, r) => s + r.netGrams, 0) }));
-  }, []);
+    stockCountsRef.current = { ...stockCountsRef.current, [id]: list.reduce((s, r) => s + r.netGrams, 0) };
+    setStockCounts(stockCountsRef.current);
+    persistDraftNow();
+  }, [persistDraftNow]);
 
   const handleAddRecipeReading = useCallback((id: string, tareId: string) => {
     const key = `recipe-${id}`;
@@ -476,8 +518,10 @@ export const Stock: React.FC = () => {
     setItemReadings(itemReadingsRef.current);
     const totalGrams = list.reduce((s, r) => s + r.netGrams, 0);
     const totalInBatchUnit = rec && (rec.batchUnit === 'kg' || rec.batchUnit === 'l') ? totalGrams / 1000 : totalGrams;
-    setRecipeCounts(prev => ({ ...prev, [id]: totalInBatchUnit }));
-  }, [recipes]);
+    recipeCountsRef.current = { ...recipeCountsRef.current, [id]: totalInBatchUnit };
+    setRecipeCounts(recipeCountsRef.current);
+    persistDraftNow();
+  }, [recipes, persistDraftNow]);
   const handleRemoveRecipeReading = useCallback((id: string, index: number) => {
     const key = `recipe-${id}`;
     const rec = recipes.find(r => r.id === id);
@@ -486,8 +530,10 @@ export const Stock: React.FC = () => {
     setItemReadings(itemReadingsRef.current);
     const totalGrams = list.reduce((s, r) => s + r.netGrams, 0);
     const totalInBatchUnit = rec && (rec.batchUnit === 'kg' || rec.batchUnit === 'l') ? totalGrams / 1000 : totalGrams;
-    setRecipeCounts(prev => ({ ...prev, [id]: totalInBatchUnit }));
-  }, [recipes]);
+    recipeCountsRef.current = { ...recipeCountsRef.current, [id]: totalInBatchUnit };
+    setRecipeCounts(recipeCountsRef.current);
+    persistDraftNow();
+  }, [recipes, persistDraftNow]);
 
   const isSaving = logMovement.isPending || saveReport.isPending;
 
@@ -575,8 +621,12 @@ export const Stock: React.FC = () => {
         'success'
       );
       setShowStockTake(false);
+      stockCountsRef.current = {};
       setStockCounts({});
+      recipeCountsRef.current = {};
       setRecipeCounts({});
+      itemTareIdsRef.current = {};
+      setItemTareIds({});
       itemReadingsRef.current = {};
       setItemReadings({});
       setStocktakeSearch('');
@@ -606,8 +656,12 @@ export const Stock: React.FC = () => {
       });
       showToast('Stock take paused — resume any time from Stock Take', 'success');
       setShowStockTake(false);
+      stockCountsRef.current = {};
       setStockCounts({});
+      recipeCountsRef.current = {};
       setRecipeCounts({});
+      itemTareIdsRef.current = {};
+      setItemTareIds({});
       itemReadingsRef.current = {};
       setItemReadings({});
       setStocktakeSearch('');
@@ -623,8 +677,12 @@ export const Stock: React.FC = () => {
   // draft on Firestore, so Cancel always means "throw this stocktake away."
   const handleCancelStockTake = async () => {
     setShowStockTake(false);
+    stockCountsRef.current = {};
     setStockCounts({});
+    recipeCountsRef.current = {};
     setRecipeCounts({});
+    itemTareIdsRef.current = {};
+    setItemTareIds({});
     itemReadingsRef.current = {};
     setItemReadings({});
     setStocktakeSearch('');
