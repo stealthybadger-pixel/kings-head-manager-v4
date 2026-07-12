@@ -335,6 +335,26 @@ export const StocktakeReportSchema = z.object({
 });
 export type StocktakeReport = z.infer<typeof StocktakeReportSchema>;
 
+// Single in-progress stocktake session (singleton doc, id 'current') —
+// lets a chef pause mid-count (exit the modal, close the tablet) and
+// resume later, on any device, without losing progress or ending up
+// with two separate reports for what was really one stocktake.
+export const ContainerReadingSchema = z.object({
+  containerId: z.string(),
+  netGrams: z.number()
+});
+export const StocktakeDraftSchema = z.object({
+  id: z.string(),
+  stockCounts: z.record(z.number()),
+  recipeCounts: z.record(z.number()),
+  itemTareIds: z.record(z.string()),
+  itemReadings: z.record(z.array(ContainerReadingSchema)),
+  menuOnlyMode: z.boolean().optional(),
+  updatedAt: z.string(),
+  updatedByName: z.string().optional()
+});
+export type StocktakeDraft = z.infer<typeof StocktakeDraftSchema>;
+
 export const SupplierProductSchema = z.object({
   id: z.string(),
   name: z.string(),
