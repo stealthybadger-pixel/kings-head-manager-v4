@@ -109,6 +109,9 @@ export const IngredientSchema = z.preprocess((val: any) => {
   name: z.string(),
   category: IngredientCategorySchema,
   subCategory: z.string().optional(),
+  // Last container/tub type (see CONTAINER_PROFILES in Stock.tsx) used to
+  // weigh this ingredient during stocktake — pre-selects the tare dropdown
+  // next time, updated whenever a new scale reading is logged at commit.
   defaultContainerId: z.string().optional(),
   wastePercent: z.number().min(0).max(100),
   allergens: z.array(AllergenSchema),
