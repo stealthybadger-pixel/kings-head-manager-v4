@@ -349,6 +349,10 @@ export const StocktakeDraftSchema = z.object({
   recipeCounts: z.record(z.number()),
   itemTareIds: z.record(z.string()),
   itemReadings: z.record(z.array(ContainerReadingSchema)),
+  // Display/entry unit picked per ingredient (g/kg/oz/ea) — stockCounts itself
+  // always stays in grams internally, this only affects what's shown and how
+  // typed numbers are interpreted. Defaults to 'g' when absent.
+  itemUnits: z.record(z.string()).optional(),
   menuOnlyMode: z.boolean().optional(),
   updatedAt: z.string(),
   updatedByName: z.string().optional()
