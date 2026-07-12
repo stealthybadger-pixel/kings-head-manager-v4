@@ -33,6 +33,18 @@ const DEFAULT_REPORT_CONFIG: ReportConfig = {
 };
 import { calculateIngredientCost, toBaseQuantity } from '../utils/costing';
 
+// Word-order-independent search for the stocktake list — a plain substring
+// match ("coconut oil".includes(name)) misses items named e.g. "Oil - Coconut",
+// since the query and the name put the words in different order. Splitting
+// both into tokens and requiring every query token to appear somewhere in the
+// name (in any order) catches that without needing a real fuzzy/edit-distance
+// library for what's fundamentally a word-order problem, not a typo problem.
+function matchesStocktakeSearch(name: string, query: string): boolean {
+  const nameLower = name.toLowerCase();
+  const queryTokens = query.toLowerCase().split(/\s+/).filter(Boolean);
+  return queryTokens.every(tok => nameLower.includes(tok));
+}
+
 // Recursively collect all ingredient IDs referenced by a set of recipe items
 function collectIngredientIds(items: RecipeItem[], allRecipes: Recipe[], visited = new Set<string>()): Set<string> {
   const ids = new Set<string>();
@@ -497,8 +509,7 @@ export const Stock: React.FC = () => {
       base = base.filter(i => menuIngredientIds.has(i.id));
     }
     if (stocktakeSearch.trim()) {
-      const q = stocktakeSearch.trim().toLowerCase();
-      base = base.filter(i => i.name.toLowerCase().includes(q));
+      base = base.filter(i => matchesStocktakeSearch(i.name, stocktakeSearch));
     }
     return base;
   }, [ingredients, activeLocation, dryStoreSubCategory, menuOnlyMode, menuIngredientIds, stocktakeSearch]);
@@ -523,8 +534,7 @@ export const Stock: React.FC = () => {
     // same as before.
     let base = menuOnlyMode ? recipes.filter(r => liveRecipeIds.has(r.id)) : recipes;
     if (stocktakeSearch.trim()) {
-      const q = stocktakeSearch.trim().toLowerCase();
-      base = base.filter(r => r.name.toLowerCase().includes(q));
+      base = base.filter(r => matchesStocktakeSearch(r.name, stocktakeSearch));
     }
     return base;
   }, [recipes, liveRecipeIds, activeLocation, stocktakeSearch, menuOnlyMode]);
