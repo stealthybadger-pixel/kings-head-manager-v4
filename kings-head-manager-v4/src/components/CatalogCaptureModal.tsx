@@ -2,10 +2,13 @@ import { useEffect, useState } from 'react';
 import { X, PackagePlus } from 'lucide-react';
 import { useCatalogCapture } from '../hooks/useCatalogCapture';
 import { useSupplierProductMutations } from '../hooks/useKitchenData';
+import { useAuth } from '../hooks/useAuth';
 import { useStore } from '../store/useStore';
 import type { SupplierProduct } from '../types';
 
 export default function CatalogCaptureModal() {
+  const { appUser } = useAuth();
+  const isManager = appUser?.role === 'manager';
   const { state, clear } = useCatalogCapture();
   const { addSupplierProduct, updateSupplierProduct } = useSupplierProductMutations();
   const showToast = useStore((s) => s.showToast);
@@ -23,7 +26,7 @@ export default function CatalogCaptureModal() {
     setPackUnit(state.captured.packUnit);
   }, [state]);
 
-  if (!state) return null;
+  if (!state || !isManager) return null;
 
   const { captured, existingMatch } = state;
   const cost = parseFloat(packCost);
