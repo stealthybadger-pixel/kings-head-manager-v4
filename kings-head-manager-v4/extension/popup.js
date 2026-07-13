@@ -1,4 +1,4 @@
-const KHKM_APP_URL_PATTERN = 'http://localhost:3000/*';
+const KHKM_APP_URL_PATTERNS = ['http://localhost:3000/*', 'https://kings-head-kitchen-claude.web.app/*'];
 
 let currentScrape = null;
 
@@ -62,7 +62,10 @@ scrapeBtn.addEventListener('click', async () => {
 
 sendBtn.addEventListener('click', async () => {
   if (!currentScrape) return;
-  const tabs = await chrome.tabs.query({ url: KHKM_APP_URL_PATTERN });
+  const tabsPerPattern = await Promise.all(
+    KHKM_APP_URL_PATTERNS.map((pattern) => chrome.tabs.query({ url: pattern }))
+  );
+  const tabs = tabsPerPattern.flat();
 
   if (tabs.length === 0) {
     status.textContent = 'KHKM app is not open. Opening it now — click "Send to KHKM" again once it loads.';

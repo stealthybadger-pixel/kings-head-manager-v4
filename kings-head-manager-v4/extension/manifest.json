@@ -8,7 +8,8 @@
     "https://www.booker.co.uk/*",
     "https://app.fresho.com/*",
     "https://shop.urbanfoodservice.co.uk/*",
-    "http://localhost:3000/*"
+    "http://localhost:3000/*",
+    "https://kings-head-kitchen-claude.web.app/*"
   ],
   "action": {
     "default_popup": "popup.html"
@@ -30,7 +31,7 @@
       "run_at": "document_idle"
     },
     {
-      "matches": ["http://localhost:3000/*"],
+      "matches": ["http://localhost:3000/*", "https://kings-head-kitchen-claude.web.app/*"],
       "js": ["content-scripts/relay.js"],
       "run_at": "document_idle"
     }
