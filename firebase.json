@@ -6,7 +6,7 @@
     "rules": "storage.rules"
   },
   "hosting": {
-    "public": "kings-head-manager-v4/dist",
+    "public": "dist",
     "ignore": [
       "firebase.json",
       "**/.*",
