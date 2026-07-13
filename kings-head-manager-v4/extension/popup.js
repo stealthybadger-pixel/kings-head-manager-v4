@@ -27,7 +27,12 @@ scrapeBtn.addEventListener('click', async () => {
 
   const results = await chrome.scripting.executeScript({
     target: { tabId: tab.id },
-    func: () => (window.khkmScrapeBooker ? window.khkmScrapeBooker() : null)
+    func: () => {
+      if (window.khkmScrapeBooker) return window.khkmScrapeBooker();
+      if (window.khkmScrapeFresho) return window.khkmScrapeFresho();
+      if (window.khkmScrapeUrban) return window.khkmScrapeUrban();
+      return null;
+    }
   });
 
   const raw = results && results[0] ? results[0].result : null;
