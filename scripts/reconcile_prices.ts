@@ -212,7 +212,7 @@ async function runReconciliation(writeToDb = false) {
 
     for (let i = 0; i < cattItems.length; i++) {
       const item = cattItems[i];
-      const url = `https://app.fresho.com/marketplace/products?company_id=053d4097-ab85-4017-b807-1699698f15b4&mode=buy&supplier_id=a7648017-0863-418e-a301-16aed6fa3d0d&search=${encodeURIComponent(item.name)}`;
+      const url = `https://app.fresho.com/marketplace/products?company_id=053d4097-ab85-4017-b807-1699698f15b4&mode=buy&supplier_id=a7648017-0863-418e-a301-16aed6fa3d0d&term=${encodeURIComponent(item.name)}`;
 
       console.log(`[${i + 1}/${cattItems.length}] Checking David Catt: ${item.name}...`);
       try {

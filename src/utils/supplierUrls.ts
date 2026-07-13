@@ -31,7 +31,7 @@ export const getSupplierUrl = (item: SupplierUrlItem): string => {
   if (supplierLower === 'david catt') {
     // David Catt uses Fresho Marketplace
     const base = 'https://app.fresho.com/marketplace/products?company_id=053d4097-ab85-4017-b807-1699698f15b4&mode=buy&supplier_id=a7648017-0863-418e-a301-16aed6fa3d0d';
-    return `${base}&search=${encodeURIComponent(item.name)}`;
+    return `${base}&term=${encodeURIComponent(item.name)}`;
   }
   
   // Fallback Google search for other wholesalers (Crouch, Cranbrook, Glovers, etc.)
