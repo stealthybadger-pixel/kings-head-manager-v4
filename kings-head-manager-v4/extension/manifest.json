@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "KHKM Catalogue Capture",
+  "version": "1.0.0",
+  "description": "Capture a supplier product's details into the King's Head Manager catalogue.",
+  "permissions": ["tabs", "scripting"],
+  "host_permissions": [
+    "https://www.booker.co.uk/*",
+    "https://app.fresho.com/*",
+    "https://shop.urbanfoodservice.co.uk/*",
+    "http://localhost:3000/*"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.booker.co.uk/products/product*"],
+      "js": ["content-scripts/booker.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://app.fresho.com/marketplace/products*"],
+      "js": ["content-scripts/fresho.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://shop.urbanfoodservice.co.uk/*"],
+      "js": ["content-scripts/urban.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["http://localhost:3000/*"],
+      "js": ["content-scripts/relay.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
