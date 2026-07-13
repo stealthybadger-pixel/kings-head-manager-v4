@@ -7,7 +7,11 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "scrape:login": "npx tsx scripts/reconcile_prices.ts --setup",
+    "scrape:check": "npx tsx scripts/reconcile_prices.ts",
+    "scrape:update": "npx tsx scripts/reconcile_prices.ts --write"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.28.4",
@@ -27,9 +31,12 @@
     "@vitejs/plugin-basic-ssl": "^1.2.0",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.19",
+    "firebase-admin": "^14.1.0",
+    "playwright": "^1.61.1",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.2.2",
-    "vite": "^5.1.6"
+    "vite": "^5.1.6",
+    "vitest": "^4.1.10"
   }
 }
