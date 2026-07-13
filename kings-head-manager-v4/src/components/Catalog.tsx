@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { supplierBadgeClass } from '../utils/supplierColors';
-import { useSupplierSearchQuery, useSupplierProductsBySupplier, useIngredients, useIngredientMutations, useSupplierProductMutations, useSuppliers } from '../hooks/useKitchenData';
+import { useSupplierProducts, useIngredients, useIngredientMutations, useSupplierProductMutations, useSuppliers } from '../hooks/useKitchenData';
 import { useStore } from '../store/useStore';
 import { useAuth } from '../hooks/useAuth';
 import { 
@@ -11,12 +11,16 @@ import {
   Link as LinkIcon, 
   HelpCircle,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  ExternalLink,
+  Trash2
 } from 'lucide-react';
 import { SupplierProduct, Ingredient, IngredientSupplier } from '../types';
 import { findBestIngredientMatch, cleanProductName } from '../utils/matching';
-import { inferCategory, CATEGORY_KEYWORDS, inferIngredientDefaults } from '../utils/ingredientAutofill';
+import { tokenizeSearchQuery, matchesSearchTokens } from '../utils/search';
+import { inferCategory, CATEGORY_KEYWORDS, inferIngredientDefaults, DRY_STORE_SUBCATEGORIES, inferDryStoreSubCategory } from '../utils/ingredientAutofill';
 import { getBaseRate, getBaseUnit } from '../utils/costing';
+import { getSupplierUrl } from '../utils/supplierUrls';
 
 export const Catalog: React.FC = () => {
   const { appUser } = useAuth();
@@ -51,17 +55,16 @@ export const Catalog: React.FC = () => {
 
   const [page, setPage] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [selectedSubCategory, setSelectedSubCategory] = useState<string>('All');
   const PAGE_SIZE = 50;
 
   const isBrowsingSupplier = selectedSupplier !== 'All';
 
-  React.useEffect(() => { setPage(0); }, [selectedSupplier, activeSearch, selectedCategory]);
+  React.useEffect(() => { setPage(0); }, [selectedSupplier, activeSearch, selectedCategory, selectedSubCategory]);
 
-  const { data: searchProducts = [], isLoading: loadingSearch } = useSupplierSearchQuery(activeSearch, selectedSupplier);
-  const { data: browseProducts = [], isLoading: loadingBrowse } = useSupplierProductsBySupplier(selectedSupplier);
+  const { data: allProducts = [], isLoading: loadingCatalog } = useSupplierProducts();
 
-  const catalogProducts = isBrowsingSupplier ? browseProducts : searchProducts;
-  const loadingCatalog = isBrowsingSupplier ? loadingBrowse : loadingSearch;
+  const catalogProducts = allProducts;
 
   const { data: ingredients = [], isLoading: loadingIngredients } = useIngredients();
   const { updateIngredient, addIngredient } = useIngredientMutations();
@@ -89,14 +92,17 @@ export const Catalog: React.FC = () => {
 
   // Filter first (cheap), then paginate, then match (expensive)
   const filteredRaw = useMemo(() => {
+    const queryTokens = tokenizeSearchQuery(searchQuery);
     return catalogProducts.filter(p => {
-      const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (p.originalName && p.originalName.toLowerCase().includes(searchQuery.toLowerCase()));
+      const matchesSearch = queryTokens.length === 0 ||
+        matchesSearchTokens(p.name, queryTokens) ||
+        (!!p.originalName && matchesSearchTokens(p.originalName, queryTokens));
       const matchesSupplier = selectedSupplier === 'All' || p.supplier === selectedSupplier;
       const matchesCategory = selectedCategory === 'All' || inferCategory(p.name) === selectedCategory;
-      return matchesSearch && matchesSupplier && matchesCategory;
+      const matchesSubCategory = selectedCategory !== 'Dry Store' || selectedSubCategory === 'All' || inferDryStoreSubCategory(p.name) === selectedSubCategory;
+      return matchesSearch && matchesSupplier && matchesCategory && matchesSubCategory;
     });
-  }, [catalogProducts, searchQuery, selectedSupplier, selectedCategory]);
+  }, [catalogProducts, searchQuery, selectedSupplier, selectedCategory, selectedSubCategory]);
 
   const pageSlice = useMemo(() => filteredRaw.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE), [filteredRaw, page]);
 
@@ -145,7 +151,7 @@ export const Catalog: React.FC = () => {
     return processedProducts.find(p => p.id === selectedProductId) || null;
   }, [processedProducts, selectedProductId]);
 
-  const { updateSupplierProduct } = useSupplierProductMutations();
+  const { updateSupplierProduct, deleteSupplierProduct } = useSupplierProductMutations();
   const [isEditingProduct, setIsEditingProduct] = useState(false);
   const [editFormState, setEditFormState] = useState<SupplierProduct | null>(null);
 
@@ -275,12 +281,23 @@ export const Catalog: React.FC = () => {
 
             <select
               value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
+              onChange={(e) => { setSelectedCategory(e.target.value); setSelectedSubCategory('All'); }}
               className="px-3 py-2 border border-outline-variant bg-surface-container-low text-xs rounded-sm focus:outline-none"
             >
               <option value="All">All Categories</option>
               {Object.keys(CATEGORY_KEYWORDS).map(c => <option key={c} value={c}>{c}</option>)}
             </select>
+
+            {selectedCategory === 'Dry Store' && (
+              <select
+                value={selectedSubCategory}
+                onChange={(e) => setSelectedSubCategory(e.target.value)}
+                className="px-3 py-2 border border-outline-variant bg-surface-container-low text-xs rounded-sm focus:outline-none"
+              >
+                <option value="All">All Sub-Categories</option>
+                {DRY_STORE_SUBCATEGORIES.map(sub => <option key={sub} value={sub}>{sub}</option>)}
+              </select>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -343,9 +360,21 @@ export const Catalog: React.FC = () => {
                           </span>
                         )}
                       </div>
-                      <h4 className="font-semibold text-sm text-on-surface truncate mt-1">
-                        {prod.name}
-                      </h4>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <h4 className="font-semibold text-sm text-on-surface truncate">
+                          {prod.name}
+                        </h4>
+                        <a
+                          href={getSupplierUrl(prod)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-outline hover:text-primary transition-colors flex-shrink-0"
+                          title="View on Supplier Site"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                      </div>
                       {prod.matchedIngredient ? (
                         <div className="text-[10px] text-emerald-700 bg-emerald-500/10 border border-emerald-500/25 px-2 py-0.5 rounded-sm mt-1.5 font-semibold inline-flex items-center gap-1">
                           <CheckCircle className="h-3 w-3 text-emerald-600" />
@@ -359,13 +388,34 @@ export const Catalog: React.FC = () => {
                       )}
                     </div>
 
-                    <div className="text-right flex-shrink-0">
-                      <div className="text-sm font-bold text-on-surface data-tabular">
-                        £{prod.packCost.toFixed(2)}
+                    <div className="text-right flex-shrink-0 flex items-start gap-2">
+                      <div>
+                        <div className="text-sm font-bold text-on-surface data-tabular">
+                          £{prod.packCost.toFixed(2)}
+                        </div>
+                        <div className="text-[10px] text-outline mt-0.5 uppercase">
+                          {prod.packSize} {prod.packUnit} • {formatUnitPrice(prod.packCost, prod.packSize, prod.packUnit)}
+                        </div>
                       </div>
-                      <div className="text-[10px] text-outline mt-0.5 uppercase">
-                        {prod.packSize} {prod.packUnit} • {formatUnitPrice(prod.packCost, prod.packSize, prod.packUnit)}
-                      </div>
+                      {isManager && (
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (!confirm(`Delete "${prod.name}" (${prod.supplier}) from the catalogue permanently?`)) return;
+                            try {
+                              await deleteSupplierProduct.mutateAsync(prod.id);
+                              if (selectedProductId === prod.id) setSelectedProductId(null);
+                              showToast("Catalog product deleted.", "success");
+                            } catch (err: any) {
+                              showToast("Error deleting catalog product: " + err.message, "error");
+                            }
+                          }}
+                          title="Delete from catalogue"
+                          className="text-outline hover:text-red-600 transition-colors p-0.5"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -502,15 +552,32 @@ export const Catalog: React.FC = () => {
                     Supplier Product Record
                   </span>
                   {isManager && (
-                    <button
-                      onClick={() => {
-                        setEditFormState(selectedProduct);
-                        setIsEditingProduct(true);
-                      }}
-                      className="text-xs text-primary font-bold hover:underline bg-transparent border-none p-0 cursor-pointer"
-                    >
-                      Edit Price/Details
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => {
+                          setEditFormState(selectedProduct);
+                          setIsEditingProduct(true);
+                        }}
+                        className="text-xs text-primary font-bold hover:underline bg-transparent border-none p-0 cursor-pointer"
+                      >
+                        Edit Price/Details
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (!confirm(`Delete "${selectedProduct.name}" (${selectedProduct.supplier}) from the catalogue permanently?`)) return;
+                          try {
+                            await deleteSupplierProduct.mutateAsync(selectedProduct.id);
+                            setSelectedProductId(null);
+                            showToast("Catalog product deleted.", "success");
+                          } catch (err: any) {
+                            showToast("Error deleting catalog product: " + err.message, "error");
+                          }
+                        }}
+                        className="text-xs text-red-600 font-bold hover:underline bg-transparent border-none p-0 cursor-pointer"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   )}
                 </div>
                 <h2 className="headline-sm text-on-surface font-semibold mt-1">
@@ -530,6 +597,15 @@ export const Catalog: React.FC = () => {
                     <span className="text-sm font-bold text-on-surface uppercase">{selectedProduct.packSize} {selectedProduct.packUnit}</span>
                   </div>
                 </div>
+                <a
+                  href={getSupplierUrl(selectedProduct)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-4 flex items-center justify-center gap-1.5 w-full py-2 border border-outline-variant hover:bg-surface-container text-xs font-semibold rounded-sm transition-colors text-primary"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  View on Supplier Site
+                </a>
               </div>
             )}
 

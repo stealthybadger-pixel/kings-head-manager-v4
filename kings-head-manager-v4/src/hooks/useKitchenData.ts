@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { collection, getDocs, getDoc, doc, setDoc, deleteDoc, updateDoc, deleteField, writeBatch, query, where, limit } from 'firebase/firestore';
 import { db } from '../firebase';
+import { tokenizeSearchQuery, matchesSearchTokens } from '../utils/search';
 import {
   Ingredient, IngredientSchema,
   Recipe, RecipeSchema,
@@ -327,10 +328,14 @@ export const useStocktakeDraftMutations = () => {
 export const searchSupplierProducts = async (searchTerm: string, supplier: string): Promise<SupplierProduct[]> => {
   if (!searchTerm || searchTerm.trim().length < 2) return [];
   
-  const trimTerm = searchTerm.trim();
+  const queryTokens = tokenizeSearchQuery(searchTerm);
+  if (queryTokens.length === 0) return [];
+  
+  // Use the first word for the Firestore prefix query
+  const firstWord = queryTokens[0];
   const variations = [
-    trimTerm,
-    trimTerm.charAt(0).toUpperCase() + trimTerm.slice(1),
+    firstWord,
+    firstWord.charAt(0).toUpperCase() + firstWord.slice(1),
   ];
   
   const resultsMap = new Map<string, SupplierProduct>();
@@ -355,7 +360,29 @@ export const searchSupplierProducts = async (searchTerm: string, supplier: strin
     });
   }
   
-  return Array.from(resultsMap.values());
+  // In-memory filter: ensure all tokens exist in the product name
+  const filteredResults = Array.from(resultsMap.values()).filter(prod =>
+    matchesSearchTokens(prod.name, queryTokens)
+  );
+  
+  return filteredResults;
+};
+
+export const useSupplierProducts = () => {
+  return useQuery<SupplierProduct[]>({
+    queryKey: ['supplier_products_all'],
+    queryFn: async () => {
+      const snap = await getDocs(collection(db, 'supplierProducts'));
+      const items: SupplierProduct[] = [];
+      snap.forEach(docSnapshot => {
+        const rawData = { id: docSnapshot.id, ...docSnapshot.data() };
+        const result = SupplierProductSchema.safeParse(rawData);
+        if (result.success) items.push(result.data);
+      });
+      return items.sort((a, b) => a.name.localeCompare(b.name));
+    },
+    staleTime: 5 * 60 * 1000
+  });
 };
 
 export const useSupplierSearchQuery = (searchTerm: string, supplier: string) => {
@@ -440,10 +467,25 @@ export const useSupplierProductMutations = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['supplier_search'] });
+      queryClient.invalidateQueries({ queryKey: ['supplier_products_all'] });
+      queryClient.invalidateQueries({ queryKey: ['all_supplier_products_summary'] });
+      queryClient.invalidateQueries({ queryKey: ['supplier_browse'] });
     }
   });
 
-  return { updateSupplierProduct: updateMutation };
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await deleteDoc(doc(db, 'supplierProducts', id));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['supplier_search'] });
+      queryClient.invalidateQueries({ queryKey: ['supplier_products_all'] });
+      queryClient.invalidateQueries({ queryKey: ['all_supplier_products_summary'] });
+      queryClient.invalidateQueries({ queryKey: ['supplier_browse'] });
+    }
+  });
+
+  return { updateSupplierProduct: updateMutation, deleteSupplierProduct: deleteMutation };
 };
 
 export interface ScrapeLogEntry {

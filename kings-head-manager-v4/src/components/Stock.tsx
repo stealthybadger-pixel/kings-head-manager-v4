@@ -7,6 +7,7 @@ import { useBleScale, isWebBluetoothSupported } from '../hooks/useBleScale';
 import { Search, Scale, FileText, CheckCircle2, X, Filter, Printer, Mail, ChevronDown, ChevronRight, BookOpen, ChefHat, PauseCircle } from 'lucide-react';
 import { Ingredient, Recipe, RecipeItem, StocktakeReport, Unit } from '../types';
 import { DRY_STORE_SUBCATEGORIES } from '../utils/ingredientAutofill';
+import { tokenizeSearchQuery, matchesSearchTokens } from '../utils/search';
 
 interface ReportConfig {
   stockLevel: boolean;
@@ -40,9 +41,7 @@ import { calculateIngredientCost, toBaseQuantity } from '../utils/costing';
 // name (in any order) catches that without needing a real fuzzy/edit-distance
 // library for what's fundamentally a word-order problem, not a typo problem.
 function matchesStocktakeSearch(name: string, query: string): boolean {
-  const nameLower = name.toLowerCase();
-  const queryTokens = query.toLowerCase().split(/\s+/).filter(Boolean);
-  return queryTokens.every(tok => nameLower.includes(tok));
+  return matchesSearchTokens(name, tokenizeSearchQuery(query));
 }
 
 // Recursively collect all ingredient IDs referenced by a set of recipe items

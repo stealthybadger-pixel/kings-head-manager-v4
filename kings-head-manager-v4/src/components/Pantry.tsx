@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { supplierBadgeClass } from '../utils/supplierColors';
-import { useIngredients, useIngredientMutations, useSupplierSearchQuery, useDishes, useSuppliers } from '../hooks/useKitchenData';
+import { useIngredients, useIngredientMutations, useSupplierProducts, useDishes, useSuppliers } from '../hooks/useKitchenData';
 import { useStore } from '../store/useStore';
 import { Search, Plus, Trash2, AlertCircle, FileText, CheckCircle2, ListTodo, Check, ArrowRight, ArrowLeft } from 'lucide-react';
 import { Ingredient, IngredientCategory, SupplierName, Unit, Allergen, IngredientSupplier } from '../types';
@@ -23,7 +23,14 @@ const CatalogRowSearch: React.FC<{
     return () => clearTimeout(t);
   }, [term]);
 
-  const { data: results = [] } = useSupplierSearchQuery(debouncedTerm, 'All');
+  const { data: allProducts = [] } = useSupplierProducts();
+  const results = useMemo(() => {
+    if (debouncedTerm.trim().length < 2) return [];
+    const tokens = tokenizeSearchQuery(debouncedTerm);
+    return allProducts.filter(p =>
+      matchesSearchTokens(p.name, tokens) || (!!p.originalName && matchesSearchTokens(p.originalName, tokens))
+    );
+  }, [allProducts, debouncedTerm]);
 
   return (
     <div className="relative w-full" ref={ref}>
@@ -61,7 +68,8 @@ const CatalogRowSearch: React.FC<{
     </div>
   );
 };
-import { cleanProductName } from '../utils/matching';
+import { cleanProductName, findBestIngredientMatch } from '../utils/matching';
+import { tokenizeSearchQuery, matchesSearchTokens } from '../utils/search';
 import * as pdfjsLib from 'pdfjs-dist';
 
 // Configure pdfjs worker path
@@ -139,6 +147,7 @@ export const Pantry: React.FC = () => {
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [selectedSubCategory, setSelectedSubCategory] = useState<string>('All');
   const [pantrySort, setPantrySort] = useState<'name' | 'date'>('name');
 
   // Menu Auditor Modal state
@@ -174,10 +183,12 @@ export const Pantry: React.FC = () => {
 
   // Filtered ingredients
   const filteredIngredients = useMemo(() => {
+    const queryTokens = tokenizeSearchQuery(searchQuery);
     const filtered = ingredients.filter(ing => {
-      const matchSearch = ing.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchSearch = matchesSearchTokens(ing.name, queryTokens);
       const matchCat = selectedCategory === 'All' || ing.category === selectedCategory;
-      return matchSearch && matchCat;
+      const matchSubCat = selectedCategory !== 'Dry Store' || selectedSubCategory === 'All' || ing.subCategory === selectedSubCategory;
+      return matchSearch && matchCat && matchSubCat;
     });
     if (pantrySort === 'date') {
       return [...filtered].sort((a, b) => {
@@ -187,7 +198,7 @@ export const Pantry: React.FC = () => {
       });
     }
     return [...filtered].sort((a, b) => a.name.localeCompare(b.name));
-  }, [ingredients, searchQuery, selectedCategory, pantrySort]);
+  }, [ingredients, searchQuery, selectedCategory, selectedSubCategory, pantrySort]);
 
   // Active selected ingredient
   const activeIngredient = useMemo(() => {
@@ -205,10 +216,14 @@ export const Pantry: React.FC = () => {
     }
   }, [activeIngredient]);
 
-  const { data: catalogProducts = [] } = useSupplierSearchQuery(
-    activeIngredient ? activeIngredient.name : '',
-    'All'
-  );
+  const { data: allProducts = [] } = useSupplierProducts();
+  const catalogProducts = useMemo(() => {
+    if (!activeIngredient) return [];
+    const words = activeIngredient.name.toLowerCase().split(/\s+/).filter(t => t.length > 1 && /[a-z0-9]/i.test(t));
+    if (words.length === 0) return [];
+    const firstWord = words[0];
+    return allProducts.filter(p => p.name.toLowerCase().includes(firstWord));
+  }, [allProducts, activeIngredient]);
 
   const cheaperCatalogOption = useMemo(() => {
     if (!activeIngredient) return null;
@@ -228,10 +243,8 @@ export const Pantry: React.FC = () => {
       const prodBaseUnit = getBaseUnit(prod.packUnit);
       if (prodBaseUnit !== currentBaseUnit) return;
 
-      const cleanProd = cleanProductName(prod.name);
-      const cleanIng = cleanProductName(activeIngredient.name);
-
-      if (cleanProd === cleanIng || cleanProd.includes(cleanIng) || cleanIng.includes(cleanProd)) {
+      const matched = findBestIngredientMatch(prod.name, [activeIngredient]);
+      if (matched) {
         const prodRate = getBaseRate(prod.packCost, prod.packSize, prod.packUnit);
         if (prodRate < currentRate - 0.00001) {
           const saving = ((currentRate - prodRate) / currentRate) * 100;
@@ -703,15 +716,28 @@ export const Pantry: React.FC = () => {
             />
           </div>
 
-          {/* Filter Category Select */}
-          <select 
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="w-full text-xs font-semibold px-2 py-1.5 border border-outline-variant bg-surface-container-lowest"
-          >
-            <option value="All">All Categories</option>
-            {categories.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
+          {/* Filter Category & Sub-Category Selects */}
+          <div className="flex flex-col gap-2">
+            <select 
+              value={selectedCategory}
+              onChange={(e) => { setSelectedCategory(e.target.value); setSelectedSubCategory('All'); }}
+              className="w-full text-xs font-semibold px-2 py-1.5 border border-outline-variant bg-surface-container-lowest"
+            >
+              <option value="All">All Categories</option>
+              {categories.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+
+            {selectedCategory === 'Dry Store' && (
+              <select
+                value={selectedSubCategory}
+                onChange={(e) => setSelectedSubCategory(e.target.value)}
+                className="w-full text-xs font-semibold px-2 py-1.5 border border-outline-variant bg-surface-container-lowest"
+              >
+                <option value="All">All Sub-Categories</option>
+                {DRY_STORE_SUBCATEGORIES.map(sub => <option key={sub} value={sub}>{sub}</option>)}
+              </select>
+            )}
+          </div>
         </div>
 
         {/* Directory List */}
@@ -1163,72 +1189,72 @@ export const Pantry: React.FC = () => {
                           }}
                         />
                       </div>
-                      <div className="flex gap-4 items-center">
-                      <div className="w-1/4">
-                        <label className="text-[10px] label-caps text-outline block mb-1">Wholesale Partner</label>
+                      <div className="flex flex-wrap md:flex-nowrap gap-2 items-center">
+                      <div className="w-[110px] flex-shrink-0">
+                        <label className="text-[9px] label-caps text-outline block mb-1">Wholesale Partner</label>
                         <select
                           value={sup.name}
                           onChange={(e) => handleUpdateSupplier(idx, 'name', e.target.value)}
-                          className="w-full px-2 py-1.5 border border-outline-variant bg-surface-container-lowest text-xs"
+                          className="w-full px-1.5 py-1 border border-outline-variant bg-surface-container-lowest text-[11px]"
                         >
                           {suppliersList.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                       </div>
 
-                      <div className="w-1/6">
-                        <label className="text-[10px] label-caps text-outline block mb-1">Pack Cost (£)</label>
+                      <div className="w-[65px] flex-shrink-0">
+                        <label className="text-[9px] label-caps text-outline block mb-1">Pack Cost (£)</label>
                         <input 
                           type="number" 
                           step="0.01" 
                           value={sup.packCost}
                           onChange={(e) => handleUpdateSupplier(idx, 'packCost', Math.max(0, parseFloat(e.target.value) || 0))}
-                          className="w-full px-2 py-1 border border-outline-variant text-xs data-tabular"
+                          className="w-full px-1.5 py-0.5 border border-outline-variant text-[11px] font-mono font-semibold"
                         />
                       </div>
 
-                      <div className="w-1/6">
-                        <label className="text-[10px] label-caps text-outline block mb-1">Pack Size</label>
+                      <div className="w-[55px] flex-shrink-0">
+                        <label className="text-[9px] label-caps text-outline block mb-1">Pack Size</label>
                         <input 
                           type="number" 
                           value={sup.packSize}
                           onChange={(e) => handleUpdateSupplier(idx, 'packSize', Math.max(1, parseFloat(e.target.value) || 1))}
-                          className="w-full px-2 py-1 border border-outline-variant text-xs data-tabular"
+                          className="w-full px-1.5 py-0.5 border border-outline-variant text-[11px] font-mono font-semibold"
                         />
                       </div>
 
-                      <div className="w-1/6">
-                        <label className="text-[10px] label-caps text-outline block mb-1">Size Unit</label>
+                      <div className="w-[60px] flex-shrink-0">
+                        <label className="text-[9px] label-caps text-outline block mb-1">Size Unit</label>
                         <select 
                           value={sup.packUnit}
                           onChange={(e) => handleUpdateSupplier(idx, 'packUnit', e.target.value as any)}
-                          className="w-full px-2 py-1.5 border border-outline-variant bg-surface-container-lowest text-xs"
+                          className="w-full px-1.5 py-1 border border-outline-variant bg-surface-container-lowest text-[11px]"
                         >
                           {units.map(u => <option key={u} value={u}>{u}</option>)}
                         </select>
                       </div>
 
-                      <div className="flex flex-col items-start mt-4 min-w-[90px]">
-                        <span className="text-[10px] label-caps text-outline block mb-1">Unit Rate</span>
-                        <span className="text-xs font-mono font-semibold text-primary data-tabular mt-0.5">
+                      <div className="flex flex-col items-start mt-4 w-[75px] flex-shrink-0">
+                        <span className="text-[9px] label-caps text-outline block mb-1">Unit Rate</span>
+                        <span className="text-[11px] font-mono font-semibold text-primary mt-0.5">
                           {formatSupplierUnitPrice(sup.packCost, sup.packSize, sup.packUnit)}
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-2 mt-4 ml-auto">
+                      <div className="flex items-center gap-1.5 mt-4 w-[75px] flex-shrink-0">
                         <input 
                           type="checkbox" 
                           checked={sup.isPreferred}
                           onChange={(e) => handleUpdateSupplier(idx, 'isPreferred', e.target.checked)}
-                          className="h-4 w-4"
+                          className="h-3.5 w-3.5"
                         />
-                        <span className="text-xs font-semibold text-outline">Preferred</span>
+                        <span className="text-[11px] font-semibold text-outline">Preferred</span>
                       </div>
 
                       <button 
                         onClick={() => handleRemoveSupplier(idx)}
-                        className="p-1 text-error hover:bg-error-container mt-4 ml-2"
+                        className="p-1 text-error hover:bg-error-container mt-4 w-[24px] flex-shrink-0 flex items-center justify-center"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
                     </div>

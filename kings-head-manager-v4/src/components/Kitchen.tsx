@@ -6,6 +6,7 @@ import { useAuth } from '../hooks/useAuth';
 import { Search, Plus, Trash2, Camera, AlertCircle, Check, HelpCircle, ExternalLink, Upload, RefreshCw, X, Link2, Unlink, ArrowLeft } from 'lucide-react';
 import { Recipe, RecipeItem, Ingredient, Unit } from '../types';
 import { calculatePlateCost } from '../utils/costing';
+import { tokenizeSearchQuery, matchesSearchTokens } from '../utils/search';
 
 async function scanRecipeWithGemini(base64Image: string, mimeType: string): Promise<{
   name: string;
@@ -139,7 +140,8 @@ export const Kitchen: React.FC = () => {
 
   // Filtered + sorted recipe list
   const filteredRecipes = useMemo(() => {
-    const filtered = recipes.filter(r => r.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    const queryTokens = tokenizeSearchQuery(searchQuery);
+    const filtered = recipes.filter(r => matchesSearchTokens(r.name, queryTokens));
     if (recipeSort === 'date') {
       return [...filtered].sort((a, b) => {
         const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -895,12 +897,13 @@ export const Kitchen: React.FC = () => {
                 </div>
 
                 {itemSearchQuery.trim().length > 1 && (() => {
+                  const queryTokens = tokenizeSearchQuery(itemSearchQuery);
                   const matchingIngredients = ingredients
-                    .filter(i => i.name.toLowerCase().includes(itemSearchQuery.toLowerCase()))
+                    .filter(i => matchesSearchTokens(i.name, queryTokens))
                     .slice(0, 5);
                   const matchingRecipes = recipes
                     .filter(r =>
-                      r.name.toLowerCase().includes(itemSearchQuery.toLowerCase()) &&
+                      matchesSearchTokens(r.name, queryTokens) &&
                       r.id !== formState.id &&
                       !(formState.id && wouldCreateCircularReference(formState.id, r.id))
                     )

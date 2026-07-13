@@ -370,7 +370,11 @@ export const SupplierProductSchema = z.object({
   unitPrice: z.number().nonnegative(),
   source: z.string().optional(),
   capturedAt: z.string().optional(),
-  importedAt: z.string().optional()
+  importedAt: z.string().optional(),
+  bookerProductCode: z.string().optional(),
+  urbanProductId: z.string().optional(),
+  sku: z.string().optional(),
+  productCode: z.string().optional()
 });
 export type SupplierProduct = z.infer<typeof SupplierProductSchema>;
 

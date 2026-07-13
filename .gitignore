@@ -8,3 +8,9 @@ tmpclaude-*
 SESSION-*.md
 screngrabs/
 .worktrees/
+.auth/
+*.log
+firestore-dump/
+firestore-dump-sanitized/
+firebase-debug.log
+firestore-debug.log

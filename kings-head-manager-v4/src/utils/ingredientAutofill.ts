@@ -13,8 +13,20 @@ export const CATEGORY_KEYWORDS: Record<string, string[]> = {
 
 export function inferCategory(name: string): string | null {
   const lower = name.toLowerCase();
+  const testWord = (w: string) => new RegExp(`\\b${w.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}\\b`, 'i').test(lower);
+
+  // Check Meat, Fish, Alcohol first to prevent false Dry Store overrides
+  if (['chicken', 'beef', 'pork', 'lamb', 'duck', 'turkey', 'steak', 'mince', 'sausage', 'bacon', 'ham', 'gammon', 'venison', 'veal', 'liver', 'kidney', 'rib', 'loin', 'brisket', 'rump', 'sirloin', 'chorizo', 'salami', 'pancetta', 'prosciutto'].some(testWord)) return 'Meat';
+  if (['salmon', 'cod', 'tuna', 'haddock', 'prawn', 'shrimp', 'crab', 'lobster', 'scallop', 'bass', 'mackerel', 'trout', 'plaice', 'halibut', 'sole', 'anchovy', 'sardine', 'squid', 'mussel', 'oyster', 'fish', 'seafood', 'bream', 'monkfish', 'skate'].some(testWord)) return 'Fish';
+  if (['wine', 'beer', 'spirit', 'gin', 'rum', 'vodka', 'whisky', 'brandy', 'champagne', 'prosecco', 'port', 'ale', 'lager', 'cider', 'sherry', 'liqueur', 'aperol'].some(testWord)) return 'Alcohol';
+
+  // Check Dry Store override (modifiers indicating dried/processed shelf-stable spices & herbs)
+  const dryStoreModifiers = ['powder', 'dried', 'ground', 'spice', 'peppercorn', 'black pepper', 'white pepper', 'cayenne pepper', 'bay leaf', 'bay leaves'];
+  if (dryStoreModifiers.some(testWord)) return 'Dry Store';
+
+  // Rest in order
   for (const [cat, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
-    if (keywords.some(kw => lower.includes(kw))) return cat;
+    if (keywords.some(testWord)) return cat;
   }
   return null;
 }
@@ -36,8 +48,9 @@ const DRY_STORE_SUBCATEGORY_KEYWORDS: Record<string, string[]> = {
 
 export function inferDryStoreSubCategory(name: string): string | null {
   const lower = name.toLowerCase();
+  const testWord = (w: string) => new RegExp(`\\b${w.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}\\b`, 'i').test(lower);
   for (const [sub, keywords] of Object.entries(DRY_STORE_SUBCATEGORY_KEYWORDS)) {
-    if (keywords.some(kw => lower.includes(kw))) return sub;
+    if (keywords.some(testWord)) return sub;
   }
   return null;
 }

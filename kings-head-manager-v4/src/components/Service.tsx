@@ -6,6 +6,7 @@ import { Allergen, AllergenSchema, Dish, DishItem, DishModifier, DishType, Ingre
 import { calculateIngredientCost, toBaseQuantity, calculatePlateCost as computePlateCost } from '../utils/costing';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { useAuth } from '../hooks/useAuth';
+import { tokenizeSearchQuery, matchesSearchTokens } from '../utils/search';
 
 const DISH_TYPES: DishType[] = ['Starter', 'Main', 'Side', 'Dessert', 'Drink', 'Other'];
 const ALL_ALLERGENS = AllergenSchema.options as Allergen[];
@@ -80,8 +81,9 @@ export const Service: React.FC = () => {
 
   // Filtered + sorted dishes
   const filteredDishes = useMemo(() => {
+    const queryTokens = tokenizeSearchQuery(searchQuery);
     const filtered = dishes.filter(d =>
-      d && d.name && d.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+      d && d.name && matchesSearchTokens(d.name, queryTokens) &&
       (liveFilter === 'all' || d.isLive)
     );
     if (dishSort === 'date') {
@@ -733,13 +735,17 @@ export const Service: React.FC = () => {
                   </button>
                 </div>
 
-                {itemSearchQuery.trim().length > 1 && (
-                  <div className="max-h-48 overflow-y-auto bg-surface-container-lowest border border-outline-variant divide-y divide-outline-variant rounded-sm">
-                    {/* Ingredients match */}
-                    {ingredients
-                      .filter(i => i.name.toLowerCase().includes(itemSearchQuery.toLowerCase()))
-                      .slice(0, 3)
-                      .map(ing => (
+                {itemSearchQuery.trim().length > 1 && (() => {
+                  const queryTokens = tokenizeSearchQuery(itemSearchQuery);
+                  const matchedIngredients = ingredients.filter(i => matchesSearchTokens(i.name, queryTokens)).slice(0, 3);
+                  const matchedRecipes = recipes.filter(r => matchesSearchTokens(r.name, queryTokens)).slice(0, 3);
+                  
+                  if (matchedIngredients.length === 0 && matchedRecipes.length === 0) return null;
+                  
+                  return (
+                    <div className="max-h-48 overflow-y-auto bg-surface-container-lowest border border-outline-variant divide-y divide-outline-variant rounded-sm">
+                      {/* Ingredients match */}
+                      {matchedIngredients.map(ing => (
                         <div 
                           key={ing.id}
                           onClick={() => {
@@ -752,11 +758,8 @@ export const Service: React.FC = () => {
                           <span className="text-primary label-caps">+ Add</span>
                         </div>
                       ))}
-                    {/* Recipes match */}
-                    {recipes
-                      .filter(r => r.name.toLowerCase().includes(itemSearchQuery.toLowerCase()))
-                      .slice(0, 3)
-                      .map(rec => (
+                      {/* Recipes match */}
+                      {matchedRecipes.map(rec => (
                         <div 
                           key={rec.id}
                           onClick={() => {
@@ -769,8 +772,9 @@ export const Service: React.FC = () => {
                           <span className="text-primary label-caps">+ Add</span>
                         </div>
                       ))}
-                  </div>
-                )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 
@@ -848,12 +852,16 @@ export const Service: React.FC = () => {
                     className="flex-1 text-xs bg-transparent outline-none border-none focus:ring-0 p-0"
                   />
                 </div>
-                {modifierSearchQuery.trim().length > 1 && (
-                  <div className="max-h-48 overflow-y-auto bg-surface-container-lowest border border-outline-variant divide-y divide-outline-variant rounded-sm">
-                    {ingredients
-                      .filter(i => i.name.toLowerCase().includes(modifierSearchQuery.toLowerCase()))
-                      .slice(0, 5)
-                      .map(ing => (
+                {modifierSearchQuery.trim().length > 1 && (() => {
+                  const queryTokens = tokenizeSearchQuery(modifierSearchQuery);
+                  const matchedIngredients = ingredients.filter(i => matchesSearchTokens(i.name, queryTokens)).slice(0, 5);
+                  const matchedRecipes = recipes.filter(r => matchesSearchTokens(r.name, queryTokens)).slice(0, 5);
+                  
+                  if (matchedIngredients.length === 0 && matchedRecipes.length === 0) return null;
+                  
+                  return (
+                    <div className="max-h-48 overflow-y-auto bg-surface-container-lowest border border-outline-variant divide-y divide-outline-variant rounded-sm">
+                      {matchedIngredients.map(ing => (
                         <div
                           key={ing.id}
                           onClick={() => { handleAddModifier({ id: ing.id, name: ing.name, type: 'ingredient' }); setModifierSearchQuery(''); }}
@@ -863,10 +871,7 @@ export const Service: React.FC = () => {
                           <span className="text-primary label-caps">+ Add</span>
                         </div>
                       ))}
-                    {recipes
-                      .filter(r => r.name.toLowerCase().includes(modifierSearchQuery.toLowerCase()))
-                      .slice(0, 5)
-                      .map(rec => (
+                      {matchedRecipes.map(rec => (
                         <div
                           key={rec.id}
                           onClick={() => { handleAddModifier({ id: rec.id, name: rec.name, type: 'recipe' }); setModifierSearchQuery(''); }}
@@ -876,8 +881,9 @@ export const Service: React.FC = () => {
                           <span className="text-primary label-caps">+ Add</span>
                         </div>
                       ))}
-                  </div>
-                )}
+                    </div>
+                  );
+                })()}
               </div>
 
               {previewExtras.selected.length > 0 && (

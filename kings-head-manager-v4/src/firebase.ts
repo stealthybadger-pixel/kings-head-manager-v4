@@ -1,5 +1,5 @@
 import { initializeApp, deleteApp } from "firebase/app";
-import { initializeFirestore } from "firebase/firestore";
+import { initializeFirestore, connectFirestoreEmulator } from "firebase/firestore";
 import { getAuth, createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 
@@ -16,6 +16,12 @@ const app = initializeApp(firebaseConfig);
 export const db = initializeFirestore(app, {
   ignoreUndefinedProperties: true
 });
+
+if (import.meta.env.DEV) {
+  connectFirestoreEmulator(db, '127.0.0.1', 8080);
+  console.log("Connected to local Firestore emulator");
+}
+
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 
