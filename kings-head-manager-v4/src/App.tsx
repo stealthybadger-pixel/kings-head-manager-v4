@@ -39,6 +39,7 @@ import Login from './components/Login';
 import FoodTempChecks from './components/FoodTempChecks';
 import EquipmentTempChecks from './components/EquipmentTempChecks';
 import TempCheckRecords from './components/TempCheckRecords';
+import CatalogCaptureModal from './components/CatalogCaptureModal';
 import { useStore } from './store/useStore';
 import { useIsMobile } from './hooks/useIsMobile';
 import { useAuth } from './hooks/useAuth';
@@ -271,6 +272,8 @@ const App: React.FC = () => {
             );
           })}
         </div>
+
+        <CatalogCaptureModal />
       </div>
     );
   }
@@ -474,6 +477,8 @@ const App: React.FC = () => {
           );
         })}
       </div>
+
+      <CatalogCaptureModal />
     </div>
   );
 };

@@ -459,33 +459,45 @@ export const useSupplierMutations = () => {
 export const useSupplierProductMutations = () => {
   const queryClient = useQueryClient();
 
+  const invalidateCatalogQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['supplier_search'] });
+    queryClient.invalidateQueries({ queryKey: ['supplier_products_all'] });
+    queryClient.invalidateQueries({ queryKey: ['all_supplier_products_summary'] });
+    queryClient.invalidateQueries({ queryKey: ['supplier_browse'] });
+  };
+
+  const addMutation = useMutation({
+    mutationFn: async (data: Omit<SupplierProduct, 'id'>) => {
+      const docRef = doc(collection(db, 'supplierProducts'));
+      const fullItem = { id: docRef.id, ...data };
+      SupplierProductSchema.parse(fullItem);
+      await setDoc(docRef, fullItem);
+      return fullItem;
+    },
+    onSuccess: invalidateCatalogQueries
+  });
+
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<SupplierProduct> }) => {
       const docRef = doc(db, 'supplierProducts', id);
       const { id: _, ...updatePayload } = data as any;
       await updateDoc(docRef, withDeleteFieldForUndefined(updatePayload));
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['supplier_search'] });
-      queryClient.invalidateQueries({ queryKey: ['supplier_products_all'] });
-      queryClient.invalidateQueries({ queryKey: ['all_supplier_products_summary'] });
-      queryClient.invalidateQueries({ queryKey: ['supplier_browse'] });
-    }
+    onSuccess: invalidateCatalogQueries
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       await deleteDoc(doc(db, 'supplierProducts', id));
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['supplier_search'] });
-      queryClient.invalidateQueries({ queryKey: ['supplier_products_all'] });
-      queryClient.invalidateQueries({ queryKey: ['all_supplier_products_summary'] });
-      queryClient.invalidateQueries({ queryKey: ['supplier_browse'] });
-    }
+    onSuccess: invalidateCatalogQueries
   });
 
-  return { updateSupplierProduct: updateMutation, deleteSupplierProduct: deleteMutation };
+  return {
+    addSupplierProduct: addMutation,
+    updateSupplierProduct: updateMutation,
+    deleteSupplierProduct: deleteMutation
+  };
 };
 
 export interface ScrapeLogEntry {
