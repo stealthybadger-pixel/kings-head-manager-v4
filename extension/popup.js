@@ -68,14 +68,29 @@ sendBtn.addEventListener('click', async () => {
   const tabs = tabsPerPattern.flat();
 
   if (tabs.length === 0) {
-    status.textContent = 'KHKM app is not open. Opening it now — click "Send to KHKM" again once it loads.';
+    status.textContent = 'KHKM app is not open. Open it in a tab (logged in as a manager), then click "Send to KHKM" again.';
     status.className = 'error';
-    chrome.tabs.create({ url: 'http://localhost:3000' });
     return;
   }
 
-  await chrome.tabs.sendMessage(tabs[0].id, { type: 'KHKM_RELAY_CAPTURE', payload: currentScrape });
-  await chrome.tabs.update(tabs[0].id, { active: true });
-  status.textContent = 'Sent — check the KHKM tab.';
-  status.className = '';
+  // Inject the postMessage straight into the app tab rather than relying on the relay
+  // content script being pre-injected — that breaks every time the extension is reloaded
+  // (an already-open app tab won't have the fresh relay until it's refreshed). Injecting
+  // on demand works regardless and lets us surface a real error instead of failing silently.
+  const target = tabs[0];
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId: target.id },
+      func: (payload) => {
+        window.postMessage({ type: 'KHKM_CATALOG_CAPTURE', payload }, window.location.origin);
+      },
+      args: [currentScrape]
+    });
+    await chrome.tabs.update(target.id, { active: true });
+    status.textContent = 'Sent — check the KHKM tab (you must be logged in as a manager).';
+    status.className = '';
+  } catch (err) {
+    status.textContent = 'Send failed: ' + (err && err.message ? err.message : String(err));
+    status.className = 'error';
+  }
 });
