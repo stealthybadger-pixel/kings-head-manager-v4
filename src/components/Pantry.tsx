@@ -209,6 +209,39 @@ export const Pantry: React.FC = () => {
     return null;
   }, [activeIngredient, catalogProducts]);
 
+  // Separate from the catalogue check above: is one of the ingredient's OWN listed suppliers
+  // cheaper (per base unit) than the one currently marked preferred? The catalogue detector
+  // only sees scraped supplierProducts, so a manually-added supplier row that undercuts the
+  // preferred one would otherwise go unnoticed.
+  const cheaperListedSupplier = useMemo(() => {
+    const suppliers = activeIngredient?.suppliers ?? [];
+    if (suppliers.length < 2) return null;
+    let prefIdx = suppliers.findIndex(s => s.isPreferred);
+    if (prefIdx < 0) prefIdx = 0;
+    const pref = suppliers[prefIdx];
+    if (!pref || !pref.packCost) return null;
+    const prefRate = getBaseRate(pref.packCost, pref.packSize, pref.packUnit);
+    const prefBase = getBaseUnit(pref.packUnit);
+
+    let best: IngredientSupplier | null = null;
+    let bestIndex = -1;
+    let bestSaving = 0;
+    for (let i = 0; i < suppliers.length; i++) {
+      if (i === prefIdx) continue;
+      const s = suppliers[i];
+      if (!s.packCost || s.packCost <= 0) continue;            // skip Internal / no-cost rows
+      if (getBaseUnit(s.packUnit) !== prefBase) continue;      // only compare like-for-like units
+      const rate = getBaseRate(s.packCost, s.packSize, s.packUnit);
+      if (rate < prefRate - 0.00001) {
+        const saving = ((prefRate - rate) / prefRate) * 100;
+        if (saving > bestSaving) { bestSaving = saving; best = s; bestIndex = i; }
+      }
+    }
+
+    if (!best) return null;
+    return { supplier: best, index: bestIndex, savingPercent: bestSaving, preferredName: pref.name };
+  }, [activeIngredient]);
+
   // Tracks which auto-fillable fields the user has manually overridden for the
   // ingredient currently being created, so typing more of the name doesn't clobber them.
   const autofillTouched = useRef({ category: false, subCategory: false, wastePercent: false, kcalPer100: false, allergens: false });
@@ -1124,6 +1157,39 @@ export const Pantry: React.FC = () => {
                   className="h-8 px-3 bg-success text-white font-bold label-caps rounded-sm hover:opacity-90 flex-shrink-0"
                 >
                   Apply Catalog Price
+                </button>
+              </div>
+            )}
+
+            {cheaperListedSupplier && (
+              <div className="bg-primary/5 border border-primary/30 p-4 rounded-sm flex items-center justify-between text-xs mt-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🔀</span>
+                  <div>
+                    <span className="font-bold text-on-surface">A listed supplier is cheaper</span>
+                    <p className="mt-0.5 text-on-surface-variant">
+                      <b>{cheaperListedSupplier.supplier.name}</b> undercuts your preferred{' '}
+                      <b>{cheaperListedSupplier.preferredName}</b> by {Math.round(cheaperListedSupplier.savingPercent)}%
+                      {' '}({formatSupplierUnitPrice(cheaperListedSupplier.supplier.packCost, cheaperListedSupplier.supplier.packSize, cheaperListedSupplier.supplier.packUnit)}).
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    const t = cheaperListedSupplier.supplier;
+                    // Match by identity rather than index, in case formState's supplier order
+                    // has diverged from the saved ingredient the nudge was computed from.
+                    setFormState(prev => ({
+                      ...prev,
+                      suppliers: (prev.suppliers || []).map(s => ({
+                        ...s,
+                        isPreferred: s.name === t.name && s.packCost === t.packCost && s.packSize === t.packSize && s.packUnit === t.packUnit
+                      }))
+                    }));
+                  }}
+                  className="h-8 px-3 bg-primary text-white font-bold label-caps rounded-sm hover:opacity-90 flex-shrink-0"
+                >
+                  Make Preferred
                 </button>
               </div>
             )}
