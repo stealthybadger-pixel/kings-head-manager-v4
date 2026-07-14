@@ -216,13 +216,15 @@ export const Catalog: React.FC = () => {
   const handleApplyCheaperOption = async (prod: typeof processedProducts[0], ing: Ingredient, makePreferred = true) => {
     if (!isManager || !ing) return;
     
-    // Build the new supplier record
+    // Build the new supplier record. sourceUrl captures a deep link back to this product on
+    // the wholesaler's site (exact product page where a code exists, else a supplier search).
     const newSupplierRecord: IngredientSupplier = {
       name: prod.supplier,
       packCost: prod.packCost,
       packSize: prod.packSize,
       packUnit: prod.packUnit,
-      isPreferred: makePreferred
+      isPreferred: makePreferred,
+      sourceUrl: getSupplierUrl(prod)
     };
 
     // Merge into the ingredient's supplier array
@@ -794,8 +796,9 @@ export const Catalog: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Save/Use Action Buttons */}
-                  {isManager ? (
+                  {/* Save/Use Action Buttons — hidden in linking mode, where the guided
+                      "Add as Supplier Option" banner at the top is the single action. */}
+                  {linkBackIngredient ? null : isManager ? (
                     <div className="flex flex-col gap-2 mt-2">
                       <button
                         onClick={() => handleApplyCheaperOption(selectedProduct, selectedProduct.matchedIngredient!, true)}

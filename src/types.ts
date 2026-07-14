@@ -78,7 +78,10 @@ export const IngredientSupplierSchema = z.object({
   packCost: z.number().nonnegative(),
   packSize: z.number().positive(),
   packUnit: z.enum(['g', 'ml', 'ea', 'kg', 'l', 'oz']),
-  isPreferred: z.boolean()
+  isPreferred: z.boolean(),
+  // Deep link to this product on the wholesaler's site, captured when linked from the
+  // catalogue. Optional — falls back to a supplier-site search when absent.
+  sourceUrl: z.string().optional()
 });
 export type IngredientSupplier = z.infer<typeof IngredientSupplierSchema>;
 

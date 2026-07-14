@@ -2,7 +2,8 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { supplierBadgeClass } from '../utils/supplierColors';
 import { useIngredients, useIngredientMutations, useSupplierProducts, useDishes, useSuppliers } from '../hooks/useKitchenData';
 import { useStore } from '../store/useStore';
-import { Search, Plus, Trash2, AlertCircle, FileText, CheckCircle2, ListTodo, Check, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Search, Plus, Trash2, AlertCircle, FileText, CheckCircle2, ListTodo, Check, ArrowRight, ArrowLeft, ExternalLink } from 'lucide-react';
+import { getSupplierUrl } from '../utils/supplierUrls';
 import { Ingredient, IngredientCategory, SupplierName, Unit, Allergen, IngredientSupplier } from '../types';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { useAuth } from '../hooks/useAuth';
@@ -1236,7 +1237,20 @@ export const Pantry: React.FC = () => {
                     <div key={idx} className="flex flex-col gap-3 bg-surface p-4 border border-outline-variant rounded-sm">
                       <div className="flex flex-wrap md:flex-nowrap gap-2 items-center">
                       <div className="w-[110px] flex-shrink-0">
-                        <label className="text-[9px] label-caps text-outline block mb-1">Wholesale Partner</label>
+                        <label className="text-[9px] label-caps text-outline flex items-center gap-1 mb-1">
+                          Wholesale Partner
+                          {sup.sourceUrl || sup.name !== 'Internal' ? (
+                            <a
+                              href={sup.sourceUrl || getSupplierUrl({ name: formState.name, supplier: sup.name })}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title={sup.sourceUrl ? 'View this product on the supplier site' : `Search ${sup.name} for "${formState.name}"`}
+                              className="text-outline hover:text-primary transition-colors"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          ) : null}
+                        </label>
                         <select
                           value={sup.name}
                           onChange={(e) => handleUpdateSupplier(idx, 'name', e.target.value)}
@@ -1306,18 +1320,8 @@ export const Pantry: React.FC = () => {
                   ))}
                 </div>
               )}
-
-              {isManager && (
-                <div className="mt-4 flex justify-end">
-                  <button
-                    onClick={handleSave}
-                    disabled={isSaving}
-                    className={`h-10 px-6 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90 flex items-center gap-2 ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    {isSaving ? 'Saving…' : 'Save Changes'}
-                  </button>
-                </div>
-              )}
+              {/* Bottom "Save Changes" removed — the sticky "Save Profile" button at the top
+                  of the detail pane is the single save action. */}
             </div>
             </>}
           </>
