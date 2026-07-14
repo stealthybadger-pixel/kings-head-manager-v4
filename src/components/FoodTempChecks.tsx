@@ -23,6 +23,15 @@ export const FoodTempChecks: React.FC = () => {
   const [activeTile, setActiveTile] = useState<FoodTempChecklistItem | null>(null);
   const [tempInput, setTempInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // One-time-per-device hint about the Chrome flag that lets the probe reconnect silently
+  // after a refresh. Dismissal is remembered in localStorage so it doesn't nag once set up.
+  const [flagHintDismissed, setFlagHintDismissed] = useState(
+    () => typeof localStorage !== 'undefined' && localStorage.getItem('probeFlagHintDismissed') === '1'
+  );
+  const dismissFlagHint = () => {
+    localStorage.setItem('probeFlagHintDismissed', '1');
+    setFlagHintDismissed(true);
+  };
 
   const { connect, autoConnect, disconnect, connected, connecting, error: bleError, probes, battery } = useBleThermometer();
   // Friendly labels for the two physical probe ports, in slot order — first plugged-in
@@ -198,6 +207,18 @@ export const FoodTempChecks: React.FC = () => {
                   </button>
                 </div>
                 {bleError && <span className="text-[10px] text-error">{bleError}</span>}
+                {!flagHintDismissed && (
+                  <div className="flex items-start gap-2 p-2 rounded-sm bg-primary/5 border border-primary/20">
+                    <span className="text-[10px] text-on-surface-variant leading-relaxed flex-1">
+                      First time on this device? For the probe to reconnect without a popup after a refresh,
+                      enable this Chrome flag once (copy into the address bar, set to <b>Enabled</b>, restart Chrome):
+                      <code className="block mt-1 select-all font-mono text-[10px] text-primary break-all">chrome://flags/#enable-web-bluetooth-new-permissions-backend</code>
+                    </span>
+                    <button onClick={dismissFlagHint} title="Dismiss" className="p-0.5 text-outline hover:text-on-surface shrink-0">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
                 {connecting && !connected && (
                   <span className="text-[10px] text-outline">Connecting to probe…</span>
                 )}
