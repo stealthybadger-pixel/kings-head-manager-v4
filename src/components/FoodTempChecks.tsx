@@ -24,11 +24,14 @@ export const FoodTempChecks: React.FC = () => {
   const [tempInput, setTempInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const { connect, disconnect, connected, connecting, error: bleError, probes, battery } = useBleThermometer();
-  // Which physical probe slots currently have a probe plugged in (non-null reading).
+  const { connect, autoConnect, disconnect, connected, connecting, error: bleError, probes, battery } = useBleThermometer();
+  // Friendly labels for the two physical probe ports, in slot order — first plugged-in
+  // probe reads as the raw item, second as the cooked item.
+  const PROBE_LABELS = ['Raw Meat', 'Cooked Item'];
   const liveProbes = probes
     .map((t, i) => ({ slot: i + 1, temp: t }))
-    .filter((p) => p.temp !== null) as { slot: number; temp: number }[];
+    .filter((p) => p.temp !== null)
+    .map((p, i) => ({ ...p, label: PROBE_LABELS[i] ?? `Probe ${p.slot}` })) as { slot: number; temp: number; label: string }[];
 
   // Tiles auto-populate from tags set on recipes/ingredients (see
   // utils/tempChecks.ts) — this is an available pool to tap into as
@@ -53,6 +56,10 @@ export const FoodTempChecks: React.FC = () => {
   const openTile = (item: FoodTempChecklistItem) => {
     setActiveTile(item);
     setTempInput('');
+    // Reconnect silently to an already-paired probe so the reading is just there — no
+    // extra button press. First-ever pairing still needs the explicit "Link Probe" tap
+    // (the browser requires a user gesture to show its device chooser).
+    if (!connected && !connecting) void autoConnect();
   };
 
   const closeModal = () => setActiveTile(null);
@@ -95,9 +102,20 @@ export const FoodTempChecks: React.FC = () => {
     <div className="p-8 h-full overflow-y-auto bg-surface-container-lowest">
       <div className="max-w-3xl mx-auto flex flex-col gap-6 pb-12">
         <div className="border-b border-outline-variant pb-6">
-          <div className="flex items-center gap-3 text-primary">
-            <Thermometer className="h-8 w-8" />
-            <h1 className="display-lg text-on-surface font-bold">Food Temperature Checks</h1>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 text-primary">
+              <Thermometer className="h-8 w-8" />
+              <h1 className="display-lg text-on-surface font-bold">Food Temperature Checks</h1>
+            </div>
+            {isWebBluetoothSupported() && (
+              <span
+                title={connected ? `Probe connected${battery !== null ? ` · ${battery}%` : ''}` : 'Probe not connected'}
+                className={`flex items-center gap-1.5 text-[10px] font-bold label-caps tracking-widest px-2.5 py-1.5 rounded-full border ${connected ? 'text-primary border-primary bg-primary/10' : 'text-outline border-outline-variant'}`}
+              >
+                <Bluetooth className="h-3.5 w-3.5" />
+                {connected ? (battery !== null ? `${battery}%` : 'On') : 'Off'}
+              </span>
+            )}
           </div>
           <p className="text-sm text-outline mt-2">
             Tap any item to record a reading — probe as many or as few as you need this shift.
@@ -180,18 +198,21 @@ export const FoodTempChecks: React.FC = () => {
                   </button>
                 </div>
                 {bleError && <span className="text-[10px] text-error">{bleError}</span>}
+                {connecting && !connected && (
+                  <span className="text-[10px] text-outline">Connecting to probe…</span>
+                )}
                 {connected && (
                   liveProbes.length === 0 ? (
                     <span className="text-[10px] text-outline">Waiting for a probe reading… (insert a probe)</span>
                   ) : (
                     <div className="flex gap-2 flex-wrap">
-                      {liveProbes.map(({ slot, temp }) => (
+                      {liveProbes.map(({ slot, temp, label }) => (
                         <button
                           key={slot}
                           onClick={() => setTempInput(temp.toFixed(1))}
                           className="flex-1 min-w-[90px] flex flex-col items-center gap-0.5 p-2 rounded-sm bg-surface border border-outline-variant hover:border-primary transition-colors"
                         >
-                          <span className="text-[9px] label-caps text-outline">Probe {slot} · tap to use</span>
+                          <span className="text-[9px] label-caps text-outline">{label} · tap to use</span>
                           <span className="text-lg font-bold data-tabular text-on-surface">{temp.toFixed(1)}&deg;C</span>
                         </button>
                       ))}

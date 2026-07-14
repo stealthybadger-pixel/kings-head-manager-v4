@@ -104,6 +104,27 @@ export function useBleThermometer() {
     keepaliveRef.current = window.setInterval(sendHandshake, KEEPALIVE_MS);
   }, [handleNotification, sendHandshake]);
 
+  // Wire up a device (from either the picker or getDevices) with the idle-drop reconnect
+  // handler, then run the init sequence. Shared by connect() and autoConnect().
+  const registerAndOpen = useCallback(async (device: BluetoothDevice) => {
+    wantConnectedRef.current = true;
+    deviceRef.current = device;
+    device.addEventListener('gattserverdisconnected', () => {
+      cleanup();
+      setConnected(false);
+      // The device idle-drops every ~15-20s; silently reconnect while the user still
+      // wants a live reading, rather than surfacing a disconnect they didn't ask for.
+      if (wantConnectedRef.current && deviceRef.current) {
+        setTimeout(() => {
+          if (wantConnectedRef.current && deviceRef.current) {
+            openSession(deviceRef.current).catch((e) => setError(e?.message || 'Reconnect failed'));
+          }
+        }, 1000);
+      }
+    });
+    await openSession(device);
+  }, [cleanup, openSession]);
+
   const connect = useCallback(async () => {
     setError(null);
     setConnecting(true);
@@ -112,31 +133,62 @@ export function useBleThermometer() {
         filters: [{ services: [THERMO_SERVICE] }],
         optionalServices: [THERMO_SERVICE],
       });
-      wantConnectedRef.current = true;
-      deviceRef.current = device;
-
-      device.addEventListener('gattserverdisconnected', () => {
-        cleanup();
-        setConnected(false);
-        // The device idle-drops every ~15-20s; silently reconnect while the user still
-        // wants a live reading, rather than surfacing a disconnect they didn't ask for.
-        if (wantConnectedRef.current && deviceRef.current) {
-          setTimeout(() => {
-            if (wantConnectedRef.current && deviceRef.current) {
-              openSession(deviceRef.current).catch((e) => setError(e?.message || 'Reconnect failed'));
-            }
-          }, 1000);
-        }
-      });
-
-      await openSession(device);
+      await registerAndOpen(device);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to connect to thermometer');
       setConnected(false);
     } finally {
       setConnecting(false);
     }
-  }, [cleanup, openSession]);
+  }, [registerAndOpen]);
+
+  // Silent reconnect to a previously-paired probe with no chooser popup — uses the
+  // permissions-backed getDevices() list. Returns false (without hard error) if no probe
+  // has been paired before or the API is unavailable, so the caller can fall back to
+  // connect(). A getDevices() device that isn't currently advertising can't be connected
+  // immediately, so if a direct connect fails we wait for one advertisement then retry.
+  const autoConnect = useCallback(async (): Promise<boolean> => {
+    if (connected || connecting) return true;
+    const bt = navigator.bluetooth as any;
+    if (!bt || typeof bt.getDevices !== 'function') {
+      setError('This browser can’t silently reconnect (getDevices unsupported) — use Link Probe.');
+      return false;
+    }
+    try {
+      const devices: BluetoothDevice[] = await bt.getDevices();
+      const known = devices.find((d) => /thermo/i.test(d.name || ''));
+      if (!known) return false; // never paired on this browser/profile yet — no error, fall back to Link Probe
+      setError(null);
+      setConnecting(true);
+      try {
+        await registerAndOpen(known);
+        return true;
+      } catch {
+        // Device likely not advertising yet — wait for it to appear, then retry once.
+        const anyKnown = known as any;
+        if (typeof anyKnown.watchAdvertisements === 'function') {
+          const abort = new AbortController();
+          const appeared = await new Promise<boolean>((resolve) => {
+            const onAdv = () => resolve(true);
+            known.addEventListener('advertisementreceived', onAdv as EventListener, { once: true });
+            anyKnown.watchAdvertisements({ signal: abort.signal }).catch(() => resolve(false));
+            setTimeout(() => resolve(false), 8000);
+          });
+          abort.abort(); // stop scanning regardless of outcome
+          if (appeared) {
+            await registerAndOpen(known);
+            return true;
+          }
+        }
+        setError('Probe paired but not responding — make sure it’s on and nearby, or tap Link Probe.');
+        return false;
+      }
+    } catch {
+      return false;
+    } finally {
+      setConnecting(false);
+    }
+  }, [connected, connecting, registerAndOpen]);
 
   const disconnect = useCallback(() => {
     wantConnectedRef.current = false;
@@ -156,5 +208,21 @@ export function useBleThermometer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { connect, disconnect, connected, connecting, error, probes: state.probes, battery: state.battery };
+  // Cleanly release the BLE connection when the page is refreshed/closed. The probe only
+  // allows one connection at a time; if we don't free its slot on unload, it keeps thinking
+  // it's connected to the dead session and won't advertise again until it's power-cycled.
+  // A synchronous gatt.disconnect() on pagehide frees the slot so it can be re-found instantly.
+  useEffect(() => {
+    const releaseOnUnload = () => {
+      try { deviceRef.current?.gatt?.disconnect(); } catch { /* best-effort on unload */ }
+    };
+    window.addEventListener('pagehide', releaseOnUnload);
+    window.addEventListener('beforeunload', releaseOnUnload);
+    return () => {
+      window.removeEventListener('pagehide', releaseOnUnload);
+      window.removeEventListener('beforeunload', releaseOnUnload);
+    };
+  }, []);
+
+  return { connect, autoConnect, disconnect, connected, connecting, error, probes: state.probes, battery: state.battery };
 }
