@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ThermoPro BLE Probe Sniffer</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 1rem; }
+  button { font-size: 1rem; padding: 0.6rem 1.2rem; cursor: pointer; margin-right: 0.5rem; }
+  #temps { display: flex; gap: 1rem; margin: 1rem 0; flex-wrap: wrap; }
+  .probe { border: 2px solid #ccc; border-radius: 8px; padding: 0.8rem 1.2rem; min-width: 120px; }
+  .probe .label { font-size: 0.75rem; color: #666; text-transform: uppercase; }
+  .probe .val { font-size: 1.8rem; font-weight: bold; font-variant-numeric: tabular-nums; }
+  .probe.live { border-color: #2a7; }
+  #log { white-space: pre-wrap; font-family: ui-monospace, Consolas, monospace; font-size: 0.8rem;
+         background: #111; color: #0f0; padding: 1rem; border-radius: 6px; margin-top: 1rem;
+         max-height: 55vh; overflow-y: auto; }
+  .err { color: #f66; }
+  .info { color: #6cf; }
+  .temp { color: #ff0; font-weight: bold; }
+</style>
+</head>
+<body>
+  <h2>ThermoPro TP25H2 BLE Sniffer</h2>
+  <p>Does the real init sequence from the thermopro-cli source: subscribe to FFF2 → wait 0.5s →
+  write the 12-byte handshake to FFF1 → decode live <code>0x30</code> temperature frames.</p>
+  <button id="connectBtn">Connect</button>
+  <button id="handshakeBtn">Re-send Handshake</button>
+  <button id="clearBtn">Clear Log</button>
+  <label style="font-size:0.85rem;"><input type="checkbox" id="keepalive" checked> Auto re-send handshake every 5s (keepalive)</label>
+
+  <div id="temps">
+    <div class="probe" id="p1"><div class="label">Probe 1 (b5-6)</div><div class="val">—</div></div>
+    <div class="probe" id="p2"><div class="label">Probe 2 (b7-8)</div><div class="val">—</div></div>
+    <div class="probe" id="p3"><div class="label">Probe 3 (b9-10)</div><div class="val">—</div></div>
+    <div class="probe" id="p4"><div class="label">Probe 4 (b11-12)</div><div class="val">—</div></div>
+    <div class="probe" id="batt"><div class="label">Battery</div><div class="val">—</div></div>
+  </div>
+
+  <div id="log"></div>
+
+<script>
+const SERVICE = '1086fff0-3343-4817-8bb2-b32206336ce8';
+const WRITE_UUID = '1086fff1-3343-4817-8bb2-b32206336ce8';
+const NOTIFY_UUID = '1086fff2-3343-4817-8bb2-b32206336ce8';
+// Handshake pulled verbatim from daniel-corbett/thermopro-cli (create_handshake_command),
+// itself captured from the official ThermoPro Android app. Trailing bytes aren't strictly
+// validated by the device, per the source comment.
+const HANDSHAKE = new Uint8Array([0x01,0x09,0x8a,0x7a,0x13,0xb7,0x3e,0xd6,0x8b,0x67,0xc2,0xa0]);
+
+const logEl = document.getElementById('log');
+function log(msg, cls) {
+  const line = document.createElement('div');
+  if (cls) line.className = cls;
+  line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function toHex(dv) {
+  let out = [];
+  for (let i = 0; i < dv.byteLength; i++) out.push(dv.getUint8(i).toString(16).padStart(2, '0'));
+  return out.join(' ');
+}
+
+// Real decode from thermopro-cli decode_temperature() (q/c.java:88-99).
+function decodeTemp(b1, b2) {
+  if (b1 === 0xff && b2 === 0xff) return null;   // probe unplugged
+  if (b1 === 0xdd && b2 === 0xdd) return 'ERR-low';
+  if (b1 === 0xee && b2 === 0xee) return 'ERR-high';
+  const neg = (b1 & 0x80) !== 0;
+  const hundreds = ((b1 & 0x70) >> 4) * 100;
+  const tens = (b1 & 0x0f) * 10;
+  const ones = (b2 & 0xf0) >> 4;
+  const tenths = (b2 & 0x0f) * 0.1;
+  let t = hundreds + tens + ones + tenths;
+  return neg ? -t : t;
+}
+
+function setProbe(id, val) {
+  const el = document.getElementById(id);
+  const valEl = el.querySelector('.val');
+  if (val === null || val === undefined) { valEl.textContent = '—'; el.classList.remove('live'); }
+  else if (typeof val === 'string') { valEl.textContent = val; el.classList.add('live'); }
+  else { valEl.textContent = val.toFixed(1) + '°C'; el.classList.add('live'); }
+}
+
+let currentDevice = null;
+let writeChar = null;
+let notifyChar = null;
+let keepaliveTimer = null;
+let lastFrameHex = '';
+
+async function sendHandshake() {
+  if (!writeChar) return;
+  try {
+    await writeChar.writeValue(HANDSHAKE);
+    log('Handshake sent to FFF1.', 'info');
+  } catch (e) {
+    log('Handshake write failed: ' + e.message, 'err');
+  }
+}
+
+function handleNotification(event) {
+  const dv = event.target.value;
+  const hex = toHex(dv);
+  const cmd = dv.getUint8(0);
+
+  if (cmd === 0x30) {
+    // Temperature frame. battery=byte2, probes at offsets 5-6,7-8,9-10,11-12.
+    const batt = dv.getUint8(2);
+    const p = [];
+    for (let i = 0; i < 4; i++) {
+      const off = 5 + i * 2;
+      p.push(off + 1 < dv.byteLength ? decodeTemp(dv.getUint8(off), dv.getUint8(off + 1)) : null);
+    }
+    setProbe('p1', p[0]); setProbe('p2', p[1]); setProbe('p3', p[2]); setProbe('p4', p[3]);
+    document.getElementById('batt').querySelector('.val').textContent = batt + '%';
+    // Only log the frame when it actually changes, to spot live movement easily.
+    if (hex !== lastFrameHex) {
+      lastFrameHex = hex;
+      const fmt = v => v === null ? 'off' : (typeof v === 'string' ? v : v.toFixed(1) + 'C');
+      log(`0x30  P1=${fmt(p[0])} P2=${fmt(p[1])} P3=${fmt(p[2])} P4=${fmt(p[3])} batt=${batt}%   raw:${hex}`, 'temp');
+    }
+  } else {
+    log(`cmd 0x${cmd.toString(16)}: ${hex}`);
+  }
+}
+
+async function connectAndInit(device) {
+  const server = await device.gatt.connect();
+  const service = await server.getPrimaryService(SERVICE);
+  notifyChar = await service.getCharacteristic(NOTIFY_UUID);
+  writeChar = await service.getCharacteristic(WRITE_UUID);
+
+  await notifyChar.startNotifications();
+  notifyChar.addEventListener('characteristicvaluechanged', handleNotification);
+  log('Connected + subscribed to FFF2. Waiting 0.5s...', 'info');
+
+  await new Promise(r => setTimeout(r, 500));
+  await sendHandshake();
+  log('Init complete. Live 0x30 frames should now stream — warm a probe and watch.', 'info');
+
+  if (keepaliveTimer) clearInterval(keepaliveTimer);
+  keepaliveTimer = setInterval(() => {
+    if (document.getElementById('keepalive').checked) sendHandshake();
+  }, 5000);
+}
+
+document.getElementById('connectBtn').onclick = async () => {
+  try {
+    log('Requesting device...', 'info');
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ services: [SERVICE] }],
+      optionalServices: [SERVICE],
+    });
+    currentDevice = device;
+    log(`Selected: ${device.name || '(unnamed)'}`, 'info');
+
+    device.addEventListener('gattserverdisconnected', () => {
+      log('Disconnected. Reconnecting in 1s...', 'err');
+      if (keepaliveTimer) clearInterval(keepaliveTimer);
+      setTimeout(() => connectAndInit(currentDevice).catch(e => log('Reconnect failed: ' + e.message, 'err')), 1000);
+    });
+
+    await connectAndInit(device);
+  } catch (e) {
+    log('Error: ' + e.message, 'err');
+  }
+};
+
+document.getElementById('handshakeBtn').onclick = sendHandshake;
+document.getElementById('clearBtn').onclick = () => { logEl.innerHTML = ''; };
+</script>
+</body>
+</html>

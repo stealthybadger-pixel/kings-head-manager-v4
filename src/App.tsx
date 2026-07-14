@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   LayoutDashboard,
   ChefHat,
@@ -41,7 +41,7 @@ import EquipmentTempChecks from './components/EquipmentTempChecks';
 import TempCheckRecords from './components/TempCheckRecords';
 import CatalogCaptureModal from './components/CatalogCaptureModal';
 import { useStore } from './store/useStore';
-import { useIsMobile } from './hooks/useIsMobile';
+import { useIsMobile, useIsDesktop } from './hooks/useIsMobile';
 import { useAuth } from './hooks/useAuth';
 
 export type ViewType = 'dashboard' | 'pantry' | 'catalog' | 'kitchen' | 'service' | 'stock' | 'stock-reports' | 'stock-waste' | 'stock-import' | 'suppliers' | 'invoice' | 'settings' | 'foh' | 'team' | 'food-temp' | 'equipment-temp' | 'temp-records';
@@ -89,6 +89,10 @@ const App: React.FC = () => {
   const [complianceOpen, setComplianceOpen] = useState<boolean>(true);
   const [stockOpen, setStockOpen] = useState<boolean>(true);
   const isMobile = useIsMobile();
+  const isDesktop = useIsDesktop();
+  // On a laptop/desktop screen, keep the sidebar pinned open rather than expanding/
+  // collapsing on hover — that jumpy behavior only earns its keep on tighter tablet widths.
+  useEffect(() => { if (isDesktop) setNavCollapsed(false); }, [isDesktop]);
   const [showMoreSheet, setShowMoreSheet] = useState(false);
 
   const isManager = appUser?.role === 'manager';
@@ -299,8 +303,8 @@ const App: React.FC = () => {
         className={`flex flex-col h-full bg-surface-container border-r border-outline-variant transition-all duration-300 ${
           navCollapsed ? 'w-[72px]' : 'w-60'
         }`}
-        onMouseEnter={() => setNavCollapsed(false)}
-        onMouseLeave={() => setNavCollapsed(true)}
+        onMouseEnter={() => { if (!isDesktop) setNavCollapsed(false); }}
+        onMouseLeave={() => { if (!isDesktop) setNavCollapsed(true); }}
       >
         {/* Brand Header */}
         <div className="h-16 flex items-center px-6 border-b border-outline-variant overflow-hidden flex-shrink-0">

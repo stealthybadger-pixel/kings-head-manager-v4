@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { Thermometer, CheckCircle2, XCircle, X } from 'lucide-react';
+import { Thermometer, CheckCircle2, XCircle, X, Bluetooth } from 'lucide-react';
 import { useDishes, useRecipes, useIngredients, useFoodTempChecksToday, useFoodTempCheckMutations, todayCheckDate } from '../hooks/useKitchenData';
 import { buildFoodTempChecklist, FOOD_TEMP_THRESHOLDS, FoodTempChecklistItem } from '../utils/tempChecks';
 import { useAuth } from '../hooks/useAuth';
 import { useStore } from '../store/useStore';
+import { useBleThermometer, isWebBluetoothSupported } from '../hooks/useBleThermometer';
 import { FoodCheckType } from '../types';
 
 function tileKey(itemId: string, checkType: FoodCheckType) {
@@ -22,6 +23,12 @@ export const FoodTempChecks: React.FC = () => {
   const [activeTile, setActiveTile] = useState<FoodTempChecklistItem | null>(null);
   const [tempInput, setTempInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const { connect, disconnect, connected, connecting, error: bleError, probes, battery } = useBleThermometer();
+  // Which physical probe slots currently have a probe plugged in (non-null reading).
+  const liveProbes = probes
+    .map((t, i) => ({ slot: i + 1, temp: t }))
+    .filter((p) => p.temp !== null) as { slot: number; temp: number }[];
 
   // Tiles auto-populate from tags set on recipes/ingredients (see
   // utils/tempChecks.ts) — this is an available pool to tap into as
@@ -154,10 +161,46 @@ export const FoodTempChecks: React.FC = () => {
               </button>
             </div>
 
-            {/* Manual entry for now. Once a Bluetooth thermometer (ThermoPro
-                TP25) is paired, this same tap-to-open flow will show a live
-                BLE reading here instead, with the same confirm-before-save
-                step — the user still presses Record, never auto-saved. */}
+            {/* Bluetooth probe: live readings from a paired ThermoPro TP25H2. Tapping a
+                probe fills the temperature field below — the user still reviews it and
+                presses Record, so nothing is ever auto-saved straight off the probe. */}
+            {isWebBluetoothSupported() && (
+              <div className="flex flex-col gap-2 p-3 rounded-sm bg-surface-container-low border border-outline-variant">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold label-caps tracking-widest text-outline flex items-center gap-1.5">
+                    <Bluetooth className="h-3.5 w-3.5" />
+                    Probe {connected ? (battery !== null ? `· ${battery}%` : '· connected') : ''}
+                  </span>
+                  <button
+                    onClick={() => connected ? disconnect() : connect()}
+                    disabled={connecting}
+                    className={`h-7 px-3 text-[10px] font-bold label-caps rounded-sm border ${connected ? 'bg-primary/10 border-primary text-primary' : 'border-outline text-outline hover:bg-surface-container'}`}
+                  >
+                    {connecting ? 'Linking...' : connected ? 'Disconnect' : 'Link Probe'}
+                  </button>
+                </div>
+                {bleError && <span className="text-[10px] text-error">{bleError}</span>}
+                {connected && (
+                  liveProbes.length === 0 ? (
+                    <span className="text-[10px] text-outline">Waiting for a probe reading… (insert a probe)</span>
+                  ) : (
+                    <div className="flex gap-2 flex-wrap">
+                      {liveProbes.map(({ slot, temp }) => (
+                        <button
+                          key={slot}
+                          onClick={() => setTempInput(temp.toFixed(1))}
+                          className="flex-1 min-w-[90px] flex flex-col items-center gap-0.5 p-2 rounded-sm bg-surface border border-outline-variant hover:border-primary transition-colors"
+                        >
+                          <span className="text-[9px] label-caps text-outline">Probe {slot} · tap to use</span>
+                          <span className="text-lg font-bold data-tabular text-on-surface">{temp.toFixed(1)}&deg;C</span>
+                        </button>
+                      ))}
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] font-bold label-caps tracking-widest text-outline">Temperature (&deg;C)</label>
               <input
