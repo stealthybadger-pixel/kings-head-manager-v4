@@ -22,7 +22,8 @@ import {
   ShieldCheck,
   Thermometer,
   Refrigerator,
-  ClipboardList
+  ClipboardList,
+  ChevronLeft
 } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import Pantry from './components/Pantry';
@@ -84,6 +85,8 @@ const App: React.FC = () => {
   const setCurrentView = useStore((state) => state.setView);
   const toasts = useStore((state) => state.toasts);
   const dismissToast = useStore((state) => state.dismissToast);
+  const goBack = useStore((state) => state.goBack);
+  const canGoBack = useStore((state) => state.navBack.length > 0);
   const [navCollapsed, setNavCollapsed] = useState<boolean>(true);
   const [kitchenOpen, setKitchenOpen] = useState<boolean>(true);
   const [complianceOpen, setComplianceOpen] = useState<boolean>(true);
@@ -175,9 +178,20 @@ const App: React.FC = () => {
       <div className="flex flex-col h-[100dvh] w-screen bg-background overflow-hidden text-on-surface font-sans">
         {/* Slim top bar */}
         <header className="h-14 flex items-center justify-between px-4 border-b border-outline-variant bg-surface-container-lowest flex-shrink-0">
-          <h1 className="text-base font-semibold text-on-surface capitalize truncate">
-            {VIEW_TITLES[currentView]}
-          </h1>
+          <div className="flex items-center gap-2 min-w-0">
+            {canGoBack && (
+              <button
+                onClick={goBack}
+                className="flex items-center justify-center h-9 w-9 -ml-2 rounded-full text-on-surface-variant hover:bg-surface-container flex-shrink-0"
+                title="Back"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+            )}
+            <h1 className="text-base font-semibold text-on-surface capitalize truncate">
+              {VIEW_TITLES[currentView]}
+            </h1>
+          </div>
           <span className="text-[9px] font-mono font-bold text-outline uppercase tracking-widest flex-shrink-0">v4</span>
         </header>
 
@@ -474,9 +488,21 @@ const App: React.FC = () => {
       <main className="flex-1 h-full overflow-hidden flex flex-col">
         {/* Header Ribbon */}
         <header className="h-16 border-b border-outline-variant bg-surface-container-lowest flex items-center px-8 justify-between flex-shrink-0">
-          <h1 className="headline-md text-on-surface capitalize font-semibold">
-            {currentView.replace('-', ' ')}
-          </h1>
+          <div className="flex items-center gap-3">
+            {canGoBack && (
+              <button
+                onClick={goBack}
+                className="flex items-center gap-1 h-8 pl-2 pr-3 rounded-sm border border-outline-variant text-xs font-semibold text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors"
+                title="Back to where you were"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Back
+              </button>
+            )}
+            <h1 className="headline-md text-on-surface capitalize font-semibold">
+              {currentView.replace('-', ' ')}
+            </h1>
+          </div>
           <div className="flex items-center gap-4">
             {appUser && (
               <span className="text-[10px] font-bold label-caps tracking-widest text-outline">

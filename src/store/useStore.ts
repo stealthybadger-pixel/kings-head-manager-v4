@@ -7,6 +7,16 @@ export interface Toast {
   type: 'success' | 'error' | 'info';
 }
 
+// A saved place to return to after cross-navigating (e.g. opening an ingredient in Pantry
+// from a recipe) — captures the view and whatever item/search was active there.
+interface NavSnapshot {
+  currentView: ViewType;
+  selectedIngredientId: string | null;
+  selectedRecipeId: string | null;
+  selectedDishId: string | null;
+  searchTerm: string;
+}
+
 interface UIState {
   currentView: ViewType;
   selectedIngredientId: string | null;
@@ -31,6 +41,9 @@ interface UIState {
   scaleWeightGrams: number;
   activeContainerId: string | null;
 
+  // Cross-navigation return stack (drives the header "Back" button)
+  navBack: NavSnapshot[];
+
   // Toast Notifications
   toasts: Toast[];
 
@@ -53,11 +66,21 @@ interface UIState {
   navigateToPantryWithIngredient: (id: string) => void;
   navigateToStockWithIngredient: (id: string) => void;
   navigateToKitchenWithRecipe: (id: string) => void;
+  goBack: () => void;
+  canGoBack: () => boolean;
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   dismissToast: (id: string) => void;
 }
 
-export const useStore = create<UIState>((set) => ({
+const snapshotOf = (s: UIState): NavSnapshot => ({
+  currentView: s.currentView,
+  selectedIngredientId: s.selectedIngredientId,
+  selectedRecipeId: s.selectedRecipeId,
+  selectedDishId: s.selectedDishId,
+  searchTerm: s.searchTerm,
+});
+
+export const useStore = create<UIState>((set, get) => ({
   currentView: 'dashboard',
   selectedIngredientId: null,
   selectedRecipeId: null,
@@ -73,6 +96,8 @@ export const useStore = create<UIState>((set) => ({
   scaleWeightGrams: 0,
   activeContainerId: null,
 
+  navBack: [],
+
   toasts: [],
 
   setView: (view) => set({
@@ -84,7 +109,8 @@ export const useStore = create<UIState>((set) => ({
     highlightProductId: null,
     searchTerm: '',
     categoryFilter: 'All',
-    supplierFilter: 'All'
+    supplierFilter: 'All',
+    navBack: [] // a deliberate sidebar jump starts a fresh trail
   }),
   selectIngredient: (id) => set({ selectedIngredientId: id, selectedRecipeId: null, selectedDishId: null }),
   selectRecipe: (id) => set({ selectedRecipeId: id, selectedIngredientId: null, selectedDishId: null }),
@@ -130,7 +156,8 @@ export const useStore = create<UIState>((set) => ({
     supplierFilter: 'All'
   }),
   clearLinkBackIngredient: () => set({ linkBackIngredientId: null }),
-  navigateToPantryWithIngredient: (id) => set({
+  navigateToPantryWithIngredient: (id) => set((state) => ({
+    navBack: [...state.navBack, snapshotOf(state)],
     currentView: 'pantry',
     selectedIngredientId: id,
     selectedRecipeId: null,
@@ -140,8 +167,9 @@ export const useStore = create<UIState>((set) => ({
     searchTerm: '',
     categoryFilter: 'All',
     supplierFilter: 'All'
-  }),
-  navigateToStockWithIngredient: (id) => set({
+  })),
+  navigateToStockWithIngredient: (id) => set((state) => ({
+    navBack: [...state.navBack, snapshotOf(state)],
     currentView: 'stock',
     selectedIngredientId: id,
     selectedRecipeId: null,
@@ -151,8 +179,9 @@ export const useStore = create<UIState>((set) => ({
     searchTerm: '',
     categoryFilter: 'All',
     supplierFilter: 'All'
-  }),
-  navigateToKitchenWithRecipe: (id) => set({
+  })),
+  navigateToKitchenWithRecipe: (id) => set((state) => ({
+    navBack: [...state.navBack, snapshotOf(state)],
     currentView: 'kitchen',
     selectedIngredientId: null,
     selectedRecipeId: id,
@@ -162,7 +191,24 @@ export const useStore = create<UIState>((set) => ({
     searchTerm: '',
     categoryFilter: 'All',
     supplierFilter: 'All'
+  })),
+  goBack: () => set((state) => {
+    const prev = state.navBack[state.navBack.length - 1];
+    if (!prev) return {};
+    return {
+      navBack: state.navBack.slice(0, -1),
+      currentView: prev.currentView,
+      selectedIngredientId: prev.selectedIngredientId,
+      selectedRecipeId: prev.selectedRecipeId,
+      selectedDishId: prev.selectedDishId,
+      searchTerm: prev.searchTerm,
+      linkBackIngredientId: null,
+      highlightProductId: null,
+      categoryFilter: 'All',
+      supplierFilter: 'All'
+    };
   }),
+  canGoBack: () => get().navBack.length > 0,
 
   showToast: (message, type = 'success') => {
     const id = Math.random().toString(36).substring(2, 9);
