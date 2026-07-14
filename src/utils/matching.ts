@@ -41,6 +41,11 @@ export const cleanProductName = (name: string): string => {
     .replace(/['"’]/g, '') // remove quotes
     .replace(/[,&/\-_+]/g, ' ') // replace common punctuation with spaces
     .replace(/\b(sachet|box|tray|pack|bag|case|bottle|tin|jar|can|pcs|slices|guide|catt|urban)\b/g, '') // remove packaging words
+    // Remove generic marketing/quality filler words that pad out branded product names
+    // (e.g. "Dr. Oetker Professional Bicarbonate of Soda") without describing the product
+    // itself — left in, these push otherwise-good matches over the unmatched-word limit
+    // in findBestIngredientMatch.
+    .replace(/\b(professional|premium|finest|superior|gourmet|select|signature|quality)\b/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 };

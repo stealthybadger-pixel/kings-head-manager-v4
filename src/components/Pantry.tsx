@@ -370,6 +370,32 @@ export const Pantry: React.FC = () => {
     }, 50);
   };
 
+  // "Find on Supplier Catalogue" needs a real ingredient id to link back to. For a brand-new,
+  // not-yet-saved ingredient there isn't one yet — auto-save it first (same validation as the
+  // normal Save button) so the search can happen immediately after typing a name, rather than
+  // forcing a separate manual save step first.
+  const [isLinkingNewIngredient, setIsLinkingNewIngredient] = useState(false);
+  const handleFindOnCatalogue = async () => {
+    if (formState.id) {
+      navigateToCatalogToLinkSupplier(formState.id, formState.name);
+      return;
+    }
+    if (!formState.name) {
+      showToast("Ingredient name is required before searching the catalogue", "error");
+      return;
+    }
+    setIsLinkingNewIngredient(true);
+    try {
+      const created = await addIngredient.mutateAsync(formState);
+      showToast(`Ingredient "${created.name}" created — searching catalogue...`, "success");
+      navigateToCatalogToLinkSupplier(created.id, created.name);
+    } catch (err: any) {
+      showToast(err.message || "Failed to save ingredient", "error");
+    } finally {
+      setIsLinkingNewIngredient(false);
+    }
+  };
+
   const handleRemoveSupplier = (index: number) => {
     setFormState(prev => ({
       ...prev,
@@ -1114,16 +1140,19 @@ export const Pantry: React.FC = () => {
                   >
                     + Manual Entry
                   </button>
-                  {formState.id ? (
+                  {formState.name ? (
                     <button
-                      onClick={() => navigateToCatalogToLinkSupplier(formState.id!, formState.name)}
-                      title="Search the full supplier catalogue and add a matching product as a supplier option for this ingredient"
-                      className="h-8 px-3 border border-primary text-primary text-[10px] label-caps font-bold rounded-sm bg-surface hover:bg-primary/5"
+                      onClick={handleFindOnCatalogue}
+                      disabled={isLinkingNewIngredient}
+                      title={formState.id
+                        ? "Search the full supplier catalogue and add a matching product as a supplier option for this ingredient"
+                        : "Saves this ingredient, then searches the supplier catalogue"}
+                      className="h-8 px-3 border border-primary text-primary text-[10px] label-caps font-bold rounded-sm bg-surface hover:bg-primary/5 disabled:opacity-50"
                     >
-                      Find on Supplier Catalogue
+                      {isLinkingNewIngredient ? 'Saving...' : 'Find on Supplier Catalogue'}
                     </button>
                   ) : (
-                    <span title="Save this ingredient first, then you can search the catalogue to add a supplier option"
+                    <span title="Type an ingredient name first, then you can search the catalogue to add a supplier option"
                       className="h-8 px-3 border border-outline-variant text-outline/50 text-[10px] label-caps font-bold rounded-sm flex items-center cursor-not-allowed">
                       Find on Supplier Catalogue
                     </span>
