@@ -9,65 +9,6 @@ import { useAuth } from '../hooks/useAuth';
 import { inferIngredientDefaults, DRY_STORE_SUBCATEGORIES } from '../utils/ingredientAutofill';
 import { getBaseRate, getBaseUnit } from '../utils/costing';
 
-// Self-contained catalog search for a single supplier row
-const CatalogRowSearch: React.FC<{
-  onSelect: (prod: { supplier: string; packCost: number; packSize: number; packUnit: string }) => void;
-}> = ({ onSelect }) => {
-  const [term, setTerm] = useState('');
-  const [debouncedTerm, setDebouncedTerm] = useState('');
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedTerm(term), 350);
-    return () => clearTimeout(t);
-  }, [term]);
-
-  const { data: allProducts = [] } = useSupplierProducts();
-  const results = useMemo(() => {
-    if (debouncedTerm.trim().length < 2) return [];
-    const tokens = tokenizeSearchQuery(debouncedTerm);
-    return allProducts.filter(p =>
-      matchesSearchTokens(p.name, tokens) || (!!p.originalName && matchesSearchTokens(p.originalName, tokens))
-    );
-  }, [allProducts, debouncedTerm]);
-
-  return (
-    <div className="relative w-full" ref={ref}>
-      <div className="flex items-center gap-1 border border-outline-variant rounded-sm px-2 py-1 bg-surface-container-lowest">
-        <Search className="h-3 w-3 text-outline shrink-0" />
-        <input
-          type="text"
-          placeholder="Search catalog…"
-          value={term}
-          onChange={e => { setTerm(e.target.value); setOpen(true); }}
-          onFocus={() => setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 150)}
-          className="flex-1 text-xs bg-transparent outline-none min-w-0"
-        />
-      </div>
-      {open && results.length > 0 && (
-        <div className="absolute z-50 top-full left-0 right-0 mt-0.5 bg-surface border border-outline-variant rounded shadow-lg max-h-48 overflow-y-auto">
-          {results.slice(0, 20).map(prod => (
-            <button
-              key={prod.id}
-              type="button"
-              onMouseDown={() => {
-                onSelect({ supplier: prod.supplier, packCost: prod.packCost, packSize: prod.packSize, packUnit: prod.packUnit });
-                setTerm('');
-                setOpen(false);
-              }}
-              className="w-full text-left px-3 py-2 hover:bg-surface-container text-xs border-b border-outline-variant/40 last:border-0"
-            >
-              <div className="font-semibold text-on-surface truncate">{prod.name}</div>
-              <div className="text-outline">{prod.supplier} · £{prod.packCost.toFixed(2)} / {prod.packSize}{prod.packUnit}</div>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
 import { cleanProductName, findBestIngredientMatch } from '../utils/matching';
 import { tokenizeSearchQuery, matchesSearchTokens } from '../utils/search';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -141,6 +82,8 @@ export const Pantry: React.FC = () => {
   const isMobile = useIsMobile();
   const showToast = useStore((state) => state.showToast);
   const navigateToCatalogWithSearch = useStore((state) => state.navigateToCatalogWithSearch);
+  const navigateToCatalogAndHighlightProduct = useStore((state) => state.navigateToCatalogAndHighlightProduct);
+  const navigateToCatalogToLinkSupplier = useStore((state) => state.navigateToCatalogToLinkSupplier);
   const { appUser } = useAuth();
   const isManager = appUser?.role === 'manager';
 
@@ -396,19 +339,6 @@ export const Pantry: React.FC = () => {
   // Supplier packaging management
   const suppliersListRef = useRef<HTMLDivElement>(null);
 
-  const handleAddSupplier = () => {
-    setFormState(prev => ({
-      ...prev,
-      suppliers: [
-        ...prev.suppliers,
-        { name: 'Internal', packCost: 0, packSize: 1, packUnit: 'kg', isPreferred: prev.suppliers.length === 0 }
-      ]
-    }));
-    setTimeout(() => {
-      suppliersListRef.current?.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }, 50);
-  };
-
   const handleUpdateSupplier = (index: number, field: string, value: any) => {
     setFormState(prev => {
       const updated = [...prev.suppliers];
@@ -423,6 +353,21 @@ export const Pantry: React.FC = () => {
       
       return { ...prev, suppliers: updated };
     });
+  };
+
+  // For items with no external wholesale product (e.g. an in-house/no-cost "Internal" entry) —
+  // the catalogue search flow only helps when a real supplier product exists to link.
+  const handleAddManualSupplier = () => {
+    setFormState(prev => ({
+      ...prev,
+      suppliers: [
+        ...prev.suppliers,
+        { name: 'Internal', packCost: 0, packSize: 1, packUnit: 'kg', isPreferred: prev.suppliers.length === 0 }
+      ]
+    }));
+    setTimeout(() => {
+      suppliersListRef.current?.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 50);
   };
 
   const handleRemoveSupplier = (index: number) => {
@@ -1116,7 +1061,7 @@ export const Pantry: React.FC = () => {
                     <p className="mt-0.5 text-on-success-variant flex items-center flex-wrap gap-1">
                       {cheaperCatalogOption.product.supplier} offers
                       <button
-                        onClick={() => navigateToCatalogWithSearch(cheaperCatalogOption.product.name)}
+                        onClick={() => navigateToCatalogAndHighlightProduct(cheaperCatalogOption.product.id, cheaperCatalogOption.product.name)}
                         className="font-bold text-primary hover:underline bg-transparent border-none p-0 cursor-pointer inline-flex items-center gap-0.5 align-baseline"
                         title="View option in supplier catalogue"
                       >
@@ -1161,12 +1106,29 @@ export const Pantry: React.FC = () => {
             <div className="mt-4 border-t border-outline-variant pt-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="label-caps text-on-surface font-bold">Supplier Options & Pricing</h3>
-                <button 
-                  onClick={handleAddSupplier}
-                  className="h-8 px-3 border border-outline text-[10px] label-caps font-bold rounded-sm bg-surface hover:bg-surface-container"
-                >
-                  + Add Supplier Option
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleAddManualSupplier}
+                    title="Add a manual entry (e.g. an in-house 'Internal' item with no external supplier cost)"
+                    className="h-8 px-3 border border-outline text-[10px] label-caps font-bold rounded-sm bg-surface hover:bg-surface-container"
+                  >
+                    + Manual Entry
+                  </button>
+                  {formState.id ? (
+                    <button
+                      onClick={() => navigateToCatalogToLinkSupplier(formState.id!, formState.name)}
+                      title="Search the full supplier catalogue and add a matching product as a supplier option for this ingredient"
+                      className="h-8 px-3 border border-primary text-primary text-[10px] label-caps font-bold rounded-sm bg-surface hover:bg-primary/5"
+                    >
+                      Find on Supplier Catalogue
+                    </button>
+                  ) : (
+                    <span title="Save this ingredient first, then you can search the catalogue to add a supplier option"
+                      className="h-8 px-3 border border-outline-variant text-outline/50 text-[10px] label-caps font-bold rounded-sm flex items-center cursor-not-allowed">
+                      Find on Supplier Catalogue
+                    </span>
+                  )}
+                </div>
               </div>
 
               {formState.suppliers.length === 0 ? (
@@ -1177,18 +1139,6 @@ export const Pantry: React.FC = () => {
                 <div className="flex flex-col gap-3" ref={suppliersListRef}>
                   {formState.suppliers.map((sup, idx) => (
                     <div key={idx} className="flex flex-col gap-3 bg-surface p-4 border border-outline-variant rounded-sm">
-                      <div>
-                        <label className="text-[10px] label-caps text-outline block mb-1">Search Catalog to Pre-fill</label>
-                        <CatalogRowSearch
-                          onSelect={({ supplier, packCost, packSize, packUnit }) => {
-                            setFormState(prev => {
-                              const updated = [...prev.suppliers];
-                              updated[idx] = { ...updated[idx], name: supplier as any, packCost, packSize, packUnit: packUnit as any };
-                              return { ...prev, suppliers: updated };
-                            });
-                          }}
-                        />
-                      </div>
                       <div className="flex flex-wrap md:flex-nowrap gap-2 items-center">
                       <div className="w-[110px] flex-shrink-0">
                         <label className="text-[9px] label-caps text-outline block mb-1">Wholesale Partner</label>

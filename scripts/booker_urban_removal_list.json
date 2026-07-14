@@ -1,0 +1,4862 @@
+[
+  {
+    "id": "booker_cooks_co_roasted_red_peppers_in_red_wine_vinegar_2760_g",
+    "name": "Cooks&Co Roasted Red Peppers in Red Wine Vinegar",
+    "supplier": "Booker",
+    "packCost": 14.49,
+    "packSize": 2760,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_cooks_co_roasted_red_peppers_in_red_wine_vinegar_360_g",
+    "name": "Cooks&Co Roasted Red Peppers in Red Wine Vinegar",
+    "supplier": "Booker",
+    "packCost": 2.49,
+    "packSize": 360,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_coolmore_classic_carrot_2400_g",
+    "name": "Coolmore Classic Carrot",
+    "supplier": "Booker",
+    "packCost": 13.29,
+    "packSize": 2400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_coolmore_classic_carrot_400_g",
+    "name": "Coolmore Classic Carrot",
+    "supplier": "Booker",
+    "packCost": 2.29,
+    "packSize": 400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_curtis_catering_cashew_nuts_1_kg",
+    "name": "Curtis Catering Cashew Nuts",
+    "supplier": "Booker",
+    "packCost": 12.99,
+    "packSize": 1,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_curtis_catering_cashew_nuts_6_kg",
+    "name": "Curtis Catering Cashew Nuts",
+    "supplier": "Booker",
+    "packCost": 75.99,
+    "packSize": 6,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_curtis_catering_chopped_mixed_nuts_1_kg",
+    "name": "Curtis Catering Chopped Mixed Nuts",
+    "supplier": "Booker",
+    "packCost": 8.99,
+    "packSize": 1,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_curtis_catering_chopped_mixed_nuts_6_kg",
+    "name": "Curtis Catering Chopped Mixed Nuts",
+    "supplier": "Booker",
+    "packCost": 51.49,
+    "packSize": 6,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_curtis_catering_chopped_pistachios_500_g",
+    "name": "Curtis Catering Chopped Pistachios",
+    "supplier": "Booker",
+    "packCost": 12.99,
+    "packSize": 500,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_curtis_catering_chopped_pistachios_7000_g",
+    "name": "Curtis Catering Chopped Pistachios",
+    "supplier": "Booker",
+    "packCost": 159.99,
+    "packSize": 7000,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_curtis_catering_currants_12_kg",
+    "name": "Curtis Catering Currants",
+    "supplier": "Booker",
+    "packCost": 73.49,
+    "packSize": 12,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_curtis_catering_currants_2_kg",
+    "name": "Curtis Catering Currants",
+    "supplier": "Booker",
+    "packCost": 12.99,
+    "packSize": 2,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_curtis_catering_desiccated_coconut_2_kg",
+    "name": "Curtis Catering Desiccated Coconut",
+    "supplier": "Booker",
+    "packCost": 9.49,
+    "packSize": 2,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_curtis_catering_desiccated_coconut_8_kg",
+    "name": "Curtis Catering Desiccated Coconut",
+    "supplier": "Booker",
+    "packCost": 35.99,
+    "packSize": 8,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_curtis_catering_flaked_almonds_1_kg",
+    "name": "Curtis Catering Flaked Almonds",
+    "supplier": "Booker",
+    "packCost": 13.49,
+    "packSize": 1,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_curtis_catering_flaked_almonds_6_kg",
+    "name": "Curtis Catering Flaked Almonds",
+    "supplier": "Booker",
+    "packCost": 79.99,
+    "packSize": 6,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_curtis_catering_ground_almonds_1_kg",
+    "name": "Curtis Catering Ground Almonds",
+    "supplier": "Booker",
+    "packCost": 12.99,
+    "packSize": 1,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_curtis_catering_ground_almonds_6_kg",
+    "name": "Curtis Catering Ground Almonds",
+    "supplier": "Booker",
+    "packCost": 76.99,
+    "packSize": 6,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_curtis_catering_hazelnuts_1_kg",
+    "name": "Curtis Catering Hazelnuts",
+    "supplier": "Booker",
+    "packCost": 15.99,
+    "packSize": 1,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_curtis_catering_hazelnuts_6_kg",
+    "name": "Curtis Catering Hazelnuts",
+    "supplier": "Booker",
+    "packCost": 91.99,
+    "packSize": 6,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_curtis_catering_pecan_nuts_1_kg",
+    "name": "Curtis Catering Pecan Nuts",
+    "supplier": "Booker",
+    "packCost": 17.99,
+    "packSize": 1,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_curtis_catering_pecan_nuts_6_kg",
+    "name": "Curtis Catering Pecan Nuts",
+    "supplier": "Booker",
+    "packCost": 104.49,
+    "packSize": 6,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_curtis_catering_raisins_12_kg",
+    "name": "Curtis Catering Raisins",
+    "supplier": "Booker",
+    "packCost": 63.49,
+    "packSize": 12,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_curtis_catering_raisins_2_kg",
+    "name": "Curtis Catering Raisins",
+    "supplier": "Booker",
+    "packCost": 10.99,
+    "packSize": 2,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_curtis_catering_sultanas_12_kg",
+    "name": "Curtis Catering Sultanas",
+    "supplier": "Booker",
+    "packCost": 51.99,
+    "packSize": 12,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_curtis_catering_sultanas_2_kg",
+    "name": "Curtis Catering Sultanas",
+    "supplier": "Booker",
+    "packCost": 8.99,
+    "packSize": 2,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_curtis_catering_walnut_halves_1_kg",
+    "name": "Curtis Catering Walnut Halves",
+    "supplier": "Booker",
+    "packCost": 12.49,
+    "packSize": 1,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_curtis_catering_walnut_halves_6_kg",
+    "name": "Curtis Catering Walnut Halves",
+    "supplier": "Booker",
+    "packCost": 71.69,
+    "packSize": 6,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_curtis_catering_walnut_pieces_1_kg",
+    "name": "Curtis Catering Walnut Pieces",
+    "supplier": "Booker",
+    "packCost": 11.49,
+    "packSize": 1,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_curtis_catering_walnut_pieces_6_kg",
+    "name": "Curtis Catering Walnut Pieces",
+    "supplier": "Booker",
+    "packCost": 66.69,
+    "packSize": 6,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_euro_shopper_15_free_range_eggs_1_ea",
+    "name": "Euro Shopper 15 Free Range Eggs",
+    "supplier": "Booker",
+    "packCost": 16.59,
+    "packSize": 675,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_euro_shopper_15_free_range_eggs_675_g",
+    "name": "Euro Shopper 15 Free Range Eggs",
+    "supplier": "Booker",
+    "packCost": 2.76,
+    "packSize": 675,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_euro_shopper_6_free_range_eggs_1_ea",
+    "name": "Euro Shopper 6 Free Range Eggs",
+    "supplier": "Booker",
+    "packCost": 10.08,
+    "packSize": 275,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_euro_shopper_6_free_range_eggs_275_g",
+    "name": "Euro Shopper 6 Free Range Eggs",
+    "supplier": "Booker",
+    "packCost": 10.08,
+    "packSize": 275,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_euro_shopper_chocolate_peanut_protein_bar_780_g",
+    "name": "Euro Shopper Chocolate Peanut Protein Bar",
+    "supplier": "Booker",
+    "packCost": 8.99,
+    "packSize": 780,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_euro_shopper_white_chocolate_2800_g",
+    "name": "Euro Shopper White Chocolate",
+    "supplier": "Booker",
+    "packCost": 20.09,
+    "packSize": 2800,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_extra_chewing_gum_bottle_sugar_free_peppermint_x46_pieces_1_ea",
+    "name": "Extra Chewing Gum Bottle Sugar Free Peppermint x46 Pieces",
+    "supplier": "Booker",
+    "packCost": 9.85,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_extra_chewing_gum_bottle_sugar_free_peppermint_x46_pieces_pmp_2_50_1_ea",
+    "name": "Extra Chewing Gum Bottle Sugar Free Peppermint x46 Pieces PMP £2.50",
+    "supplier": "Booker",
+    "packCost": 8.65,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_extra_chewing_gum_bottle_sugar_free_spearmint_x46_pieces_1_ea",
+    "name": "Extra Chewing Gum Bottle Sugar Free Spearmint x46 Pieces",
+    "supplier": "Booker",
+    "packCost": 9.85,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_extra_chewing_gum_sugar_free_cool_breeze_x10_pieces_1_ea",
+    "name": "Extra Chewing Gum Sugar Free Cool Breeze x10 Pieces",
+    "supplier": "Booker",
+    "packCost": 11.85,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_extra_cool_breeze_sugar_free_chewing_gum_x46_pieces_1_ea",
+    "name": "Extra Cool Breeze Sugar Free Chewing Gum x46 Pieces",
+    "supplier": "Booker",
+    "packCost": 9.85,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_extra_peppermint_chewing_gum_x10_pieces_1_ea",
+    "name": "Extra Peppermint Chewing Gum  x10 Pieces",
+    "supplier": "Booker",
+    "packCost": 11.85,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_extra_plus_chill_sugarfree_chewing_gum_bottle_30_pieces_1_ea",
+    "name": "Extra Plus Chill Sugarfree Chewing Gum Bottle 30 Pieces",
+    "supplier": "Booker",
+    "packCost": 10.49,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_extra_plus_deep_clean_sugarfree_chewing_gum_7_pieces_1_ea",
+    "name": "Extra Plus Deep Clean Sugarfree Chewing Gum 7 Pieces",
+    "supplier": "Booker",
+    "packCost": 6.39,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_extra_plus_deep_clean_sugarfree_chewing_gum_bottle_30_pieces_1_ea",
+    "name": "Extra Plus Deep Clean Sugarfree Chewing Gum Bottle (30 Pieces)",
+    "supplier": "Booker",
+    "packCost": 10.49,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_extra_plus_hydro_sugarfree_chewing_gum_bottle_30_pieces_1_ea",
+    "name": "Extra Plus Hydro Sugarfree Chewing Gum Bottle 30 Pieces",
+    "supplier": "Booker",
+    "packCost": 10.49,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_extra_refreshers_chewing_gum_sugar_free_strawberry_lemon_x7_pieces_1_ea",
+    "name": "Extra Refreshers Chewing Gum Sugar Free Strawberry Lemon x7 Pieces",
+    "supplier": "Booker",
+    "packCost": 6.79,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_extra_refreshers_tropical_sugar_free_chewing_gum_x7_pieces_1_ea",
+    "name": "Extra Refreshers Tropical Sugar Free Chewing Gum x7 Pieces",
+    "supplier": "Booker",
+    "packCost": 6.79,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_extra_refreshers_watermelon_raspberry_flavour_sugarfree_chewing_gum_handy_box_7_pieces_1_ea",
+    "name": "Extra Refreshers Watermelon Raspberry Flavour Sugarfree Chewing Gum Handy Box 7 Pieces",
+    "supplier": "Booker",
+    "packCost": 6.79,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_extra_spearmint_sugar_free_chewing_gum_x10_pieces_1_ea",
+    "name": "Extra Spearmint Sugar Free Chewing Gum x10 Pieces",
+    "supplier": "Booker",
+    "packCost": 11.85,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_extra_spearmint_sugarfree_chewing_gum_bottle_2_50_pmp_46_pieces_1_ea",
+    "name": "Extra Spearmint Sugarfree Chewing Gum Bottle £2.50 PMP 46 Pieces",
+    "supplier": "Booker",
+    "packCost": 8.65,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_extra_strawberry_flavour_sugarfree_chewing_gum_bottle_2_50_pmp_46_pieces_1_ea",
+    "name": "Extra Strawberry Flavour Sugarfree Chewing Gum Bottle £2.50 PMP 46 Pieces",
+    "supplier": "Booker",
+    "packCost": 207.59,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_extra_strawberry_sugar_free_chewing_gum_x10_pieces_1_ea",
+    "name": "Extra Strawberry Sugar Free Chewing Gum x10 Pieces",
+    "supplier": "Booker",
+    "packCost": 11.85,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_extra_watermelon_sugar_free_chewing_gum_x10_pieces_1_ea",
+    "name": "Extra Watermelon  Sugar Free Chewing Gum x10 Pieces",
+    "supplier": "Booker",
+    "packCost": 11.85,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_extra_white_bubblemint_sugar_free_chewing_gum_x10_pieces_1_ea",
+    "name": "Extra White Bubblemint Sugar Free Chewing Gum x10 Pieces",
+    "supplier": "Booker",
+    "packCost": 12.69,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_extra_white_bubblemint_sugarfree_chewing_gum_bottle_2_50_pmp_46_pieces_1_ea",
+    "name": "Extra White Bubblemint Sugarfree Chewing Gum Bottle £2.50 PMP 46 Pieces",
+    "supplier": "Booker",
+    "packCost": 8.65,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_extra_white_chewing_gum_sugar_free_10_pieces_1_ea",
+    "name": "Extra White Chewing Gum Sugar Free 10 Pieces",
+    "supplier": "Booker",
+    "packCost": 12.69,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_aubergines_1_ea",
+    "name": "Farm Fresh Aubergines",
+    "supplier": "Booker",
+    "packCost": 14.94,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_avocados_1_ea",
+    "name": "Farm Fresh Avocados",
+    "supplier": "Booker",
+    "packCost": 59.94,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_baby_potatoes_10_kg",
+    "name": "Farm Fresh Baby Potatoes",
+    "supplier": "Booker",
+    "packCost": 10.99,
+    "packSize": 10,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_banana_shallots_1_kg",
+    "name": "Farm Fresh Banana Shallots",
+    "supplier": "Booker",
+    "packCost": 2.29,
+    "packSize": 1,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_banana_shallots_8_kg",
+    "name": "Farm Fresh Banana Shallots",
+    "supplier": "Booker",
+    "packCost": 18.32,
+    "packSize": 8,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_basil_1_ea",
+    "name": "Farm Fresh Basil",
+    "supplier": "Booker",
+    "packCost": 1.59,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_basil_400_g",
+    "name": "Farm Fresh Basil",
+    "supplier": "Booker",
+    "packCost": 6.36,
+    "packSize": 400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_carrots_12_kg",
+    "name": "Farm Fresh Carrots",
+    "supplier": "Booker",
+    "packCost": 11.94,
+    "packSize": 12,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_carrots_15_kg",
+    "name": "Farm Fresh Carrots",
+    "supplier": "Booker",
+    "packCost": 14.25,
+    "packSize": 15,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_carrots_1_ea",
+    "name": "Farm Fresh Carrots",
+    "supplier": "Booker",
+    "packCost": 4.75,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_carrots_2_kg",
+    "name": "Farm Fresh Carrots",
+    "supplier": "Booker",
+    "packCost": 1.99,
+    "packSize": 2,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_cherry_tomatoes_4800_g",
+    "name": "Farm Fresh Cherry Tomatoes",
+    "supplier": "Booker",
+    "packCost": 25.5,
+    "packSize": 4800,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_cherry_tomatoes_800_g",
+    "name": "Farm Fresh Cherry Tomatoes",
+    "supplier": "Booker",
+    "packCost": 4.25,
+    "packSize": 800,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_chives_1_ea",
+    "name": "Farm Fresh Chives",
+    "supplier": "Booker",
+    "packCost": 1.59,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_chives_400_g",
+    "name": "Farm Fresh Chives",
+    "supplier": "Booker",
+    "packCost": 6.36,
+    "packSize": 400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_coriander_1_ea",
+    "name": "Farm Fresh Coriander",
+    "supplier": "Booker",
+    "packCost": 1.59,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_coriander_400_g",
+    "name": "Farm Fresh Coriander",
+    "supplier": "Booker",
+    "packCost": 6.36,
+    "packSize": 400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_courgettes_1_kg",
+    "name": "Farm Fresh Courgettes",
+    "supplier": "Booker",
+    "packCost": 3.95,
+    "packSize": 1,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_courgettes_4_kg",
+    "name": "Farm Fresh Courgettes",
+    "supplier": "Booker",
+    "packCost": 15.8,
+    "packSize": 4,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_cucumber_1_ea",
+    "name": "Farm Fresh Cucumber",
+    "supplier": "Booker",
+    "packCost": 10.99,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_dill_1_ea",
+    "name": "Farm Fresh Dill",
+    "supplier": "Booker",
+    "packCost": 1.59,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_dill_400_g",
+    "name": "Farm Fresh Dill",
+    "supplier": "Booker",
+    "packCost": 6.36,
+    "packSize": 400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_fine_beans_1_ea",
+    "name": "Farm Fresh Fine Beans",
+    "supplier": "Booker",
+    "packCost": 6.5,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_fine_beans_4_kg",
+    "name": "Farm Fresh Fine Beans",
+    "supplier": "Booker",
+    "packCost": 26,
+    "packSize": 4,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_flat_parsley_1_ea",
+    "name": "Farm Fresh Flat Parsley",
+    "supplier": "Booker",
+    "packCost": 1.59,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_flat_parsley_400_g",
+    "name": "Farm Fresh Flat Parsley",
+    "supplier": "Booker",
+    "packCost": 6.36,
+    "packSize": 400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_ginger_4500_g",
+    "name": "Farm Fresh Ginger",
+    "supplier": "Booker",
+    "packCost": 29.9,
+    "packSize": 4500,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_ginger_450_g",
+    "name": "Farm Fresh Ginger",
+    "supplier": "Booker",
+    "packCost": 2.99,
+    "packSize": 450,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_green_peppers_1_ea",
+    "name": "Farm Fresh Green Peppers",
+    "supplier": "Booker",
+    "packCost": 17,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_leeks_10_kg",
+    "name": "Farm Fresh Leeks",
+    "supplier": "Booker",
+    "packCost": 29.95,
+    "packSize": 10,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_leeks_1_ea",
+    "name": "Farm Fresh Leeks",
+    "supplier": "Booker",
+    "packCost": 5.99,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_lemons_10_kg",
+    "name": "Farm Fresh Lemons",
+    "supplier": "Booker",
+    "packCost": 24.95,
+    "packSize": 10,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_lemons_1_ea",
+    "name": "Farm Fresh Lemons",
+    "supplier": "Booker",
+    "packCost": 39.9,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_lemons_2_kg",
+    "name": "Farm Fresh Lemons",
+    "supplier": "Booker",
+    "packCost": 4.99,
+    "packSize": 2,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_limes_1_ea",
+    "name": "Farm Fresh Limes",
+    "supplier": "Booker",
+    "packCost": 5.49,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_limes_4_kg",
+    "name": "Farm Fresh Limes",
+    "supplier": "Booker",
+    "packCost": 10.98,
+    "packSize": 4,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_mint_1_ea",
+    "name": "Farm Fresh Mint",
+    "supplier": "Booker",
+    "packCost": 1.59,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_mint_400_g",
+    "name": "Farm Fresh Mint",
+    "supplier": "Booker",
+    "packCost": 6.36,
+    "packSize": 400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_parsley_1_ea",
+    "name": "Farm Fresh Parsley",
+    "supplier": "Booker",
+    "packCost": 1.59,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_parsley_400_g",
+    "name": "Farm Fresh Parsley",
+    "supplier": "Booker",
+    "packCost": 6.36,
+    "packSize": 400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_parsnips_1_5_kg",
+    "name": "Farm Fresh Parsnips",
+    "supplier": "Booker",
+    "packCost": 3.19,
+    "packSize": 1.5,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_parsnips_9_kg",
+    "name": "Farm Fresh Parsnips",
+    "supplier": "Booker",
+    "packCost": 19.14,
+    "packSize": 9,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_peeled_garlic_1_kg",
+    "name": "Farm Fresh Peeled Garlic",
+    "supplier": "Booker",
+    "packCost": 6.5,
+    "packSize": 1,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_peeled_garlic_3600_g",
+    "name": "Farm Fresh Peeled Garlic",
+    "supplier": "Booker",
+    "packCost": 26.99,
+    "packSize": 3600,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_peeled_garlic_400_g",
+    "name": "Farm Fresh Peeled Garlic",
+    "supplier": "Booker",
+    "packCost": 2.99,
+    "packSize": 400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_peeled_garlic_9_kg",
+    "name": "Farm Fresh Peeled Garlic",
+    "supplier": "Booker",
+    "packCost": 58.5,
+    "packSize": 9,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_red_onions_5_kg",
+    "name": "Farm Fresh Red Onions",
+    "supplier": "Booker",
+    "packCost": 5.49,
+    "packSize": 5,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_red_peppers_5_kg",
+    "name": "Farm Fresh Red Peppers",
+    "supplier": "Booker",
+    "packCost": 18,
+    "packSize": 5,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_rosemary_1_ea",
+    "name": "Farm Fresh Rosemary",
+    "supplier": "Booker",
+    "packCost": 1.59,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_rosemary_400_g",
+    "name": "Farm Fresh Rosemary",
+    "supplier": "Booker",
+    "packCost": 6.36,
+    "packSize": 400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_salad_tomatoes_6_kg",
+    "name": "Farm Fresh Salad Tomatoes",
+    "supplier": "Booker",
+    "packCost": 10.99,
+    "packSize": 6,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_spinach_1_ea",
+    "name": "Farm Fresh Spinach",
+    "supplier": "Booker",
+    "packCost": 1.29,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_spinach_2000_g",
+    "name": "Farm Fresh Spinach",
+    "supplier": "Booker",
+    "packCost": 10.32,
+    "packSize": 2000,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_thyme_1_ea",
+    "name": "Farm Fresh Thyme",
+    "supplier": "Booker",
+    "packCost": 1.59,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_thyme_400_g",
+    "name": "Farm Fresh Thyme",
+    "supplier": "Booker",
+    "packCost": 6.36,
+    "packSize": 400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_tomatoes_2_kg",
+    "name": "Farm Fresh Tomatoes",
+    "supplier": "Booker",
+    "packCost": 5.5,
+    "packSize": 2,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_tomatoes_8_kg",
+    "name": "Farm Fresh Tomatoes",
+    "supplier": "Booker",
+    "packCost": 22,
+    "packSize": 8,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_vine_tomatoes_1_ea",
+    "name": "Farm Fresh Vine Tomatoes",
+    "supplier": "Booker",
+    "packCost": 12.99,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_vine_tomatoes_2_kg",
+    "name": "Farm Fresh Vine Tomatoes",
+    "supplier": "Booker",
+    "packCost": 5.99,
+    "packSize": 2,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_vine_tomatoes_8_kg",
+    "name": "Farm Fresh Vine Tomatoes",
+    "supplier": "Booker",
+    "packCost": 23.96,
+    "packSize": 8,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_farm_fresh_watermelon_1_ea",
+    "name": "Farm Fresh Watermelon",
+    "supplier": "Booker",
+    "packCost": 21.16,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_frosty_jack_s_cider_12000_ml",
+    "name": "Frosty Jack's Cider",
+    "supplier": "Booker",
+    "packCost": 17.99,
+    "packSize": 12000,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_fry_s_peppermint_cream_chocolate_bar_3_pack_multipack_147g_3_x_49g_2352_g",
+    "name": "Fry's Peppermint Cream Chocolate Bar 3 Pack Multipack 147g (3 x 49g)",
+    "supplier": "Booker",
+    "packCost": 21.79,
+    "packSize": 2352,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_fulfil_chocolate_peanut_butter_flavour_vitamin_protein_bar_600_g",
+    "name": "Fulfil Chocolate Peanut Butter Flavour Vitamin & Protein Bar",
+    "supplier": "Booker",
+    "packCost": 19.59,
+    "packSize": 600,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_fulfil_chocolate_peanut_caramel_flavour_vitamin_protein_bar_600_g",
+    "name": "FULFIL Chocolate Peanut & Caramel Flavour Vitamin & Protein Bar",
+    "supplier": "Booker",
+    "packCost": 19.59,
+    "packSize": 600,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_fyffes_premium_bananas_1_ea",
+    "name": "Fyffes Premium Bananas",
+    "supplier": "Booker",
+    "packCost": 21,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_getpro_18g_high_protein_chocolate_hazelnut_pudding_1080_g",
+    "name": "GetPro 18g High Protein Chocolate & Hazelnut Pudding",
+    "supplier": "Booker",
+    "packCost": 8.99,
+    "packSize": 1080,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_getpro_chocolate_hazelnut_flavour_pudding_1080_g",
+    "name": "GetPro Chocolate Hazelnut Flavour Pudding",
+    "supplier": "Booker",
+    "packCost": 8.99,
+    "packSize": 1080,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_grenade_protein_bars_peanut_nutter_peanut_flavour_720_g",
+    "name": "Grenade Protein Bars Peanut Nutter Peanut Flavour",
+    "supplier": "Booker",
+    "packCost": 15.99,
+    "packSize": 720,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_grenade_white_chocolate_salted_peanut_flavour_720_g",
+    "name": "Grenade White Chocolate Salted Peanut Flavour",
+    "supplier": "Booker",
+    "packCost": 15.99,
+    "packSize": 720,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_griffiths_family_foods_free_range_whole_liquid_egg_12_kg",
+    "name": "Griffiths Family Foods Free Range Whole Liquid Egg",
+    "supplier": "Booker",
+    "packCost": 53.99,
+    "packSize": 12,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_griffiths_family_foods_free_range_whole_liquid_egg_1_ea",
+    "name": "Griffiths Family Foods Free Range Whole Liquid Egg",
+    "supplier": "Booker",
+    "packCost": 4.99,
+    "packSize": 1,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_guinness_draught_0_0_1_ea",
+    "name": "Guinness Draught 0.0%",
+    "supplier": "Booker",
+    "packCost": 35.99,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_guinness_fes_nrb_7920_ml",
+    "name": "Guinness FES NRB",
+    "supplier": "Booker",
+    "packCost": 27.99,
+    "packSize": 7920,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_guinness_mcrdrght_1_ea",
+    "name": "Guinness Mcrdrght",
+    "supplier": "Booker",
+    "packCost": 42.49,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_heinz_malt_vinegar_1400_ml",
+    "name": "Heinz Malt Vinegar",
+    "supplier": "Booker",
+    "packCost": 9.99,
+    "packSize": 1400,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_heinz_mayonnaise_10l_versatile_foodservice_mayo_base_10_l",
+    "name": "Heinz Mayonnaise 10L | Versatile Foodservice Mayo Base",
+    "supplier": "Booker",
+    "packCost": 31.49,
+    "packSize": 10,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_heinz_mayonnaise_4000_ml",
+    "name": "Heinz Mayonnaise",
+    "supplier": "Booker",
+    "packCost": 19.99,
+    "packSize": 4000,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_heinz_mayonnaise_6_x_1l_precision_squeeze_foodservice_mayo_6_l",
+    "name": "Heinz Mayonnaise 6 x 1L Precision Squeeze Foodservice Mayo",
+    "supplier": "Booker",
+    "packCost": 19.99,
+    "packSize": 6,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_heinz_mayonnaise_dispenser_pouch_3_x_2_5l_foodservice_mayo_for_sauce_dispensers_7_5_l",
+    "name": "Heinz Mayonnaise Dispenser Pouch 3 x 2.5L | Foodservice Mayo for Sauce Dispensers",
+    "supplier": "Booker",
+    "packCost": 19.99,
+    "packSize": 7.5,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_heinz_professional_mayonnaise_10_l",
+    "name": "Heinz Professional Mayonnaise",
+    "supplier": "Booker",
+    "packCost": 28.49,
+    "packSize": 10,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_heinz_salad_cream_original_2_15_l",
+    "name": "Heinz Salad Cream Original",
+    "supplier": "Booker",
+    "packCost": 10.99,
+    "packSize": 2.15,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_heinz_salad_cream_original_4_3_l",
+    "name": "Heinz Salad Cream Original",
+    "supplier": "Booker",
+    "packCost": 21.89,
+    "packSize": 4.3,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_heinz_smooth_and_creamy_mayonnaise_2500_g",
+    "name": "Heinz Smooth and Creamy Mayonnaise",
+    "supplier": "Booker",
+    "packCost": 13.99,
+    "packSize": 2500,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_heinz_tomato_ketchup_11_g",
+    "name": "Heinz Tomato Ketchup",
+    "supplier": "Booker",
+    "packCost": 17.99,
+    "packSize": 11,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_heinz_tomato_ketchup_1_35_kg",
+    "name": "Heinz Tomato Ketchup",
+    "supplier": "Booker",
+    "packCost": 4.99,
+    "packSize": 1.35,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_heinz_tomato_ketchup_2500_g",
+    "name": "Heinz Tomato Ketchup",
+    "supplier": "Booker",
+    "packCost": 13.99,
+    "packSize": 2500,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_heinz_tomato_ketchup_2_15_l",
+    "name": "Heinz Tomato Ketchup",
+    "supplier": "Booker",
+    "packCost": 11.99,
+    "packSize": 2.15,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_heinz_tomato_ketchup_3420_g",
+    "name": "Heinz Tomato Ketchup",
+    "supplier": "Booker",
+    "packCost": 19.99,
+    "packSize": 3420,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_heinz_tomato_ketchup_4_3_l",
+    "name": "Heinz Tomato Ketchup",
+    "supplier": "Booker",
+    "packCost": 22.89,
+    "packSize": 4.3,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_heinz_tomato_ketchup_4_5_kg",
+    "name": "Heinz Tomato Ketchup",
+    "supplier": "Booker",
+    "packCost": 19.19,
+    "packSize": 4.5,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_heinz_tomato_ketchup_7_5_l",
+    "name": "Heinz Tomato Ketchup",
+    "supplier": "Booker",
+    "packCost": 19.99,
+    "packSize": 7.5,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_heinz_tomato_ketchup_8_100000000000001_kg",
+    "name": "Heinz Tomato Ketchup",
+    "supplier": "Booker",
+    "packCost": 29.89,
+    "packSize": 8.100000000000001,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_heinz_tomato_ketchup_8_l",
+    "name": "Heinz Tomato Ketchup",
+    "supplier": "Booker",
+    "packCost": 35.89,
+    "packSize": 8,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_heinz_truffle_mayonnaise_5250_ml",
+    "name": "Heinz Truffle Mayonnaise",
+    "supplier": "Booker",
+    "packCost": 19.99,
+    "packSize": 5250,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_heinz_truffle_mayonnaise_875_ml",
+    "name": "Heinz Truffle Mayonnaise",
+    "supplier": "Booker",
+    "packCost": 3.39,
+    "packSize": 875,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_hellmann_s_bbq_flavour_sauce_14_399999999999999_kg",
+    "name": "Hellmann's BBQ Flavour Sauce",
+    "supplier": "Booker",
+    "packCost": 39.99,
+    "packSize": 14.399999999999999,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_hellmann_s_bbq_flavour_sauce_4_8_kg",
+    "name": "Hellmann's BBQ Flavour Sauce",
+    "supplier": "Booker",
+    "packCost": 14.99,
+    "packSize": 4.8,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_hellmann_s_real_mayonnaise_10_l",
+    "name": "Hellmann's Real Mayonnaise",
+    "supplier": "Booker",
+    "packCost": 39.49,
+    "packSize": 10,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_hellmann_s_real_mayonnaise_5_l",
+    "name": "Hellmann's Real Mayonnaise",
+    "supplier": "Booker",
+    "packCost": 21.49,
+    "packSize": 5,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_hellmann_s_real_squeezy_mayonnaise_4500_ml",
+    "name": "Hellmann's Real Squeezy Mayonnaise",
+    "supplier": "Booker",
+    "packCost": 28.49,
+    "packSize": 4500,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_hellmann_s_real_squeezy_mayonnaise_750_ml",
+    "name": "Hellmann's Real Squeezy Mayonnaise",
+    "supplier": "Booker",
+    "packCost": 4.79,
+    "packSize": 750,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_hellmann_s_tomato_ketchup_14_399999999999999_kg",
+    "name": "Hellmann's Tomato Ketchup",
+    "supplier": "Booker",
+    "packCost": 39.99,
+    "packSize": 14.399999999999999,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_hellmann_s_tomato_ketchup_4_8_kg",
+    "name": "Hellmann's Tomato Ketchup",
+    "supplier": "Booker",
+    "packCost": 14.99,
+    "packSize": 4.8,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_hellmann_s_vegan_mayo_2000_ml",
+    "name": "Hellmann's Vegan Mayo",
+    "supplier": "Booker",
+    "packCost": 17.49,
+    "packSize": 2000,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_hoops_big_hoops_salt_vinegar_crisps_70g_1_35_pmp_1400_g",
+    "name": "Hoops Big Hoops Salt & Vinegar Crisps 70g, £1.35 PMP",
+    "supplier": "Booker",
+    "packCost": 15.69,
+    "packSize": 1400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_hovis_seed_sensations_seven_seeds_800_g",
+    "name": "Hovis Seed Sensations Seven Seeds",
+    "supplier": "Booker",
+    "packCost": 1.65,
+    "packSize": 800,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_hovis_seeded_batch_800_g",
+    "name": "Hovis Seeded Batch",
+    "supplier": "Booker",
+    "packCost": 1.25,
+    "packSize": 800,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_hovis_seeded_sourdough_450_g",
+    "name": "Hovis Seeded Sourdough",
+    "supplier": "Booker",
+    "packCost": 1.49,
+    "packSize": 450,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_hp_brown_sauce_2280_g",
+    "name": "HP Brown Sauce",
+    "supplier": "Booker",
+    "packCost": 16.99,
+    "packSize": 2280,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_hp_brown_sauce_2_15_l",
+    "name": "HP Brown Sauce",
+    "supplier": "Booker",
+    "packCost": 12.49,
+    "packSize": 2.15,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_hp_brown_sauce_4_3_l",
+    "name": "HP Brown Sauce",
+    "supplier": "Booker",
+    "packCost": 24.29,
+    "packSize": 4.3,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_hp_brown_sauce_4_l",
+    "name": "HP Brown Sauce",
+    "supplier": "Booker",
+    "packCost": 15.99,
+    "packSize": 4,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_hp_brown_sauce_8_l",
+    "name": "HP Brown Sauce",
+    "supplier": "Booker",
+    "packCost": 33.99,
+    "packSize": 8,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_almonds_400_g",
+    "name": "Itac Almonds",
+    "supplier": "Booker",
+    "packCost": 4.99,
+    "packSize": 400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_almonds_5400_g",
+    "name": "Itac Almonds",
+    "supplier": "Booker",
+    "packCost": 59.94,
+    "packSize": 5400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_almonds_5600_g",
+    "name": "Itac Almonds",
+    "supplier": "Booker",
+    "packCost": 69.86,
+    "packSize": 5600,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_almonds_900_g",
+    "name": "Itac Almonds",
+    "supplier": "Booker",
+    "packCost": 9.99,
+    "packSize": 900,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_brazil_nuts_400_g",
+    "name": "Itac Brazil Nuts",
+    "supplier": "Booker",
+    "packCost": 8.99,
+    "packSize": 400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_brazil_nuts_5600_g",
+    "name": "Itac Brazil Nuts",
+    "supplier": "Booker",
+    "packCost": 125.86,
+    "packSize": 5600,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_cashews_400_g",
+    "name": "Itac Cashews",
+    "supplier": "Booker",
+    "packCost": 4.99,
+    "packSize": 400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_cashews_5600_g",
+    "name": "Itac Cashews",
+    "supplier": "Booker",
+    "packCost": 69.86,
+    "packSize": 5600,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_dried_mango_2250_g",
+    "name": "Itac Dried Mango",
+    "supplier": "Booker",
+    "packCost": 35.91,
+    "packSize": 2250,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_dried_mango_250_g",
+    "name": "Itac Dried Mango",
+    "supplier": "Booker",
+    "packCost": 3.99,
+    "packSize": 250,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_honey_roasted_cashews_400_g",
+    "name": "Itac Honey Roasted Cashews",
+    "supplier": "Booker",
+    "packCost": 6.49,
+    "packSize": 400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_honey_roasted_cashews_5600_g",
+    "name": "Itac Honey Roasted Cashews",
+    "supplier": "Booker",
+    "packCost": 90.86,
+    "packSize": 5600,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_jumbo_seedless_raisins_3600_g",
+    "name": "Itac Jumbo Seedless Raisins",
+    "supplier": "Booker",
+    "packCost": 13.41,
+    "packSize": 3600,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_jumbo_seedless_raisins_400_g",
+    "name": "Itac Jumbo Seedless Raisins",
+    "supplier": "Booker",
+    "packCost": 1.49,
+    "packSize": 400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_pecan_nuts_400_g",
+    "name": "Itac Pecan Nuts",
+    "supplier": "Booker",
+    "packCost": 6.99,
+    "packSize": 400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_pecan_nuts_5600_g",
+    "name": "Itac Pecan Nuts",
+    "supplier": "Booker",
+    "packCost": 97.86,
+    "packSize": 5600,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_pine_nuts_400_g",
+    "name": "Itac Pine Nuts",
+    "supplier": "Booker",
+    "packCost": 11.99,
+    "packSize": 400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_pine_nuts_5600_g",
+    "name": "Itac Pine Nuts",
+    "supplier": "Booker",
+    "packCost": 167.86,
+    "packSize": 5600,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_pitted_prunes_4000_g",
+    "name": "Itac Pitted Prunes",
+    "supplier": "Booker",
+    "packCost": 24.9,
+    "packSize": 4000,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_pitted_prunes_400_g",
+    "name": "Itac Pitted Prunes",
+    "supplier": "Booker",
+    "packCost": 2.49,
+    "packSize": 400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_pumpkin_seeds_2800_g",
+    "name": "Itac Pumpkin Seeds",
+    "supplier": "Booker",
+    "packCost": 20.93,
+    "packSize": 2800,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_pumpkin_seeds_400_g",
+    "name": "Itac Pumpkin Seeds",
+    "supplier": "Booker",
+    "packCost": 2.99,
+    "packSize": 400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_roasted_monkey_nuts_600_g",
+    "name": "Itac Roasted Monkey Nuts",
+    "supplier": "Booker",
+    "packCost": 2,
+    "packSize": 600,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_roasted_monkey_nuts_9000_g",
+    "name": "Itac Roasted Monkey Nuts",
+    "supplier": "Booker",
+    "packCost": 30,
+    "packSize": 9000,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_roasted_salted_cashews_400_g",
+    "name": "Itac Roasted & Salted Cashews",
+    "supplier": "Booker",
+    "packCost": 6.99,
+    "packSize": 400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_roasted_salted_cashews_5600_g",
+    "name": "Itac Roasted & Salted Cashews",
+    "supplier": "Booker",
+    "packCost": 97.86,
+    "packSize": 5600,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_roasted_salted_pistachios_400_g",
+    "name": "Itac Roasted & Salted Pistachios",
+    "supplier": "Booker",
+    "packCost": 6.99,
+    "packSize": 400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_roasted_salted_pistachios_5600_g",
+    "name": "Itac Roasted & Salted Pistachios",
+    "supplier": "Booker",
+    "packCost": 97.86,
+    "packSize": 5600,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_shelled_pistachios_2450_g",
+    "name": "Itac Shelled Pistachios",
+    "supplier": "Booker",
+    "packCost": 62.93,
+    "packSize": 2450,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_shelled_pistachios_350_g",
+    "name": "Itac Shelled Pistachios",
+    "supplier": "Booker",
+    "packCost": 8.99,
+    "packSize": 350,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_sunflower_seeds_2800_g",
+    "name": "Itac Sunflower Seeds",
+    "supplier": "Booker",
+    "packCost": 13.93,
+    "packSize": 2800,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_sunflower_seeds_400_g",
+    "name": "Itac Sunflower Seeds",
+    "supplier": "Booker",
+    "packCost": 1.99,
+    "packSize": 400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_walnuts_halves_400_g",
+    "name": "Itac Walnuts Halves",
+    "supplier": "Booker",
+    "packCost": 6.49,
+    "packSize": 400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_itac_walnuts_halves_4800_g",
+    "name": "Itac Walnuts Halves",
+    "supplier": "Booker",
+    "packCost": 77.88,
+    "packSize": 4800,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_10_large_free_range_eggs_1_ea",
+    "name": "Jack's 10 Large Free Range Eggs",
+    "supplier": "Booker",
+    "packCost": 21.85,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_12_large_free_range_eggs_12_l",
+    "name": "Jack's 12 Large Free Range Eggs",
+    "supplier": "Booker",
+    "packCost": 12.25,
+    "packSize": 12,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_12_medium_free_range_eggs_1_ea",
+    "name": "Jack's 12 Medium Free Range Eggs",
+    "supplier": "Booker",
+    "packCost": 11.75,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_6_large_free_range_eggs_1_ea",
+    "name": "Jack's 6 Large Free Range Eggs",
+    "supplier": "Booker",
+    "packCost": 13.4,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_6_large_free_range_eggs_6_l",
+    "name": "Jack's 6 Large Free Range Eggs",
+    "supplier": "Booker",
+    "packCost": 13.4,
+    "packSize": 6,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_6_medium_free_range_eggs_1_ea",
+    "name": "Jack's 6 Medium Free Range Eggs",
+    "supplier": "Booker",
+    "packCost": 12.25,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_8_mild_cheddar_slices_1800_g",
+    "name": "Jack's 8 Mild Cheddar Slices",
+    "supplier": "Booker",
+    "packCost": 15.99,
+    "packSize": 1800,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_apple_pencils_1400_g",
+    "name": "Jack's Apple Pencils",
+    "supplier": "Booker",
+    "packCost": 5.8,
+    "packSize": 1400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_assorted_mints_1680_g",
+    "name": "Jack's Assorted Mints",
+    "supplier": "Booker",
+    "packCost": 6.99,
+    "packSize": 1680,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_avocados_2_pack_1_ea",
+    "name": "Jack's Avocados 2 Pack",
+    "supplier": "Booker",
+    "packCost": 2.19,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_avocados_2_pack_4000_g",
+    "name": "Jack's Avocados 2 Pack",
+    "supplier": "Booker",
+    "packCost": 21.9,
+    "packSize": 4000,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_baby_carrots_4000_g",
+    "name": "Jack's Baby Carrots",
+    "supplier": "Booker",
+    "packCost": 6.65,
+    "packSize": 4000,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_baby_potatoes_6000_g",
+    "name": "Jack's Baby Potatoes",
+    "supplier": "Booker",
+    "packCost": 7.12,
+    "packSize": 6000,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_baby_potatoes_750_g",
+    "name": "Jack's Baby Potatoes",
+    "supplier": "Booker",
+    "packCost": 0.89,
+    "packSize": 750,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_blueberries_150_g",
+    "name": "Jack's Blueberries",
+    "supplier": "Booker",
+    "packCost": 2.59,
+    "packSize": 150,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_blueberries_1800_g",
+    "name": "Jack's Blueberries",
+    "supplier": "Booker",
+    "packCost": 31.08,
+    "packSize": 1800,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_broccoli_3500_g",
+    "name": "Jack's Broccoli",
+    "supplier": "Booker",
+    "packCost": 11.9,
+    "packSize": 3500,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_broccoli_350_g",
+    "name": "Jack's Broccoli",
+    "supplier": "Booker",
+    "packCost": 1.19,
+    "packSize": 350,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_broccoli_florets_3600_g",
+    "name": "Jack's Broccoli Florets",
+    "supplier": "Booker",
+    "packCost": 6.65,
+    "packSize": 3600,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_butternut_squash_1_ea",
+    "name": "Jack's Butternut Squash",
+    "supplier": "Booker",
+    "packCost": 1.49,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_butternut_squash_7000_g",
+    "name": "Jack's Butternut Squash",
+    "supplier": "Booker",
+    "packCost": 14.9,
+    "packSize": 7000,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_carrots_5000_g",
+    "name": "Jack's Carrots",
+    "supplier": "Booker",
+    "packCost": 5.9,
+    "packSize": 5000,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_carrots_500_g",
+    "name": "Jack's Carrots",
+    "supplier": "Booker",
+    "packCost": 0.59,
+    "packSize": 500,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_cauliflower_florets_4000_g",
+    "name": "Jack's Cauliflower Florets",
+    "supplier": "Booker",
+    "packCost": 6.65,
+    "packSize": 4000,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_cauliflower_single_1_ea",
+    "name": "Jack's Cauliflower Single",
+    "supplier": "Booker",
+    "packCost": 11.92,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_celery_1_ea",
+    "name": "Jack's Celery",
+    "supplier": "Booker",
+    "packCost": 7.6,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_cherry_tomatoes_2250_g",
+    "name": "Jack's Cherry Tomatoes",
+    "supplier": "Booker",
+    "packCost": 8.91,
+    "packSize": 2250,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_cherry_tomatoes_250_g",
+    "name": "Jack's Cherry Tomatoes",
+    "supplier": "Booker",
+    "packCost": 0.99,
+    "packSize": 250,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_chilli_flavour_peanuts_1320_g",
+    "name": "Jack's Chilli Flavour Peanuts",
+    "supplier": "Booker",
+    "packCost": 9.79,
+    "packSize": 1320,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_chocolate_mini_eggs_1575_g",
+    "name": "Jack's Chocolate Mini Eggs",
+    "supplier": "Booker",
+    "packCost": 15.75,
+    "packSize": 1575,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_cream_crackers_3600_g",
+    "name": "Jack's Cream Crackers",
+    "supplier": "Booker",
+    "packCost": 10.45,
+    "packSize": 3600,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_cucumber_single_1_ea",
+    "name": "Jack's Cucumber Single",
+    "supplier": "Booker",
+    "packCost": 12.46,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_dry_roasted_peanuts_1320_g",
+    "name": "Jack's Dry Roasted Peanuts",
+    "supplier": "Booker",
+    "packCost": 9.79,
+    "packSize": 1320,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_fine_beans_1600_g",
+    "name": "Jack's Fine Beans",
+    "supplier": "Booker",
+    "packCost": 11.12,
+    "packSize": 1600,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_fine_beans_200_g",
+    "name": "Jack's Fine Beans",
+    "supplier": "Booker",
+    "packCost": 1.39,
+    "packSize": 200,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_garden_peas_5000_g",
+    "name": "Jack's Garden Peas",
+    "supplier": "Booker",
+    "packCost": 8.35,
+    "packSize": 5000,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_giant_strawberries_1400_g",
+    "name": "Jack's Giant Strawberries",
+    "supplier": "Booker",
+    "packCost": 5.8,
+    "packSize": 1400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_grated_mild_cheddar_1800_g",
+    "name": "Jack's Grated Mild Cheddar",
+    "supplier": "Booker",
+    "packCost": 15.99,
+    "packSize": 1800,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_honey_roasted_peanuts_1320_g",
+    "name": "Jack's Honey Roasted Peanuts",
+    "supplier": "Booker",
+    "packCost": 9.79,
+    "packSize": 1320,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_large_white_cabbage_1_ea",
+    "name": "Jack's Large White Cabbage",
+    "supplier": "Booker",
+    "packCost": 13.95,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_leeks_2400_g",
+    "name": "Jack's Leeks",
+    "supplier": "Booker",
+    "packCost": 9.54,
+    "packSize": 2400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_leeks_400_g",
+    "name": "Jack's Leeks",
+    "supplier": "Booker",
+    "packCost": 1.59,
+    "packSize": 400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_little_gem_lettuce_1_ea",
+    "name": "Jack's Little Gem Lettuce",
+    "supplier": "Booker",
+    "packCost": 9.5,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_mild_cheddar_2000_g",
+    "name": "Jack's Mild Cheddar",
+    "supplier": "Booker",
+    "packCost": 15.99,
+    "packSize": 2000,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_milk_chocolate_peanuts_960_g",
+    "name": "Jack's Milk Chocolate Peanuts",
+    "supplier": "Booker",
+    "packCost": 9.85,
+    "packSize": 960,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_mint_imperials_1680_g",
+    "name": "Jack's Mint Imperials",
+    "supplier": "Booker",
+    "packCost": 6.99,
+    "packSize": 1680,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_morning_coffee_1800_g",
+    "name": "Jack's Morning Coffee",
+    "supplier": "Booker",
+    "packCost": 6.49,
+    "packSize": 1800,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_red_cabbage_1_ea",
+    "name": "Jack's Red Cabbage",
+    "supplier": "Booker",
+    "packCost": 16.68,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_red_onions_3_pack_1_ea",
+    "name": "Jack's Red Onions 3 pack",
+    "supplier": "Booker",
+    "packCost": 19.8,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_roasted_salted_cashews_1080_g",
+    "name": "Jack's Roasted Salted Cashews",
+    "supplier": "Booker",
+    "packCost": 15.99,
+    "packSize": 1080,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_roasted_salted_peanuts_1800_g",
+    "name": "Jack's Roasted Salted Peanuts",
+    "supplier": "Booker",
+    "packCost": 9.79,
+    "packSize": 1800,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_salt_vinegar_sticks_1080_g",
+    "name": "Jack's Salt & Vinegar Sticks",
+    "supplier": "Booker",
+    "packCost": 6.99,
+    "packSize": 1080,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_salt_vinegar_twirls_810_g",
+    "name": "Jack's Salt & Vinegar Twirls",
+    "supplier": "Booker",
+    "packCost": 6.99,
+    "packSize": 810,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_sea_salt_chardonnay_vinegar_hand_cooked_crisps_1920_g",
+    "name": "Jack's Sea Salt & Chardonnay Vinegar Hand Cooked Crisps",
+    "supplier": "Booker",
+    "packCost": 11.69,
+    "packSize": 1920,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_seedless_grapes_5000_g",
+    "name": "Jack's Seedless Grapes",
+    "supplier": "Booker",
+    "packCost": 22.5,
+    "packSize": 5000,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_seedless_grapes_500_g",
+    "name": "Jack's Seedless Grapes",
+    "supplier": "Booker",
+    "packCost": 2.25,
+    "packSize": 500,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_seedless_red_grapes_5000_g",
+    "name": "Jack's Seedless Red Grapes",
+    "supplier": "Booker",
+    "packCost": 22.5,
+    "packSize": 5000,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_seedless_red_grapes_500_g",
+    "name": "Jack's Seedless Red Grapes",
+    "supplier": "Booker",
+    "packCost": 2.25,
+    "packSize": 500,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_spring_onions_1000_g",
+    "name": "Jack's Spring Onions",
+    "supplier": "Booker",
+    "packCost": 7.9,
+    "packSize": 1000,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_spring_onions_100_g",
+    "name": "Jack's Spring Onions",
+    "supplier": "Booker",
+    "packCost": 0.79,
+    "packSize": 100,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_strawberries_2270_g",
+    "name": "Jack's Strawberries",
+    "supplier": "Booker",
+    "packCost": 29.9,
+    "packSize": 2270,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_strawberries_227_g",
+    "name": "Jack's Strawberries",
+    "supplier": "Booker",
+    "packCost": 2.99,
+    "packSize": 227,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_strawberry_pencils_1400_g",
+    "name": "Jack's Strawberry Pencils",
+    "supplier": "Booker",
+    "packCost": 5.8,
+    "packSize": 1400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_swede_single_1_ea",
+    "name": "Jack's Swede single",
+    "supplier": "Booker",
+    "packCost": 11.99,
+    "packSize": 700,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_swede_single_700_g",
+    "name": "Jack's Swede single",
+    "supplier": "Booker",
+    "packCost": 1.09,
+    "packSize": 700,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_tomato_herb_sauce_1400_g",
+    "name": "Jack's Tomato & Herb Sauce",
+    "supplier": "Booker",
+    "packCost": 6.3,
+    "packSize": 1400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_white_chocolate_buttons_990_g",
+    "name": "Jack's White Chocolate Buttons",
+    "supplier": "Booker",
+    "packCost": 9.59,
+    "packSize": 990,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_white_potatoes_20_kg",
+    "name": "Jack's White Potatoes",
+    "supplier": "Booker",
+    "packCost": 13.5,
+    "packSize": 20,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_jack_s_white_potatoes_2_kg",
+    "name": "Jack's White Potatoes",
+    "supplier": "Booker",
+    "packCost": 1.35,
+    "packSize": 2,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_just_tapas_houmous_1_ea",
+    "name": "Just Tapas Houmous",
+    "supplier": "Booker",
+    "packCost": 1.89,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_just_tapas_houmous_2700_g",
+    "name": "Just Tapas Houmous",
+    "supplier": "Booker",
+    "packCost": 11.35,
+    "packSize": 2700,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_kind_caramel_almond_sea_salt_bars_12_x_40g_480g_480_g",
+    "name": "KIND Caramel Almond & Sea Salt Bars 12 x 40g (480g)",
+    "supplier": "Booker",
+    "packCost": 11.19,
+    "packSize": 480,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_kind_caramel_chocolate_peanut_12_x_40g_480g_2880_g",
+    "name": "Kind Caramel Chocolate Peanut 12 x 40g (480g)",
+    "supplier": "Booker",
+    "packCost": 76.74,
+    "packSize": 2880,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_kind_caramel_chocolate_peanut_12_x_40g_480g_480_g",
+    "name": "Kind Caramel Chocolate Peanut 12 x 40g (480g)",
+    "supplier": "Booker",
+    "packCost": 11.19,
+    "packSize": 480,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_kind_dark_chocolate_nuts_sea_salt_bars_12_x_40g_480g_480_g",
+    "name": "KIND Dark Chocolate Nuts & Sea Salt Bars 12 x 40g (480g)",
+    "supplier": "Booker",
+    "packCost": 11.19,
+    "packSize": 480,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_kind_peanut_butter_dark_chocolate_bars_12_x_40g_480g_480_g",
+    "name": "KIND Peanut Butter Dark Chocolate Bars 12 x 40g (480g)",
+    "supplier": "Booker",
+    "packCost": 11.19,
+    "packSize": 480,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_kind_protein_crunchy_peanut_butter_bars_12_x_50g_600g_600_g",
+    "name": "Kind Protein Crunchy Peanut Butter Bars 12 x 50g (600g)",
+    "supplier": "Booker",
+    "packCost": 16.35,
+    "packSize": 600,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_kinder_2_bueno_milk_hazelnut_43_g",
+    "name": "Kinder 2 Bueno Milk & Hazelnut",
+    "supplier": "Booker",
+    "packCost": 17.99,
+    "packSize": 43,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_kinder_5_bueno_milk_hazelnut_972_g",
+    "name": "Kinder 5 Bueno Milk & Hazelnut",
+    "supplier": "Booker",
+    "packCost": 11.25,
+    "packSize": 972,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_kinder_5_bueno_white_milk_hazelnuts_891_g",
+    "name": "Kinder 5 Bueno White Milk & Hazelnuts",
+    "supplier": "Booker",
+    "packCost": 11.25,
+    "packSize": 891,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_kinder_bueno_milk_chocolate_and_hazelnut_twin_bars_single_pack_1290_g",
+    "name": "Kinder Bueno Milk Chocolate and Hazelnut Twin Bars Single Pack",
+    "supplier": "Booker",
+    "packCost": 23.99,
+    "packSize": 1290,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_kinder_bueno_white_chocolate_hazelnut_wafer_biscuit_snack_bar_1170_g",
+    "name": "Kinder Bueno White Chocolate & Hazelnut Wafer Biscuit Snack Bar",
+    "supplier": "Booker",
+    "packCost": 23.99,
+    "packSize": 1170,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_kinder_happy_hippo_milk_hazelnut_filling_wafer_biscuit_snack_bar_574_g",
+    "name": "Kinder Happy Hippo Milk & Hazelnut Filling Wafer Biscuit Snack Bar",
+    "supplier": "Booker",
+    "packCost": 13.95,
+    "packSize": 574,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_kinder_surprise_milk_chocolate_egg_with_toy_messages_720_g",
+    "name": "Kinder Surprise Milk Chocolate Egg With Toy Messages",
+    "supplier": "Booker",
+    "packCost": 33.65,
+    "packSize": 720,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_knights_premium_cider_12000_ml",
+    "name": "Knights Premium Cider",
+    "supplier": "Booker",
+    "packCost": 22.89,
+    "packSize": 12000,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_lee_kum_kee_the_professional_range_premium_dark_soy_sauce_1_9_l",
+    "name": "Lee Kum Kee The Professional Range Premium Dark Soy Sauce",
+    "supplier": "Booker",
+    "packCost": 8.99,
+    "packSize": 1.9,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_lee_kum_kee_the_professional_range_premium_dark_soy_sauce_3_8_l",
+    "name": "Lee Kum Kee The Professional Range Premium Dark Soy Sauce",
+    "supplier": "Booker",
+    "packCost": 17.89,
+    "packSize": 3.8,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_lee_kum_kee_the_professional_range_premium_light_soy_sauce_1_9_l",
+    "name": "Lee Kum Kee The Professional Range Premium Light Soy Sauce",
+    "supplier": "Booker",
+    "packCost": 8.99,
+    "packSize": 1.9,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_lee_kum_kee_the_professional_range_premium_light_soy_sauce_3_8_l",
+    "name": "Lee Kum Kee The Professional Range Premium Light Soy Sauce",
+    "supplier": "Booker",
+    "packCost": 17.89,
+    "packSize": 3.8,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_levi_roots_reggae_reggae_jerk_bbq_marinade_sauce_original_1_l",
+    "name": "Levi Roots Reggae Reggae Jerk BBQ Marinade & Sauce Original",
+    "supplier": "Booker",
+    "packCost": 7.79,
+    "packSize": 1,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_levi_roots_reggae_reggae_jerk_bbq_marinade_sauce_original_4_l",
+    "name": "Levi Roots Reggae Reggae Jerk BBQ Marinade & Sauce Original",
+    "supplier": "Booker",
+    "packCost": 30.99,
+    "packSize": 4,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_lichfields_chocolate_mint_cremes_1_kg",
+    "name": "Lichfields Chocolate Mint Cremes",
+    "supplier": "Booker",
+    "packCost": 12.85,
+    "packSize": 1,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_lichfields_chocolate_mint_crisps_1_kg",
+    "name": "Lichfields Chocolate Mint Crisps",
+    "supplier": "Booker",
+    "packCost": 17.59,
+    "packSize": 1,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_lichfields_clear_honey_400_g",
+    "name": "Lichfields Clear Honey",
+    "supplier": "Booker",
+    "packCost": 21.49,
+    "packSize": 400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_lichfields_clear_honey_672_g",
+    "name": "Lichfields Clear Honey",
+    "supplier": "Booker",
+    "packCost": 10.99,
+    "packSize": 672,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_lichfields_demerara_cane_sugar_2_kg",
+    "name": "Lichfields Demerara Cane Sugar",
+    "supplier": "Booker",
+    "packCost": 8.49,
+    "packSize": 2,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_lichfields_dry_roasted_peanuts_1200_g",
+    "name": "Lichfields Dry Roasted Peanuts",
+    "supplier": "Booker",
+    "packCost": 10.85,
+    "packSize": 1200,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_lichfields_fairtrade_white_sugar_2_kg",
+    "name": "Lichfields Fairtrade White Sugar",
+    "supplier": "Booker",
+    "packCost": 8.49,
+    "packSize": 2,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_lichfields_mint_imperials_2_kg",
+    "name": "Lichfields Mint Imperials",
+    "supplier": "Booker",
+    "packCost": 11.39,
+    "packSize": 2,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_lichfields_neapolitan_mint_chocolates_1_kg",
+    "name": "Lichfields Neapolitan Mint Chocolates",
+    "supplier": "Booker",
+    "packCost": 21.99,
+    "packSize": 1,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_lichfields_salted_peanuts_1200_g",
+    "name": "Lichfields Salted Peanuts",
+    "supplier": "Booker",
+    "packCost": 10.85,
+    "packSize": 1200,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_lichfields_strawberry_jam_400_g",
+    "name": "Lichfields Strawberry Jam",
+    "supplier": "Booker",
+    "packCost": 16.99,
+    "packSize": 400,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_lichfields_whole_black_peppercorns_1200_g",
+    "name": "Lichfields Whole Black Peppercorns",
+    "supplier": "Booker",
+    "packCost": 39.99,
+    "packSize": 1200,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_lichfields_whole_black_peppercorns_200_g",
+    "name": "Lichfields Whole Black Peppercorns",
+    "supplier": "Booker",
+    "packCost": 6.69,
+    "packSize": 200,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_lindt_lindor_pistachio_milk_chocolate_treat_bar_912_g",
+    "name": "Lindt Lindor Pistachio Milk Chocolate Treat Bar",
+    "supplier": "Booker",
+    "packCost": 17.99,
+    "packSize": 912,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_love_struck_smoothies_blueberry_banana_raspberry_and_flaxseed_2100_g",
+    "name": "Love Struck Smoothies Blueberry Banana, Raspberry and Flaxseed",
+    "supplier": "Booker",
+    "packCost": 14.99,
+    "packSize": 2100,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_m_ller_m_llerlicious_whole_milk_10_l",
+    "name": "Müller Müllerlicious Whole Milk",
+    "supplier": "Booker",
+    "packCost": 9.99,
+    "packSize": 10,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_m_ller_m_llerlicious_whole_milk_2_l",
+    "name": "Müller Müllerlicious Whole Milk",
+    "supplier": "Booker",
+    "packCost": 1.49,
+    "packSize": 2,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_m_ller_m_llerlicious_whole_milk_8_l",
+    "name": "Müller Müllerlicious Whole Milk",
+    "supplier": "Booker",
+    "packCost": 5.85,
+    "packSize": 8,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_m_ller_salted_british_butter_1_ea",
+    "name": "Müller Salted British Butter",
+    "supplier": "Booker",
+    "packCost": 1.79,
+    "packSize": 250,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_m_ller_salted_british_butter_250_g",
+    "name": "Müller Salted British Butter",
+    "supplier": "Booker",
+    "packCost": 1.79,
+    "packSize": 250,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_m_ller_salted_british_butter_5000_g",
+    "name": "Müller Salted British Butter",
+    "supplier": "Booker",
+    "packCost": 29.99,
+    "packSize": 5000,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_m_ller_semi_skimmed_milk_10_l",
+    "name": "müller Semi Skimmed Milk",
+    "supplier": "Booker",
+    "packCost": 9.99,
+    "packSize": 10,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_m_ller_semi_skimmed_milk_5680_ml",
+    "name": "müller Semi Skimmed Milk",
+    "supplier": "Booker",
+    "packCost": 6.65,
+    "packSize": 5680,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_m_ller_unsalted_british_butter_1_ea",
+    "name": "Müller Unsalted British Butter",
+    "supplier": "Booker",
+    "packCost": 1.79,
+    "packSize": 250,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_m_ller_unsalted_british_butter_250_g",
+    "name": "Müller Unsalted British Butter",
+    "supplier": "Booker",
+    "packCost": 1.79,
+    "packSize": 250,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_m_ller_unsalted_british_butter_5000_g",
+    "name": "Müller Unsalted British Butter",
+    "supplier": "Booker",
+    "packCost": 29.99,
+    "packSize": 5000,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_m_m_s_milk_chocolate_crunchy_peanut_bag_1080_g",
+    "name": "M&M'S Milk Chocolate Crunchy Peanut Bag",
+    "supplier": "Booker",
+    "packCost": 18.29,
+    "packSize": 1080,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_m_m_s_milk_chocolate_peanut_1_69_pmp_bag_1312_g",
+    "name": "M&M's Milk Chocolate Peanut £1.69 PMP Bag",
+    "supplier": "Booker",
+    "packCost": 17.69,
+    "packSize": 1312,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_m_m_s_peanut_chocolate_pouch_bag_1456_g",
+    "name": "M&M's Peanut Chocolate Pouch Bag",
+    "supplier": "Booker",
+    "packCost": 26.09,
+    "packSize": 1456,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_magnum_ice_cream_stick_mint_2000_ml",
+    "name": "Magnum  Ice Cream Stick Mint",
+    "supplier": "Booker",
+    "packCost": 26.45,
+    "packSize": 2000,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_magnum_mini_ice_cream_sticks_classic_almond_white_chocolate_1980_ml",
+    "name": "Magnum Mini Ice Cream Sticks Classic, Almond & White Chocolate",
+    "supplier": "Booker",
+    "packCost": 21.75,
+    "packSize": 1980,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_magnum_mini_ice_cream_sticks_classic_almond_white_chocolate_330_ml",
+    "name": "Magnum Mini Ice Cream Sticks Classic, Almond & White Chocolate",
+    "supplier": "Booker",
+    "packCost": 3.65,
+    "packSize": 330,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_magnum_utopia_double_hazelnut_ice_cream_sticks_255_ml",
+    "name": "Magnum Utopia Double Hazelnut Ice Cream Sticks",
+    "supplier": "Booker",
+    "packCost": 28.39,
+    "packSize": 255,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_magnum_utopia_ice_cream_stick_double_hazelnut_1700_ml",
+    "name": "Magnum Utopia Ice Cream Stick Double Hazelnut",
+    "supplier": "Booker",
+    "packCost": 28.35,
+    "packSize": 1700,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_mahal_spice_10_piece_indian_selection_200_g",
+    "name": "Mahal Spice 10 Piece Indian Selection",
+    "supplier": "Booker",
+    "packCost": 1.15,
+    "packSize": 200,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_mahal_spice_10_piece_indian_selection_2800_g",
+    "name": "Mahal Spice 10 Piece Indian Selection",
+    "supplier": "Booker",
+    "packCost": 15.69,
+    "packSize": 2800,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_nakd_protein_cocoa_hazelnut_fruit_nut_bar_720_g",
+    "name": "nakd. Protein Cocoa Hazelnut Fruit & Nut Bar",
+    "supplier": "Booker",
+    "packCost": 13.19,
+    "packSize": 720,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_nestle_condensed_milk_12_kg",
+    "name": "Nestle Condensed Milk",
+    "supplier": "Booker",
+    "packCost": 69.29,
+    "packSize": 12,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_nestle_condensed_milk_1_ea",
+    "name": "Nestle Condensed Milk",
+    "supplier": "Booker",
+    "packCost": 6.59,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_nic_sugar_strands_vegan_1_kg",
+    "name": "Nic Sugar Strands Vegan",
+    "supplier": "Booker",
+    "packCost": 10.49,
+    "packSize": 1,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_nic_sugar_strands_vegan_6_kg",
+    "name": "Nic Sugar Strands Vegan",
+    "supplier": "Booker",
+    "packCost": 56.99,
+    "packSize": 6,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_nobby_s_nuts_dry_roasted_peanuts_pub_card_1200_g",
+    "name": "Nobby's Nuts Dry Roasted Peanuts Pub Card",
+    "supplier": "Booker",
+    "packCost": 11.75,
+    "packSize": 1200,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_nobby_s_nuts_salted_peanuts_pub_card_1200_g",
+    "name": "Nobby's Nuts Salted Peanuts Pub Card",
+    "supplier": "Booker",
+    "packCost": 11.75,
+    "packSize": 1200,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_nobby_s_nuts_sweet_chilli_coated_peanuts_pub_card_800_g",
+    "name": "Nobby's Nuts Sweet Chilli Coated Peanuts Pub Card",
+    "supplier": "Booker",
+    "packCost": 11.99,
+    "packSize": 800,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_noel_s_green_peppercorns_in_brine_4800_ml",
+    "name": "Noel's Green Peppercorns in Brine",
+    "supplier": "Booker",
+    "packCost": 84.99,
+    "packSize": 4800,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_noel_s_green_peppercorns_in_brine_800_g",
+    "name": "Noel's Green Peppercorns in Brine",
+    "supplier": "Booker",
+    "packCost": 14.49,
+    "packSize": 800,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_nutella_hazelnut_and_chocolate_spread_3kg_tub_3_kg",
+    "name": "Nutella Hazelnut and Chocolate Spread 3kg Tub",
+    "supplier": "Booker",
+    "packCost": 21.99,
+    "packSize": 3,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_nutella_hazelnut_and_chocolate_spread_3kg_tub_6_kg",
+    "name": "Nutella Hazelnut and Chocolate Spread 3kg Tub",
+    "supplier": "Booker",
+    "packCost": 41.99,
+    "packSize": 6,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_nutella_hazelnut_chocolate_spread_filled_biscuits_tube_3320_g",
+    "name": "Nutella Hazelnut Chocolate Spread Filled Biscuits Tube",
+    "supplier": "Booker",
+    "packCost": 36.75,
+    "packSize": 3320,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_nutella_hazelnut_chocolate_spread_jar_1000_g",
+    "name": "Nutella Hazelnut Chocolate Spread Jar",
+    "supplier": "Booker",
+    "packCost": 6.99,
+    "packSize": 1000,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_nutella_hazelnut_chocolate_spread_jar_6_kg",
+    "name": "Nutella Hazelnut Chocolate Spread Jar",
+    "supplier": "Booker",
+    "packCost": 38.99,
+    "packSize": 6,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_nutella_hazelnut_spread_with_cocoa_1800_g",
+    "name": "nutella Hazelnut Spread with Cocoa",
+    "supplier": "Booker",
+    "packCost": 22.99,
+    "packSize": 1800,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_omega_white_cider_10_l",
+    "name": "Omega White Cider",
+    "supplier": "Booker",
+    "packCost": 14.75,
+    "packSize": 10,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_omega_white_cider_12000_ml",
+    "name": "Omega White Cider",
+    "supplier": "Booker",
+    "packCost": 19.49,
+    "packSize": 12000,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_omega_white_cider_12_l",
+    "name": "Omega White Cider",
+    "supplier": "Booker",
+    "packCost": 19.99,
+    "packSize": 12,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_onken_cherry_yogurt_2700_g",
+    "name": "Onken Cherry Yogurt",
+    "supplier": "Booker",
+    "packCost": 8.65,
+    "packSize": 2700,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_onken_cherry_yogurt_450_g",
+    "name": "Onken Cherry Yogurt",
+    "supplier": "Booker",
+    "packCost": 1.49,
+    "packSize": 450,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_onken_natural_set_yogurt_1_kg",
+    "name": "Onken Natural Set Yogurt",
+    "supplier": "Booker",
+    "packCost": 2.35,
+    "packSize": 1,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_onken_natural_set_yogurt_2700_g",
+    "name": "Onken Natural Set Yogurt",
+    "supplier": "Booker",
+    "packCost": 8.65,
+    "packSize": 2700,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_onken_natural_set_yogurt_450_g",
+    "name": "Onken Natural Set Yogurt",
+    "supplier": "Booker",
+    "packCost": 1.49,
+    "packSize": 450,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_onken_natural_set_yogurt_5_kg",
+    "name": "Onken Natural Set Yogurt",
+    "supplier": "Booker",
+    "packCost": 11.49,
+    "packSize": 5,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_onken_natural_set_yogurt_6_kg",
+    "name": "Onken Natural Set Yogurt",
+    "supplier": "Booker",
+    "packCost": 13.75,
+    "packSize": 6,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_peka_freshline_potato_wedges_with_rosemary_12_kg",
+    "name": "peka Freshline Potato Wedges with Rosemary",
+    "supplier": "Booker",
+    "packCost": 25.74,
+    "packSize": 12,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_peka_freshline_potato_wedges_with_rosemary_2_kg",
+    "name": "peka Freshline Potato Wedges with Rosemary",
+    "supplier": "Booker",
+    "packCost": 4.29,
+    "packSize": 2,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_pipers_burrow_hill_cider_vinegar_sea_salt_crisps_960_g",
+    "name": "Pipers Burrow Hill Cider Vinegar & Sea Salt Crisps",
+    "supplier": "Booker",
+    "packCost": 12.59,
+    "packSize": 960,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_pipers_upton_cheyney_jalape_o_dill_crisps_960_g",
+    "name": "Pipers Upton Cheyney Jalapeño & Dill Crisps",
+    "supplier": "Booker",
+    "packCost": 12.59,
+    "packSize": 960,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_polo_original_mint_tube_1068_8_g",
+    "name": "Polo Original Mint Tube",
+    "supplier": "Booker",
+    "packCost": 12.35,
+    "packSize": 1068.8,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_polo_spearmint_mint_tube_1152_g",
+    "name": "POLO® Spearmint Mint Tube",
+    "supplier": "Booker",
+    "packCost": 12.35,
+    "packSize": 1152,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_polo_sugar_free_mint_tube_1068_8_g",
+    "name": "Polo Sugar Free Mint Tube",
+    "supplier": "Booker",
+    "packCost": 12.35,
+    "packSize": 1068.8,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_pringles_salt_vinegar_sharing_crisps_6_x_165g_pmp_2_99_990_g",
+    "name": "Pringles Salt & Vinegar Sharing Crisps 6 x 165g PMP £2.99",
+    "supplier": "Booker",
+    "packCost": 7.99,
+    "packSize": 990,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_pringles_salt_vinegar_snacking_crisps_12_x_70g_pmp_1_25_840_g",
+    "name": "Pringles Salt & Vinegar Snacking Crisps 12 x 70g PMP £1.25",
+    "supplier": "Booker",
+    "packCost": 9.69,
+    "packSize": 840,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_pringles_salt_vinegar_snacking_crisps_480_g",
+    "name": "Pringles Salt & Vinegar Snacking Crisps",
+    "supplier": "Booker",
+    "packCost": 7.49,
+    "packSize": 480,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_pringles_texas_bbq_sauce_480_g",
+    "name": "Pringles Texas BBQ Sauce",
+    "supplier": "Booker",
+    "packCost": 7.49,
+    "packSize": 480,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_reese_s_dipped_peanuts_68g_1_35_pmp_1088_g",
+    "name": "Reese's Dipped Peanuts 68g £1.35 PMP",
+    "supplier": "Booker",
+    "packCost": 13.89,
+    "packSize": 1088,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_reese_s_fast_break_with_peanut_butter_nougat_single_bar_918_g",
+    "name": "Reese's Fast Break with Peanut Butter & Nougat Single Bar",
+    "supplier": "Booker",
+    "packCost": 11.85,
+    "packSize": 918,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_reese_s_milk_chocolate_and_peanut_butter_cups_2_pack_1512_g",
+    "name": "Reese's Milk Chocolate and Peanut Butter Cups, 2 Pack,",
+    "supplier": "Booker",
+    "packCost": 23.25,
+    "packSize": 1512,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_reese_s_milk_chocolate_and_peanut_butter_cups_trio_3_pack_2520_g",
+    "name": "Reese's Milk Chocolate and Peanut Butter Cups, Trio (3 Pack),",
+    "supplier": "Booker",
+    "packCost": 36.99,
+    "packSize": 2520,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_reese_s_peanut_butter_and_milk_chocolate_flavour_bar_90g_pmp_1_95_1440_g",
+    "name": "Reese's Peanut Butter and Milk Chocolate Flavour Bar 90g PMP £1.95",
+    "supplier": "Booker",
+    "packCost": 18.09,
+    "packSize": 1440,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_reese_s_peanut_butter_cup_minis_unwrapped_68g_pmp_1_35_1088_g",
+    "name": "Reese's Peanut Butter Cup Minis Unwrapped 68g PMP £1.35",
+    "supplier": "Booker",
+    "packCost": 13.89,
+    "packSize": 1088,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_reese_s_peanut_butter_pieces_68g_pmp_1_35_1088_g",
+    "name": "Reese's Peanut Butter Pieces 68g PMP £1.35",
+    "supplier": "Booker",
+    "packCost": 13.89,
+    "packSize": 1088,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_reese_s_white_chocolate_flavour_peanut_butter_bar_1440_g",
+    "name": "Reese's White Chocolate Flavour Peanut Butter Bar",
+    "supplier": "Booker",
+    "packCost": 15.49,
+    "packSize": 1440,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_reese_s_white_creme_peanut_butter_2_cups_936_g",
+    "name": "Reese's White Creme Peanut Butter 2 Cups",
+    "supplier": "Booker",
+    "packCost": 15.49,
+    "packSize": 936,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_reggia_plain_neapolitan_pizza_sauce_15_600000000000001_kg",
+    "name": "Reggia Plain Neapolitan Pizza Sauce",
+    "supplier": "Booker",
+    "packCost": 32.49,
+    "packSize": 15.600000000000001,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_reggia_plain_neapolitan_pizza_sauce_2550_g",
+    "name": "Reggia Plain Neapolitan Pizza Sauce",
+    "supplier": "Booker",
+    "packCost": 5.49,
+    "packSize": 2550,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_reggia_spiced_neapolitan_pizza_sauce_15_600000000000001_kg",
+    "name": "Reggia Spiced Neapolitan Pizza Sauce",
+    "supplier": "Booker",
+    "packCost": 32.49,
+    "packSize": 15.600000000000001,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_reggia_spiced_neapolitan_pizza_sauce_2500_g",
+    "name": "Reggia Spiced Neapolitan Pizza Sauce",
+    "supplier": "Booker",
+    "packCost": 5.49,
+    "packSize": 2500,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_rustlers_the_juicy_bbq_rib_with_our_smokey_bbq_sauce_628_g",
+    "name": "Rustlers The Juicy BBQ Rib with Our Smokey BBQ Sauce",
+    "supplier": "Booker",
+    "packCost": 8,
+    "packSize": 628,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_skips_salt_vinegar_crisps_45g_1_35_pmp_720_g",
+    "name": "Skips Salt & Vinegar Crisps 45g, £1.35 PMP",
+    "supplier": "Booker",
+    "packCost": 15.1,
+    "packSize": 720,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_snacksters_chunky_egg_mayo_804_g",
+    "name": "Snacksters Chunky Egg Mayo",
+    "supplier": "Booker",
+    "packCost": 7.99,
+    "packSize": 804,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_snacksters_chunky_egg_mayo_fillers_1_ea",
+    "name": "Snacksters Chunky Egg Mayo Fillers",
+    "supplier": "Booker",
+    "packCost": 8.99,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_snickers_duo_peanut_caramel_chocolate_bar_1656_g",
+    "name": "Snickers Duo Peanut & Caramel Chocolate Bar",
+    "supplier": "Booker",
+    "packCost": 20.85,
+    "packSize": 1656,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_snickers_peanut_caramel_chocolate_bar_1920_g",
+    "name": "Snickers Peanut & Caramel Chocolate Bar",
+    "supplier": "Booker",
+    "packCost": 31.49,
+    "packSize": 1920,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_snickers_peanut_chocolate_bar_40g_pmp_0_75_1920_g",
+    "name": "Snickers Peanut & Chocolate Bar 40g PMP £0.75",
+    "supplier": "Booker",
+    "packCost": 21.65,
+    "packSize": 1920,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_snickers_peanut_multipack_chocolate_bars_3_x_40g_1_75_pmp_120_g",
+    "name": "Snickers Peanut  Multipack Chocolate Bars 3 x 40g £1.75 PMP",
+    "supplier": "Booker",
+    "packCost": 24.99,
+    "packSize": 120,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_spice_magic_chennai_style_madras_curry_sauce_2_2_kg",
+    "name": "Spice Magic Chennai Style Madras Curry Sauce",
+    "supplier": "Booker",
+    "packCost": 14.59,
+    "packSize": 2.2,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_spice_magic_chennai_style_madras_curry_sauce_8_8_kg",
+    "name": "Spice Magic Chennai Style Madras Curry Sauce",
+    "supplier": "Booker",
+    "packCost": 52.49,
+    "packSize": 8.8,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_spice_magic_green_thai_curry_cooking_sauce_8_8_kg",
+    "name": "Spice Magic Green Thai Curry Cooking Sauce",
+    "supplier": "Booker",
+    "packCost": 52.49,
+    "packSize": 8.8,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_spice_magic_raita_sauce_5580_g",
+    "name": "Spice Magic Raita Sauce",
+    "supplier": "Booker",
+    "packCost": 21.49,
+    "packSize": 5580,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_spice_magic_raita_sauce_930_g",
+    "name": "Spice Magic Raita Sauce",
+    "supplier": "Booker",
+    "packCost": 3.99,
+    "packSize": 930,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_spice_magic_tamarind_sauce_1_1_kg",
+    "name": "Spice Magic Tamarind Sauce",
+    "supplier": "Booker",
+    "packCost": 3.99,
+    "packSize": 1.1,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_spice_magic_tamarind_sauce_6_6000000000000005_kg",
+    "name": "Spice Magic Tamarind Sauce",
+    "supplier": "Booker",
+    "packCost": 21.49,
+    "packSize": 6.6000000000000005,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_viennetta_ice_cream_mint_3900_ml",
+    "name": "Viennetta  Ice Cream Mint",
+    "supplier": "Booker",
+    "packCost": 8.59,
+    "packSize": 3900,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_viennetta_ice_cream_mint_650_ml",
+    "name": "Viennetta  Ice Cream Mint",
+    "supplier": "Booker",
+    "packCost": 1.49,
+    "packSize": 650,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_vk_black_cherry_4200_ml",
+    "name": "VK Black Cherry",
+    "supplier": "Booker",
+    "packCost": 8.49,
+    "packSize": 4200,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_vk_orange_passion_fruit_4200_ml",
+    "name": "VK Orange & Passion Fruit",
+    "supplier": "Booker",
+    "packCost": 8.49,
+    "packSize": 4200,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_vk_orange_passion_fruit_6600_ml",
+    "name": "VK Orange & Passion Fruit",
+    "supplier": "Booker",
+    "packCost": 22.99,
+    "packSize": 6600,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_vk_strawberry_lime_4200_ml",
+    "name": "VK Strawberry & Lime",
+    "supplier": "Booker",
+    "packCost": 8.49,
+    "packSize": 4200,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_walkers_bbq_sauce_grab_bag_crisps_1440_g",
+    "name": "Walkers BBQ Sauce Grab Bag Crisps",
+    "supplier": "Booker",
+    "packCost": 16.99,
+    "packSize": 1440,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_walkers_bbq_sauce_sharing_bag_crisps_70g_pmp_1_35_rrp_1260_g",
+    "name": "Walkers BBQ Sauce Sharing Bag Crisps 70g PMP £1.35 RRP",
+    "supplier": "Booker",
+    "packCost": 14.15,
+    "packSize": 1260,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_walkers_heinz_tomato_ketchup_sharing_crisps_70g_pmp_rrp_1_35_1260_g",
+    "name": "Walkers Heinz Tomato Ketchup Sharing Crisps 70g PMP RRP £1.35",
+    "supplier": "Booker",
+    "packCost": 11.99,
+    "packSize": 1260,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_walkers_max_punchy_paprika_sharing_crisps_70g_pmp_1_35_rrp_1050_g",
+    "name": "Walkers Max Punchy Paprika Sharing Crisps 70g PMP £1.35 RRP",
+    "supplier": "Booker",
+    "packCost": 13.05,
+    "packSize": 1050,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_walkers_salt_vinegar_crisps_1040_g",
+    "name": "Walkers Salt & Vinegar Crisps",
+    "supplier": "Booker",
+    "packCost": 15.35,
+    "packSize": 1040,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_walkers_salt_vinegar_grab_bag_crisps_1440_g",
+    "name": "Walkers Salt & Vinegar Grab Bag Crisps",
+    "supplier": "Booker",
+    "packCost": 16.99,
+    "packSize": 1440,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_walkers_salt_vinegar_sharing_crisps_70g_pmp_1_35_rrp_1260_g",
+    "name": "Walkers Salt & Vinegar Sharing Crisps 70g PMP £1.35 RRP",
+    "supplier": "Booker",
+    "packCost": 11.99,
+    "packSize": 1260,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_walkers_snacks_salt_vinegar_crisps_32_5g_pmp_rrp_85p_1040_g",
+    "name": "Walkers Snacks Salt & Vinegar Crisps 32.5g PMP RRP 85p",
+    "supplier": "Booker",
+    "packCost": 15.35,
+    "packSize": 1040,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_walkers_squares_salt_vinegar_crisps_72g_pmp_1_35_rrp_1296_g",
+    "name": "Walkers Squares Salt & Vinegar Crisps 72g PMP £1.35 RRP",
+    "supplier": "Booker",
+    "packCost": 11.99,
+    "packSize": 1296,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_walkers_squares_salt_vinegar_snacks_crisps_880_g",
+    "name": "Walkers Squares Salt & Vinegar Snacks Crisps",
+    "supplier": "Booker",
+    "packCost": 15.09,
+    "packSize": 880,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_warrior_raw_protein_flapjack_chocolate_peanut_butter_900_g",
+    "name": "Warrior Raw Protein Flapjack Chocolate Peanut Butter",
+    "supplier": "Booker",
+    "packCost": 6,
+    "packSize": 900,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_werther_s_original_sugar_free_butter_candies_780_g",
+    "name": "Werther's Original Sugar Free Butter Candies",
+    "supplier": "Booker",
+    "packCost": 9.29,
+    "packSize": 780,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_whirlz_1600_ml",
+    "name": "Whirlz",
+    "supplier": "Booker",
+    "packCost": 9.99,
+    "packSize": 1600,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_whirlz_4800_ml",
+    "name": "Whirlz",
+    "supplier": "Booker",
+    "packCost": 29.95,
+    "packSize": 4800,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_wright_s_bravo_pizza_flour_16_kg",
+    "name": "Wright's Bravo Pizza Flour",
+    "supplier": "Booker",
+    "packCost": 15.29,
+    "packSize": 16,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "booker_wyke_salted_butter_2500_g",
+    "name": "Wyke Salted Butter",
+    "supplier": "Booker",
+    "packCost": 14.89,
+    "packSize": 2500,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_cooks_co_mixed_pitted_greek_olives_with_oregano_1_kg",
+    "name": "Cooks & Co. Mixed Pitted Greek Olives with Oregano",
+    "supplier": "Urban",
+    "packCost": 6.12,
+    "packSize": 1,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_curtis_pecan_nuts_1_kg",
+    "name": "Curtis Pecan Nuts",
+    "supplier": "Urban",
+    "packCost": 20.02,
+    "packSize": 1,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_curtis_pistachio_kernels_1_kg",
+    "name": "Curtis Pistachio Kernels",
+    "supplier": "Urban",
+    "packCost": 37.91,
+    "packSize": 1,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_curtis_sunflower_seeds_1_kg",
+    "name": "Curtis Sunflower Seeds",
+    "supplier": "Urban",
+    "packCost": 4.65,
+    "packSize": 1,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_baked_beans_no_added_sugar_2_62_kg",
+    "name": "Heinz Baked Beans No Added Sugar",
+    "supplier": "Urban",
+    "packCost": 6.29,
+    "packSize": 2.62,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_baked_beans_no_added_sugar_415_g",
+    "name": "Heinz Baked Beans No Added Sugar",
+    "supplier": "Urban",
+    "packCost": 35.18,
+    "packSize": 415,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_burger_relish_2_15l_2_15_l",
+    "name": "Heinz Burger Relish 2.15L",
+    "supplier": "Urban",
+    "packCost": 14.99,
+    "packSize": 2.15,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_light_mayonnaise_5l_5_l",
+    "name": "Heinz Light Mayonnaise 5L",
+    "supplier": "Urban",
+    "packCost": 11.59,
+    "packSize": 5,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_malt_vinegar_250ml_250_ml",
+    "name": "Heinz Malt Vinegar 250ml",
+    "supplier": "Urban",
+    "packCost": 5.51,
+    "packSize": 250,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_malt_vinegar_sachets_7_ml",
+    "name": "Heinz Malt Vinegar Sachets",
+    "supplier": "Urban",
+    "packCost": 12.94,
+    "packSize": 7,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_mayonnaise_1l_1_l",
+    "name": "Heinz Mayonnaise 1L",
+    "supplier": "Urban",
+    "packCost": 19.99,
+    "packSize": 1,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_mayonnaise_220ml_220_ml",
+    "name": "Heinz Mayonnaise 220ml",
+    "supplier": "Urban",
+    "packCost": 19.99,
+    "packSize": 220,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_mayonnaise_2_15l_2_15_l",
+    "name": "Heinz Mayonnaise 2.15L",
+    "supplier": "Urban",
+    "packCost": 13.99,
+    "packSize": 2.15,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_mayonnaise_400ml_400_ml",
+    "name": "Heinz Mayonnaise 400ml",
+    "supplier": "Urban",
+    "packCost": 26.83,
+    "packSize": 400,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_mayonnaise_dip_pots_25_g",
+    "name": "Heinz Mayonnaise Dip Pots",
+    "supplier": "Urban",
+    "packCost": 19.25,
+    "packSize": 25,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_mayonnaise_room_service_mini_jars_33ml_33_ml",
+    "name": "Heinz Mayonnaise Room Service Mini Jars 33ml",
+    "supplier": "Urban",
+    "packCost": 31.51,
+    "packSize": 33,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_mayonnaise_sauce_dispenser_pouch_2_5l_2_5_l",
+    "name": "Heinz Mayonnaise Sauce Dispenser Pouch 2.5L",
+    "supplier": "Urban",
+    "packCost": 45.36,
+    "packSize": 2.5,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_mild_yellow_mustard_1l_1_l",
+    "name": "Heinz Mild Yellow Mustard 1L",
+    "supplier": "Urban",
+    "packCost": 5.41,
+    "packSize": 1,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_mustard_sauce_dispenser_pouch_2_5l_2_5_l",
+    "name": "Heinz Mustard Sauce Dispenser Pouch 2.5L",
+    "supplier": "Urban",
+    "packCost": 42.43,
+    "packSize": 2.5,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_original_mayonnaise_pail_10l_10_l",
+    "name": "Heinz Original Mayonnaise Pail 10L",
+    "supplier": "Urban",
+    "packCost": 30.59,
+    "packSize": 10,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_professional_mayonnaise_10l_10_l",
+    "name": "Heinz Professional Mayonnaise 10L",
+    "supplier": "Urban",
+    "packCost": 26.39,
+    "packSize": 10,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_professional_mayonnaise_5l_5_l",
+    "name": "Heinz Professional Mayonnaise 5L",
+    "supplier": "Urban",
+    "packCost": 14.99,
+    "packSize": 5,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_salad_cream_2_15l_2_15_l",
+    "name": "Heinz Salad Cream 2.15L",
+    "supplier": "Urban",
+    "packCost": 18.49,
+    "packSize": 2.15,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_salad_cream_425_g",
+    "name": "Heinz Salad Cream",
+    "supplier": "Urban",
+    "packCost": 40.01,
+    "packSize": 425,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_sweet_chilli_sauce_1l_1_l",
+    "name": "Heinz Sweet Chilli Sauce 1L",
+    "supplier": "Urban",
+    "packCost": 19.99,
+    "packSize": 1,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_tartare_sauce_2_15l_2_15_l",
+    "name": "Heinz Tartare Sauce 2.15L",
+    "supplier": "Urban",
+    "packCost": 14.99,
+    "packSize": 2.15,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_tomato_ketchup_1_kg",
+    "name": "Heinz Tomato Ketchup",
+    "supplier": "Urban",
+    "packCost": 5.34,
+    "packSize": 1,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_tomato_ketchup_2_15l_2_15_l",
+    "name": "Heinz Tomato Ketchup 2.15L",
+    "supplier": "Urban",
+    "packCost": 20.69,
+    "packSize": 2.15,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_tomato_ketchup_342_g",
+    "name": "Heinz Tomato Ketchup",
+    "supplier": "Urban",
+    "packCost": 21,
+    "packSize": 342,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_tomato_ketchup_400ml_400_ml",
+    "name": "Heinz Tomato Ketchup 400ml",
+    "supplier": "Urban",
+    "packCost": 30.48,
+    "packSize": 400,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_tomato_ketchup_4l_4_l",
+    "name": "Heinz Tomato Ketchup 4L",
+    "supplier": "Urban",
+    "packCost": 33.99,
+    "packSize": 4,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_tomato_ketchup_dip_pots_25_g",
+    "name": "Heinz Tomato Ketchup Dip Pots",
+    "supplier": "Urban",
+    "packCost": 17.42,
+    "packSize": 25,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_tomato_ketchup_glass_bottle_342_g",
+    "name": "Heinz Tomato Ketchup Glass Bottle",
+    "supplier": "Urban",
+    "packCost": 32.74,
+    "packSize": 342,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_tomato_ketchup_reduced_sugar_and_salt_2_15l_2_15_l",
+    "name": "Heinz Tomato Ketchup Reduced Sugar and Salt 2.15L",
+    "supplier": "Urban",
+    "packCost": 12.79,
+    "packSize": 2.15,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_tomato_ketchup_room_service_mini_jars_33ml_33_ml",
+    "name": "Heinz Tomato Ketchup Room Service Mini Jars 33ml",
+    "supplier": "Urban",
+    "packCost": 31.04,
+    "packSize": 33,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_tomato_ketchup_sauce_dispenser_pouch_2_5l_2_5_l",
+    "name": "Heinz Tomato Ketchup Sauce Dispenser Pouch 2.5L",
+    "supplier": "Urban",
+    "packCost": 43.87,
+    "packSize": 2.5,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_tomato_ketchup_sauce_dispenser_pouch_5l_5_l",
+    "name": "Heinz Tomato Ketchup Sauce Dispenser Pouch 5L",
+    "supplier": "Urban",
+    "packCost": 71.12,
+    "packSize": 5,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_tomato_salsa_2_15l_2_15_l",
+    "name": "Heinz Tomato Salsa 2.15L",
+    "supplier": "Urban",
+    "packCost": 17.99,
+    "packSize": 2.15,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_truffle_mayonnaise_220ml_220_ml",
+    "name": "Heinz Truffle Mayonnaise 220ml",
+    "supplier": "Urban",
+    "packCost": 20.07,
+    "packSize": 220,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_heinz_vegan_mayonnaise_5l_5_l",
+    "name": "Heinz Vegan Mayonnaise 5L",
+    "supplier": "Urban",
+    "packCost": 13.89,
+    "packSize": 5,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_hellmann_s_light_mayonnaise_10_l",
+    "name": "Hellmann's Light Mayonnaise",
+    "supplier": "Urban",
+    "packCost": 37.05,
+    "packSize": 10,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_hellmann_s_light_mayonnaise_430_ml",
+    "name": "Hellmann's Light Mayonnaise",
+    "supplier": "Urban",
+    "packCost": 25.6,
+    "packSize": 430,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_hellmann_s_light_mayonnaise_5_l",
+    "name": "Hellmann's Light Mayonnaise",
+    "supplier": "Urban",
+    "packCost": 26.92,
+    "packSize": 5,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_hellmann_s_light_mayonnaise_product_discounted_due_to_limit_on_shelf_life_10_l",
+    "name": "Hellmann's Light Mayonnaise. Product Discounted due to limit on shelf life",
+    "supplier": "Urban",
+    "packCost": 31.09,
+    "packSize": 10,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_hellmann_s_mayonnaise_10_l",
+    "name": "Hellmann's Mayonnaise",
+    "supplier": "Urban",
+    "packCost": 40.09,
+    "packSize": 10,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_hellmann_s_mayonnaise_5_l",
+    "name": "Hellmann's Mayonnaise",
+    "supplier": "Urban",
+    "packCost": 22.46,
+    "packSize": 5,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_hellmann_s_professional_mayonnaise_10l_10_l",
+    "name": "Hellmann's Professional Mayonnaise 10L",
+    "supplier": "Urban",
+    "packCost": 28.99,
+    "packSize": 10,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_hellmann_s_professional_mayonnaise_5l_5_l",
+    "name": "Hellmann's Professional Mayonnaise 5L",
+    "supplier": "Urban",
+    "packCost": 17.4,
+    "packSize": 5,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_hellmann_s_real_mayonnaise_430_ml",
+    "name": "Hellmann's Real Mayonnaise",
+    "supplier": "Urban",
+    "packCost": 19.97,
+    "packSize": 430,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_hellmann_s_real_mayonnaise_bucket_1_85_kg",
+    "name": "Hellmann's Real Mayonnaise Bucket",
+    "supplier": "Urban",
+    "packCost": 13.19,
+    "packSize": 1.85,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_hellmann_s_tomato_ketchup_squeezy_430_ml",
+    "name": "Hellmann's Tomato Ketchup Squeezy",
+    "supplier": "Urban",
+    "packCost": 18.95,
+    "packSize": 430,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_hellmanns_ketchup_4_8_kg",
+    "name": "Hellmanns Ketchup",
+    "supplier": "Urban",
+    "packCost": 11.89,
+    "packSize": 4.8,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_hellmanns_light_mayonnaise_2l_bucket_2_l",
+    "name": "Hellmanns Light Mayonnaise 2L Bucket",
+    "supplier": "Urban",
+    "packCost": 15.69,
+    "packSize": 2,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_hp_brown_sauce_285_g",
+    "name": "HP Brown Sauce",
+    "supplier": "Urban",
+    "packCost": 16.75,
+    "packSize": 285,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_hp_brown_sauce_2l_2_l",
+    "name": "HP Brown Sauce 2L",
+    "supplier": "Urban",
+    "packCost": 19.09,
+    "packSize": 2,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_hp_brown_sauce_450_g",
+    "name": "HP Brown Sauce",
+    "supplier": "Urban",
+    "packCost": 39.43,
+    "packSize": 450,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_hp_brown_sauce_dispenser_pouch_2_5l_2_5_l",
+    "name": "HP Brown Sauce Dispenser Pouch 2.5L",
+    "supplier": "Urban",
+    "packCost": 44.86,
+    "packSize": 2.5,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_hp_brown_sauce_glass_bottle_255_g",
+    "name": "HP Brown Sauce Glass Bottle",
+    "supplier": "Urban",
+    "packCost": 30.67,
+    "packSize": 255,
+    "packUnit": "g",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_hp_brown_sauce_room_service_mini_jars_33ml_33_ml",
+    "name": "HP Brown Sauce Room Service Mini Jars 33ml",
+    "supplier": "Urban",
+    "packCost": 30.91,
+    "packSize": 33,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_hp_texan_barbecue_bbq_brown_sauce_2_15l_2_15_l",
+    "name": "HP Texan Barbecue (BBQ) Brown Sauce 2.15L",
+    "supplier": "Urban",
+    "packCost": 14.79,
+    "packSize": 2.15,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_lee_kum_kee_premium_dark_soy_sauce_1_9_l",
+    "name": "Lee Kum Kee Premium Dark Soy Sauce",
+    "supplier": "Urban",
+    "packCost": 14.08,
+    "packSize": 1.9,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_lee_kum_kee_premium_light_soy_sauce_1_9_l",
+    "name": "Lee Kum Kee Premium Light Soy Sauce",
+    "supplier": "Urban",
+    "packCost": 14.08,
+    "packSize": 1.9,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_nic_sugar_cone_small_1_ea",
+    "name": "Nic Sugar Cone Small",
+    "supplier": "Urban",
+    "packCost": 22.23,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_nic_sugar_cone_small_sleeved_1_ea",
+    "name": "Nic Sugar Cone Small Sleeved",
+    "supplier": "Urban",
+    "packCost": 29.71,
+    "packSize": 1,
+    "packUnit": "ea",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_noels_sliced_dill_gherkins_2_45_kg",
+    "name": "Noels Sliced Dill Gherkins",
+    "supplier": "Urban",
+    "packCost": 20.98,
+    "packSize": 2.45,
+    "packUnit": "kg",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_sarsons_malt_vinegar_5_l",
+    "name": "Sarsons Malt Vinegar",
+    "supplier": "Urban",
+    "packCost": 11.37,
+    "packSize": 5,
+    "packUnit": "l",
+    "keep": false,
+    "reason": "brand-exclude"
+  },
+  {
+    "id": "urban_sarsons_vinegar_table_bottle_plastic_300_ml",
+    "name": "Sarsons Vinegar Table Bottle Plastic",
+    "supplier": "Urban",
+    "packCost": 15.35,
+    "packSize": 300,
+    "packUnit": "ml",
+    "keep": false,
+    "reason": "brand-exclude"
+  }
+]

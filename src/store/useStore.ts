@@ -12,7 +12,15 @@ interface UIState {
   selectedIngredientId: string | null;
   selectedRecipeId: string | null;
   selectedDishId: string | null;
-  
+  // Set when Catalog was opened from Pantry's "Find on Supplier Catalogue" flow — identifies
+  // which ingredient a chosen product should be attached to as a supplier option, and that
+  // the user should be returned to Pantry (with that ingredient selected) once done.
+  linkBackIngredientId: string | null;
+  // Set when navigating to Catalog with a specific product already known (e.g. Pantry's
+  // "Cheaper Catalog Option Available" nudge) — Catalog auto-selects and scrolls to this
+  // product on arrival instead of leaving the user to spot it in a filtered list.
+  highlightProductId: string | null;
+
   // Sidebar Search/Filters
   searchTerm: string;
   categoryFilter: string;
@@ -38,6 +46,10 @@ interface UIState {
   setScaleWeight: (weight: number) => void;
   setActiveContainerId: (id: string | null) => void;
   navigateToCatalogWithSearch: (term: string) => void;
+  navigateToCatalogAndHighlightProduct: (productId: string, searchTerm: string) => void;
+  clearHighlightProduct: () => void;
+  navigateToCatalogToLinkSupplier: (ingredientId: string, searchTerm: string) => void;
+  clearLinkBackIngredient: () => void;
   navigateToPantryWithIngredient: (id: string) => void;
   navigateToStockWithIngredient: (id: string) => void;
   navigateToKitchenWithRecipe: (id: string) => void;
@@ -50,7 +62,9 @@ export const useStore = create<UIState>((set) => ({
   selectedIngredientId: null,
   selectedRecipeId: null,
   selectedDishId: null,
-  
+  linkBackIngredientId: null,
+  highlightProductId: null,
+
   searchTerm: '',
   categoryFilter: 'All',
   supplierFilter: 'All',
@@ -61,11 +75,13 @@ export const useStore = create<UIState>((set) => ({
 
   toasts: [],
 
-  setView: (view) => set({ 
-    currentView: view, 
-    selectedIngredientId: null, 
-    selectedRecipeId: null, 
+  setView: (view) => set({
+    currentView: view,
+    selectedIngredientId: null,
+    selectedRecipeId: null,
     selectedDishId: null,
+    linkBackIngredientId: null,
+    highlightProductId: null,
     searchTerm: '',
     categoryFilter: 'All',
     supplierFilter: 'All'
@@ -84,15 +100,43 @@ export const useStore = create<UIState>((set) => ({
     selectedIngredientId: null,
     selectedRecipeId: null,
     selectedDishId: null,
+    linkBackIngredientId: null,
+    highlightProductId: null,
     searchTerm: term,
     categoryFilter: 'All',
     supplierFilter: 'All'
   }),
+  navigateToCatalogAndHighlightProduct: (productId, searchTerm) => set({
+    currentView: 'catalog',
+    selectedIngredientId: null,
+    selectedRecipeId: null,
+    selectedDishId: null,
+    linkBackIngredientId: null,
+    highlightProductId: productId,
+    searchTerm,
+    categoryFilter: 'All',
+    supplierFilter: 'All'
+  }),
+  clearHighlightProduct: () => set({ highlightProductId: null }),
+  navigateToCatalogToLinkSupplier: (ingredientId, searchTerm) => set({
+    currentView: 'catalog',
+    selectedIngredientId: null,
+    selectedRecipeId: null,
+    selectedDishId: null,
+    linkBackIngredientId: ingredientId,
+    highlightProductId: null,
+    searchTerm,
+    categoryFilter: 'All',
+    supplierFilter: 'All'
+  }),
+  clearLinkBackIngredient: () => set({ linkBackIngredientId: null }),
   navigateToPantryWithIngredient: (id) => set({
     currentView: 'pantry',
     selectedIngredientId: id,
     selectedRecipeId: null,
     selectedDishId: null,
+    linkBackIngredientId: null,
+    highlightProductId: null,
     searchTerm: '',
     categoryFilter: 'All',
     supplierFilter: 'All'
@@ -102,6 +146,8 @@ export const useStore = create<UIState>((set) => ({
     selectedIngredientId: id,
     selectedRecipeId: null,
     selectedDishId: null,
+    linkBackIngredientId: null,
+    highlightProductId: null,
     searchTerm: '',
     categoryFilter: 'All',
     supplierFilter: 'All'
@@ -111,6 +157,8 @@ export const useStore = create<UIState>((set) => ({
     selectedIngredientId: null,
     selectedRecipeId: id,
     selectedDishId: null,
+    linkBackIngredientId: null,
+    highlightProductId: null,
     searchTerm: '',
     categoryFilter: 'All',
     supplierFilter: 'All'

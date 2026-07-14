@@ -44,7 +44,7 @@ import { useStore } from './store/useStore';
 import { useIsMobile } from './hooks/useIsMobile';
 import { useAuth } from './hooks/useAuth';
 
-export type ViewType = 'dashboard' | 'pantry' | 'catalog' | 'kitchen' | 'service' | 'stock' | 'suppliers' | 'invoice' | 'settings' | 'foh' | 'team' | 'food-temp' | 'equipment-temp' | 'temp-records';
+export type ViewType = 'dashboard' | 'pantry' | 'catalog' | 'kitchen' | 'service' | 'stock' | 'stock-reports' | 'stock-waste' | 'stock-import' | 'suppliers' | 'invoice' | 'settings' | 'foh' | 'team' | 'food-temp' | 'equipment-temp' | 'temp-records';
 
 // Views rendered on the floor during a shift — get the primary mobile tab bar slots.
 const MOBILE_TAB_ITEMS = [
@@ -59,6 +59,9 @@ const MOBILE_TAB_ITEMS = [
 const MOBILE_MORE_ITEMS = [
   { id: 'catalog', label: 'Supplier Catalogue', icon: BookOpen },
   { id: 'kitchen', label: 'Recipes', icon: ChefHat },
+  { id: 'stock-reports', label: 'Stock Reports', icon: BookOpen },
+  { id: 'stock-waste', label: 'Stock Waste', icon: AlertCircle },
+  { id: 'stock-import', label: 'Import EPOS', icon: ScanLine },
   { id: 'suppliers', label: 'Suppliers', icon: Truck },
   { id: 'food-temp', label: 'Food Temp Checks', icon: Thermometer },
   { id: 'equipment-temp', label: 'Equipment Temp Checks', icon: Refrigerator },
@@ -71,7 +74,8 @@ const VIEW_TITLES: Record<ViewType, string> = {
   service: 'Dishes', stock: 'Stock', suppliers: 'Suppliers', invoice: 'Invoices',
   settings: 'Help', foh: 'Front of House', team: 'Team',
   'food-temp': 'Food Temp Checks', 'equipment-temp': 'Equipment Temp Checks',
-  'temp-records': 'Temp Check Records'
+  'temp-records': 'Temp Check Records',
+  'stock-reports': 'Stock Reports', 'stock-waste': 'Stock Waste', 'stock-import': 'Import EPOS'
 };
 
 const App: React.FC = () => {
@@ -83,6 +87,7 @@ const App: React.FC = () => {
   const [navCollapsed, setNavCollapsed] = useState<boolean>(true);
   const [kitchenOpen, setKitchenOpen] = useState<boolean>(true);
   const [complianceOpen, setComplianceOpen] = useState<boolean>(true);
+  const [stockOpen, setStockOpen] = useState<boolean>(true);
   const isMobile = useIsMobile();
   const [showMoreSheet, setShowMoreSheet] = useState(false);
 
@@ -105,9 +110,15 @@ const App: React.FC = () => {
     { id: 'temp-records', label: 'Temp Check Records', icon: ClipboardList },
   ] as const;
 
+  const stockItems = [
+    { id: 'stock', label: 'Stock On Hand', icon: Boxes },
+    { id: 'stock-reports', label: 'Reports', icon: BookOpen },
+    { id: 'stock-waste', label: 'Waste', icon: AlertCircle },
+    { id: 'stock-import', label: 'Import EPOS', icon: ScanLine },
+  ] as const;
+
   const bottomItems = [
     { id: 'foh', label: 'Front of House', icon: MonitorPlay },
-    { id: 'stock', label: 'Stock', icon: Boxes },
     ...(isManager ? [{ id: 'invoice', label: 'Invoices', icon: ScanLine }] as const : []),
     { id: 'suppliers', label: 'Suppliers', icon: Truck },
     ...(isManager ? [{ id: 'team', label: 'Team', icon: Users }] as const : []),
@@ -139,7 +150,10 @@ const App: React.FC = () => {
       {currentView === 'catalog' && <Catalog />}
       {currentView === 'kitchen' && <Kitchen />}
       {currentView === 'service' && <Service />}
-      {currentView === 'stock' && <Stock />}
+      {currentView === 'stock' && <Stock section="directory" />}
+      {currentView === 'stock-reports' && <Stock section="reports" />}
+      {currentView === 'stock-waste' && <Stock section="waste" />}
+      {currentView === 'stock-import' && <Stock section="import" />}
       {currentView === 'invoice' && (isManager ? <InvoiceScanner /> : <Dashboard />)}
       {currentView === 'foh' && <FrontOfHouse />}
       {currentView === 'suppliers' && <Suppliers />}
@@ -364,6 +378,38 @@ const App: React.FC = () => {
           </button>
 
           {(complianceOpen || navCollapsed) && complianceItems.map((item) => {
+            const IconComponent = item.icon;
+            const isActive = currentView === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setCurrentView(item.id)}
+                className={`relative h-10 flex items-center transition-colors duration-150 ${
+                  isActive ? 'bg-surface-container-high text-primary font-semibold' : 'text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface'
+                } ${navCollapsed ? 'justify-center' : 'pl-10 pr-6 gap-3'}`}
+              >
+                {isActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary" />}
+                <IconComponent className="h-5 w-5 flex-shrink-0" />
+                {!navCollapsed && <span className="text-sm font-sans tracking-wide truncate">{item.label}</span>}
+              </button>
+            );
+          })}
+
+          {/* Stock group */}
+          <button
+            onClick={() => { if (!navCollapsed) setStockOpen(o => !o); }}
+            className={`relative h-10 flex items-center transition-colors duration-150 mt-1 text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface ${navCollapsed ? 'justify-center' : 'px-6 gap-3'}`}
+          >
+            <Boxes className="h-5 w-5 flex-shrink-0 text-outline" />
+            {!navCollapsed && (
+              <>
+                <span className="text-[10px] font-bold label-caps tracking-widest text-outline flex-1">Stock</span>
+                <ChevronDown className={`h-3.5 w-3.5 text-outline transition-transform duration-200 ${stockOpen ? '' : '-rotate-90'}`} />
+              </>
+            )}
+          </button>
+
+          {(stockOpen || navCollapsed) && stockItems.map((item) => {
             const IconComponent = item.icon;
             const isActive = currentView === item.id;
             return (

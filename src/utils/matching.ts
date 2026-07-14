@@ -63,15 +63,20 @@ const isTransposition = (w1: string, w2: string): boolean => {
   return false;
 };
 
+// w1 is always a word from the catalog/product name being matched; w2 is always a word
+// from the master pantry ingredient name (see getDistinctWords call order below).
 const areWordsFuzzyEqual = (w1: string, w2: string): boolean => {
   if (w1 === w2) return true;
-  
+
   // Transposition check (e.g., "fluor" vs "flour")
   if (isTransposition(w1, w2)) return true;
-  
-  // Prefix abbreviation check (minimum 3 characters, e.g. "cabb" vs "cabbage")
-  if (w1.length >= 3 && w2.length >= 3) {
-    if (w1.startsWith(w2) || w2.startsWith(w1)) {
+
+  // Prefix abbreviation check (minimum 3 characters, e.g. product word "cabb" vs ingredient
+  // word "cabbage"). Directional on purpose: only the product word may be a truncated
+  // abbreviation of the ingredient word, never the reverse — otherwise unrelated words that
+  // happen to share a prefix (e.g. product "Larder" vs ingredient "Lard") would false-match.
+  if (w1.length >= 3 && w2.length >= 3 && w1.length <= w2.length) {
+    if (w2.startsWith(w1)) {
       return true;
     }
   }

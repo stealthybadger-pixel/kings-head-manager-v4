@@ -331,6 +331,7 @@ export const StocktakeReportSchema = z.object({
   scope: z.enum(['all', 'menu', 'nonzero']).optional(),
   wastageTotal: z.number().optional(),
   wastageCount: z.number().optional(),
+  wastageCounts: z.record(z.number()).optional(),
   createdAt: z.string().optional()
 });
 export type StocktakeReport = z.infer<typeof StocktakeReportSchema>;

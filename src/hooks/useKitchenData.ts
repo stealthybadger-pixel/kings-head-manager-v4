@@ -246,14 +246,26 @@ export const useStocktakeReports = () => {
   return useQuery<StocktakeReport[]>({
     queryKey: ['stocktake_reports'],
     queryFn: async () => {
-      const snap = await getDocs(collection(db, 'stocktake_reports'));
-      const items: StocktakeReport[] = [];
-      snap.forEach(d => {
-        const raw = { id: d.id, ...d.data() };
-        const result = StocktakeReportSchema.safeParse(raw);
-        items.push(result.success ? result.data : raw as StocktakeReport);
-      });
-      return items.sort((a, b) => b.date.localeCompare(a.date));
+      try {
+        console.log("[useStocktakeReports] Fetching stocktake_reports...");
+        const snap = await getDocs(collection(db, 'stocktake_reports'));
+        console.log(`[useStocktakeReports] Found ${snap.size} documents in Firestore`);
+        const items: StocktakeReport[] = [];
+        snap.forEach(d => {
+          const raw = { id: d.id, ...d.data() };
+          const result = StocktakeReportSchema.safeParse(raw);
+          if (!result.success) {
+            console.warn(`[useStocktakeReports] Validation failed for report ${d.id}:`, result.error);
+          }
+          items.push(result.success ? result.data : raw as StocktakeReport);
+        });
+        const sorted = items.sort((a, b) => b.date.localeCompare(a.date));
+        console.log("[useStocktakeReports] Returning sorted reports:", sorted);
+        return sorted;
+      } catch (err) {
+        console.error("[useStocktakeReports] Error fetching reports:", err);
+        throw err;
+      }
     },
     staleTime: 60 * 1000
   });
@@ -493,10 +505,23 @@ export const useSupplierProductMutations = () => {
     onSuccess: invalidateCatalogQueries
   });
 
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      for (let i = 0; i < ids.length; i += 500) {
+        const chunk = ids.slice(i, i + 500);
+        const batch = writeBatch(db);
+        chunk.forEach(id => batch.delete(doc(db, 'supplierProducts', id)));
+        await batch.commit();
+      }
+    },
+    onSuccess: invalidateCatalogQueries
+  });
+
   return {
     addSupplierProduct: addMutation,
     updateSupplierProduct: updateMutation,
-    deleteSupplierProduct: deleteMutation
+    deleteSupplierProduct: deleteMutation,
+    bulkDeleteSupplierProducts: bulkDeleteMutation
   };
 };
 

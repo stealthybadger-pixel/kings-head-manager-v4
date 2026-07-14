@@ -70,6 +70,17 @@ export const Catalog: React.FC = () => {
   const { updateIngredient, addIngredient } = useIngredientMutations();
   const showToast = useStore((state) => state.showToast);
 
+  // Set when Catalog was opened from Pantry's "Find on Supplier Catalogue" flow — identifies
+  // which ingredient a chosen product should be attached to, and drives the return-to-Pantry
+  // navigation once a product is picked.
+  const linkBackIngredientId = useStore((state) => state.linkBackIngredientId);
+  const clearLinkBackIngredient = useStore((state) => state.clearLinkBackIngredient);
+  const navigateToPantryWithIngredient = useStore((state) => state.navigateToPantryWithIngredient);
+  const linkBackIngredient = useMemo(
+    () => (linkBackIngredientId ? ingredients.find(i => i.id === linkBackIngredientId) ?? null : null),
+    [linkBackIngredientId, ingredients]
+  );
+
   // Selected item detail state
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
 
@@ -151,9 +162,46 @@ export const Catalog: React.FC = () => {
     return processedProducts.find(p => p.id === selectedProductId) || null;
   }, [processedProducts, selectedProductId]);
 
-  const { updateSupplierProduct, deleteSupplierProduct } = useSupplierProductMutations();
+  // Arriving from Pantry's "Cheaper Catalog Option Available" nudge — auto-select and scroll
+  // to the specific product instead of leaving the user to spot it in the filtered list.
+  const highlightProductId = useStore((state) => state.highlightProductId);
+  const clearHighlightProduct = useStore((state) => state.clearHighlightProduct);
+  React.useEffect(() => {
+    if (!highlightProductId) return;
+    if (!processedProducts.some(p => p.id === highlightProductId)) return;
+    setSelectedProductId(highlightProductId);
+    const t = setTimeout(() => {
+      document.getElementById(`catalog-row-${highlightProductId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      clearHighlightProduct();
+    }, 100);
+    return () => clearTimeout(t);
+  }, [highlightProductId, processedProducts, clearHighlightProduct]);
+
+  const { updateSupplierProduct, deleteSupplierProduct, bulkDeleteSupplierProducts } = useSupplierProductMutations();
   const [isEditingProduct, setIsEditingProduct] = useState(false);
   const [editFormState, setEditFormState] = useState<SupplierProduct | null>(null);
+  const [selectedForDelete, setSelectedForDelete] = useState<Set<string>>(new Set());
+
+  const toggleSelectForDelete = (id: string) => {
+    setSelectedForDelete(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (!isManager || selectedForDelete.size === 0) return;
+    if (!confirm(`Delete ${selectedForDelete.size} selected product(s) from the catalogue permanently? This cannot be undone.`)) return;
+    try {
+      await bulkDeleteSupplierProducts.mutateAsync(Array.from(selectedForDelete));
+      if (selectedProductId && selectedForDelete.has(selectedProductId)) setSelectedProductId(null);
+      setSelectedForDelete(new Set());
+      showToast("Selected catalog products deleted.", "success");
+    } catch (err: any) {
+      showToast("Error deleting catalog products: " + err.message, "error");
+    }
+  };
 
   React.useEffect(() => {
     setIsEditingProduct(false);
@@ -213,6 +261,17 @@ export const Catalog: React.FC = () => {
     }
   };
 
+  // Action: attach the currently-selected catalog product as a supplier option for the
+  // ingredient that sent us here (via Pantry's "Find on Supplier Catalogue" button), then
+  // return to Pantry with that ingredient selected, per the linking workflow.
+  const handleLinkBackAdd = async (prod: typeof processedProducts[0]) => {
+    if (!isManager || !linkBackIngredient) return;
+    await handleApplyCheaperOption(prod, linkBackIngredient, false);
+    const ingredientId = linkBackIngredient.id;
+    clearLinkBackIngredient();
+    navigateToPantryWithIngredient(ingredientId);
+  };
+
   // Action: Create a brand new pantry ingredient from a catalog product
   const handleCreateIngredientFromProduct = async (prod: SupplierProduct) => {
     if (!isManager) return;
@@ -256,6 +315,19 @@ export const Catalog: React.FC = () => {
     <div className="flex h-full w-full bg-surface-container-lowest overflow-hidden">
       {/* LEFT COLUMN: Search & Product Registry List */}
       <div className="w-7/12 border-r border-outline-variant flex flex-col h-full bg-surface-container-lowest">
+        {linkBackIngredient && (
+          <div className="px-6 py-3 bg-primary text-white flex items-center justify-between gap-4 flex-shrink-0">
+            <span className="text-xs font-semibold">
+              Finding a supplier option for <strong>{linkBackIngredient.name}</strong> — pick a product, then "Add as Supplier Option".
+            </span>
+            <button
+              onClick={() => clearLinkBackIngredient()}
+              className="text-[10px] font-bold label-caps border border-white/40 px-2 py-1 rounded-sm hover:bg-white/10 flex-shrink-0"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
         {/* Search Header Ribbon */}
         <div className="p-6 border-b border-outline-variant flex flex-col gap-4 flex-shrink-0">
           <div className="flex gap-4">
@@ -300,17 +372,30 @@ export const Catalog: React.FC = () => {
             )}
           </div>
 
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="cheaper_toggle"
-              checked={showCheaperOnly}
-              onChange={(e) => setShowCheaperOnly(e.target.checked)}
-              className="h-4 w-4"
-            />
-            <label htmlFor="cheaper_toggle" className="text-xs font-semibold text-on-surface cursor-pointer select-none">
-              Show Cheaper Alternatives Only
-            </label>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="cheaper_toggle"
+                checked={showCheaperOnly}
+                onChange={(e) => setShowCheaperOnly(e.target.checked)}
+                className="h-4 w-4"
+              />
+              <label htmlFor="cheaper_toggle" className="text-xs font-semibold text-on-surface cursor-pointer select-none">
+                Show Cheaper Alternatives Only
+              </label>
+            </div>
+
+            {isManager && selectedForDelete.size > 0 && (
+              <button
+                onClick={handleBulkDelete}
+                disabled={bulkDeleteSupplierProducts.isPending}
+                className="flex items-center gap-1.5 text-xs font-bold text-red-600 bg-red-500/10 border border-red-500/30 px-3 py-1.5 rounded-sm hover:bg-red-500/20 transition-colors disabled:opacity-50"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete Selected ({selectedForDelete.size})
+              </button>
+            )}
           </div>
         </div>
 
@@ -339,13 +424,16 @@ export const Catalog: React.FC = () => {
                 return (
                   <div
                     key={prod.id}
+                    id={`catalog-row-${prod.id}`}
                     onClick={() => setSelectedProductId(prod.id)}
-                    className={`flex items-center justify-between p-4 border-b border-outline-variant cursor-pointer hover:bg-surface-container transition-all ${
+                    className={`flex items-center justify-between p-4 border-b border-outline-variant cursor-pointer hover:bg-surface-container transition-all duration-300 ${
                       isSelected
                         ? 'bg-surface-container-high border-l-4 border-l-primary'
-                        : idx % 2 === 0
-                          ? 'bg-transparent' 
-                          : 'bg-black/[0.0075]'
+                        : prod.isCheaper
+                          ? 'bg-success-container/25 border-l-4 border-l-success'
+                          : idx % 2 === 0
+                            ? 'bg-transparent'
+                            : 'bg-black/[0.0075]'
                     }`}
                   >
                     <div className="flex-1 min-w-0 pr-4">
@@ -398,23 +486,33 @@ export const Catalog: React.FC = () => {
                         </div>
                       </div>
                       {isManager && (
-                        <button
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            if (!confirm(`Delete "${prod.name}" (${prod.supplier}) from the catalogue permanently?`)) return;
-                            try {
-                              await deleteSupplierProduct.mutateAsync(prod.id);
-                              if (selectedProductId === prod.id) setSelectedProductId(null);
-                              showToast("Catalog product deleted.", "success");
-                            } catch (err: any) {
-                              showToast("Error deleting catalog product: " + err.message, "error");
-                            }
-                          }}
-                          title="Delete from catalogue"
-                          className="text-outline hover:text-red-600 transition-colors p-0.5"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="checkbox"
+                            checked={selectedForDelete.has(prod.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={() => toggleSelectForDelete(prod.id)}
+                            title="Select for bulk delete"
+                            className="h-3.5 w-3.5"
+                          />
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (!confirm(`Delete "${prod.name}" (${prod.supplier}) from the catalogue permanently?`)) return;
+                              try {
+                                await deleteSupplierProduct.mutateAsync(prod.id);
+                                if (selectedProductId === prod.id) setSelectedProductId(null);
+                                showToast("Catalog product deleted.", "success");
+                              } catch (err: any) {
+                                showToast("Error deleting catalog product: " + err.message, "error");
+                              }
+                            }}
+                            title="Delete from catalogue"
+                            className="text-outline hover:text-red-600 transition-colors p-0.5"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -606,6 +704,30 @@ export const Catalog: React.FC = () => {
                   <ExternalLink className="h-3.5 w-3.5" />
                   View on Supplier Site
                 </a>
+              </div>
+            )}
+
+            {/* Linking mode: attach this product to the ingredient that sent us here from Pantry */}
+            {isManager && linkBackIngredient && (
+              <div className="bg-primary/5 border border-primary/30 p-5 rounded-sm flex flex-col gap-3">
+                <div>
+                  <span className="text-[10px] label-caps text-primary block">Linking a Supplier Option</span>
+                  <span className="text-sm font-bold text-on-surface">for {linkBackIngredient.name}</span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleLinkBackAdd(selectedProduct)}
+                    className="flex-1 h-10 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90"
+                  >
+                    Add as Supplier Option
+                  </button>
+                  <button
+                    onClick={() => clearLinkBackIngredient()}
+                    className="h-10 px-4 border border-outline-variant text-xs font-bold label-caps rounded-sm hover:bg-surface-container"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             )}
 

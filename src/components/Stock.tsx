@@ -4,7 +4,7 @@ import { useIngredients, useRecipes, useDishes, useStockMutations, useStockMovem
 import { useStore } from '../store/useStore';
 import { useAuth } from '../hooks/useAuth';
 import { useBleScale, isWebBluetoothSupported } from '../hooks/useBleScale';
-import { Search, Scale, FileText, CheckCircle2, X, Filter, Printer, Mail, ChevronDown, ChevronRight, BookOpen, ChefHat, PauseCircle } from 'lucide-react';
+import { Search, Scale, FileText, CheckCircle2, X, Printer, Mail, ChevronDown, ChevronRight, ChefHat, PauseCircle } from 'lucide-react';
 import { Ingredient, Recipe, RecipeItem, StocktakeReport, Unit } from '../types';
 import { DRY_STORE_SUBCATEGORIES } from '../utils/ingredientAutofill';
 import { tokenizeSearchQuery, matchesSearchTokens } from '../utils/search';
@@ -18,6 +18,7 @@ interface ReportConfig {
   kcal: boolean;
   supplier: boolean;
   includeWastage: boolean;
+  recordedWastage: boolean;
   scope: 'all' | 'menu' | 'nonzero';
 }
 
@@ -30,6 +31,7 @@ const DEFAULT_REPORT_CONFIG: ReportConfig = {
   kcal: false,
   supplier: false,
   includeWastage: true,
+  recordedWastage: true,
   scope: 'nonzero'
 };
 import { calculateIngredientCost, toBaseQuantity } from '../utils/costing';
@@ -337,7 +339,11 @@ const StocktakeIngredientRow = React.memo(function StocktakeIngredientRow({
   );
 });
 
-export const Stock: React.FC = () => {
+interface StockProps {
+  section?: 'directory' | 'reports' | 'waste' | 'import';
+}
+
+export const Stock: React.FC<StockProps> = ({ section = 'directory' }) => {
   const { data: ingredients = [], isLoading } = useIngredients();
   const { data: recipes = [] } = useRecipes();
   const { data: dishes = [] } = useDishes();
@@ -366,11 +372,18 @@ export const Stock: React.FC = () => {
     if (bleScale.error) showToast(bleScale.error, 'error');
   }, [bleScale.error, showToast]);
 
+  const setCurrentView = useStore((state) => state.setView);
+  // A standalone nav section (reports/waste/import) forces its panel open on mount instead
+  // of relying on a toolbar button click, since those buttons now live in the sidebar instead
+  // of on the directory page. Closing the panel in that mode navigates back to Stock directory
+  // rather than leaving a blank page behind.
+  const goBackToStock = () => setCurrentView('stock');
+
   const [showWastePanel, setShowWastePanel] = useState(false);
   const [showStockTake, setShowStockTake] = useState(false);
-  const [showEposImport, setShowEposImport] = useState(false);
-  const [showWastageHistory, setShowWastageHistory] = useState(false);
-  const [showReports, setShowReports] = useState(false);
+  const [showEposImport, setShowEposImport] = useState(section === 'import');
+  const [showWastageHistory, setShowWastageHistory] = useState(section === 'waste');
+  const [showReports, setShowReports] = useState(section === 'reports');
   // Merging fixes an accidental early "Commit Now" splitting one physical
   // stocktake into two report records — combine their counts back into one.
   const [mergeMode, setMergeMode] = useState(false);
@@ -388,6 +401,7 @@ export const Stock: React.FC = () => {
   const [wasteQty, setWasteQty] = useState(0);
   const [wasteUnit, setWasteUnit] = useState<Unit>('g');
   const [wasteReason, setWasteReason] = useState('Spoil');
+  const [wasteTareId, setWasteTareId] = useState('none');
 
   // Wastage history filters
   const [wasteDateFrom, setWasteDateFrom] = useState('');
@@ -455,6 +469,7 @@ export const Stock: React.FC = () => {
   const [varianceReport, setVarianceReport] = useState<{
     name: string; projected: number; actual: number; variance: number; unit: string; costLoss: number;
   }[] | null>(null);
+  const [selectedReportForPreview, setSelectedReportForPreview] = useState<StocktakeReport | null>(null);
 
   // ── Feature 1: cascade live menu → ingredient IDs ─────────────────────────
   const menuIngredientIds = useMemo(() => {
@@ -649,19 +664,31 @@ export const Stock: React.FC = () => {
 
   const isSaving = logMovement.isPending || saveReport.isPending;
 
+  // Reads the live BLE scale weight (same connection used by Stock Take), nets off the
+  // selected container's tare, and fills the waste quantity in grams — so a chef weighing
+  // a bin of trim can log it straight off the scale instead of typing a number by hand.
+  const handleReadWasteFromScale = () => {
+    const rawGrams = useStore.getState().scaleWeightGrams;
+    const netGrams = Math.max(0, rawGrams - getTareWeight(wasteTareId));
+    setWasteUnit('g');
+    setWasteQty(Math.round(netGrams));
+  };
+
   const handleSaveWaste = async () => {
     if (!wasteIngId || wasteQty <= 0) return;
-    const ingName = ingredients.find(i => i.id === wasteIngId)?.name || 'Ingredient';
+    const ing = ingredients.find(i => i.id === wasteIngId);
+    if (!ing) return;
+    const baseQty = unitToGrams(wasteQty, wasteUnit as StocktakeEntryUnit, ing);
     try {
       await logMovement.mutateAsync({
         ingredientId: wasteIngId,
         type: 'waste',
-        quantity: -Math.abs(wasteQty),
+        quantity: -Math.abs(baseQty),
         date: new Date().toISOString().slice(0, 10),
         costValue: 0,
         notes: wasteReason
       });
-      showToast(`Waste logged: ${ingName} (${wasteQty}${wasteUnit})`, 'success');
+      showToast(`Waste logged: ${ing.name} (${wasteQty}${wasteUnit})`, 'success');
       setShowWastePanel(false);
       setWasteIngId(''); setWasteQty(0);
     } catch (err: any) {
@@ -718,13 +745,25 @@ export const Stock: React.FC = () => {
         }
       }
 
+      // Sum up waste movements recorded today for each ingredient
+      const wastageCounts: Record<string, number> = {};
+      const todayStr = new Date().toISOString().slice(0, 10);
+      wasteMovements
+        .filter(m => m.date === todayStr)
+        .forEach(m => {
+          const qty = Math.abs(m.quantity);
+          wastageCounts[m.ingredientId] = (wastageCounts[m.ingredientId] || 0) + qty;
+        });
+
       // Save the report snapshot
       await saveReport.mutateAsync({
-        date: new Date().toISOString().slice(0, 10),
+        date: todayStr,
         counts,
         totalValue,
         itemCount: Object.keys(counts).length,
-        menuOnly: menuOnlyMode
+        menuOnly: menuOnlyMode,
+        columns: ['stockLevel', 'stockValue', 'category', 'recordedWastage'],
+        wastageCounts
       });
 
       // Persist counted prep-recipe batches (e.g. Mash Potato)
@@ -844,12 +883,18 @@ export const Stock: React.FC = () => {
     const sorted = [...toMerge].sort((a, b) => (a.createdAt || a.date).localeCompare(b.createdAt || b.date));
 
     const counts: Record<string, number> = {};
+    const wastageCounts: Record<string, number> = {};
     let wastageTotal = 0;
     let wastageCount = 0;
     let hasWastage = false;
     let menuOnly = true;
     for (const r of sorted) {
       Object.assign(counts, r.counts);
+      if (r.wastageCounts) {
+        for (const [ingId, qty] of Object.entries(r.wastageCounts)) {
+          wastageCounts[ingId] = (wastageCounts[ingId] || 0) + qty;
+        }
+      }
       if (r.wastageTotal !== undefined) { wastageTotal += r.wastageTotal; hasWastage = true; }
       if (r.wastageCount !== undefined) wastageCount += r.wastageCount;
       if (!r.menuOnly) menuOnly = false;
@@ -877,7 +922,8 @@ export const Stock: React.FC = () => {
           menuOnly,
           type: 'stocktake',
           wastageTotal: hasWastage ? wastageTotal : undefined,
-          wastageCount: hasWastage ? wastageCount : undefined
+          wastageCount: hasWastage ? wastageCount : undefined,
+          wastageCounts: Object.keys(wastageCounts).length > 0 ? wastageCounts : undefined
         }
       });
       showToast(`Merged ${sorted.length} reports into one`, 'success');
@@ -908,18 +954,27 @@ export const Stock: React.FC = () => {
       .filter(([k, v]) => v === true && k !== 'includeWastage')
       .map(([k]) => k);
 
+    const wastageCounts: Record<string, number> = {};
     let wastageTotal: number | undefined;
     let wastageCount: number | undefined;
-    if (cfg.includeWastage) {
+    if (cfg.includeWastage || cfg.recordedWastage) {
       const cutoff = new Date();
       cutoff.setDate(cutoff.getDate() - 7);
       const cutoffStr = cutoff.toISOString().slice(0, 10);
       const recentWaste = wasteMovements.filter(m => m.date >= cutoffStr);
-      wastageCount = recentWaste.length;
-      wastageTotal = recentWaste.reduce((sum, m) => {
-        const ing = ingMap.get(m.ingredientId);
-        return sum + (ing ? calculateIngredientCost(ing, Math.abs(m.quantity), 'g', ingredients) : 0);
-      }, 0);
+      if (cfg.includeWastage) {
+        wastageCount = recentWaste.length;
+        wastageTotal = recentWaste.reduce((sum, m) => {
+          const ing = ingMap.get(m.ingredientId);
+          return sum + (ing ? calculateIngredientCost(ing, Math.abs(m.quantity), 'g', ingredients) : 0);
+        }, 0);
+      }
+      if (cfg.recordedWastage) {
+        recentWaste.forEach(m => {
+          const qty = Math.abs(m.quantity);
+          wastageCounts[m.ingredientId] = (wastageCounts[m.ingredientId] || 0) + qty;
+        });
+      }
     }
 
     try {
@@ -932,7 +987,8 @@ export const Stock: React.FC = () => {
         columns,
         scope: cfg.scope,
         wastageTotal,
-        wastageCount
+        wastageCount,
+        wastageCounts: Object.keys(wastageCounts).length > 0 ? wastageCounts : undefined
       });
       showToast('Report generated', 'success');
       setShowReportConfig(false);
@@ -955,27 +1011,51 @@ export const Stock: React.FC = () => {
     const showAllergens = cols.includes('allergens');
     const showKcal      = cols.includes('kcal');
     const showSupplier  = cols.includes('supplier');
+    const showRecordedWastage = cols.includes('recordedWastage') && !!report.wastageCounts;
 
     const headerCells = [
       '<th>Ingredient</th>',
       showCategory  ? '<th>Category</th>'       : '',
       showLevel     ? '<th style="text-align:right">Stock Level</th>' : '',
+      showRecordedWastage ? '<th style="text-align:right;color:#d32f2f">Recorded Wastage</th>' : '',
       showValue     ? '<th style="text-align:right">Value (£)</th>'   : '',
+      (showRecordedWastage && showValue) ? '<th style="text-align:right">Value - Waste (£)</th>' : '',
       showWaste     ? '<th style="text-align:right">Waste %</th>'     : '',
       showAllergens ? '<th>Allergens</th>'       : '',
       showKcal      ? '<th style="text-align:right">kcal/100g</th>'   : '',
       showSupplier  ? '<th>Supplier</th>'        : ''
     ].join('');
 
+    let totalNetValue = 0;
+
     const rows = Object.entries(report.counts).map(([id, count]) => {
       const ing = ingMap.get(id);
       const value = (ing && showValue) ? calculateIngredientCost(ing, count, 'g', ingredients) : 0;
       const pref = ing?.suppliers?.find(s => s.isPreferred) ?? ing?.suppliers?.[0];
+      const displayUnit = pref?.packUnit || 'g';
+      
+      const displayLevel = ing ? `${formatUnitValue(gramsToUnit(count, displayUnit as StocktakeEntryUnit, ing), displayUnit as StocktakeEntryUnit)} ${displayUnit}` : `${count}`;
+      
+      let displayWasted = '—';
+      let netValue = value;
+      if (showRecordedWastage && report.wastageCounts) {
+        const wastedGrams = report.wastageCounts[id] || 0;
+        if (wastedGrams > 0 && ing) {
+          displayWasted = `<span style="color:#d32f2f;font-weight:bold">${formatUnitValue(gramsToUnit(wastedGrams, displayUnit as StocktakeEntryUnit, ing), displayUnit as StocktakeEntryUnit)} ${displayUnit}</span>`;
+          const wasteValue = calculateIngredientCost(ing, wastedGrams, 'g', ingredients);
+          netValue = Math.max(0, value - wasteValue);
+        }
+      }
+      
+      totalNetValue += netValue;
+
       return `<tr>
         <td>${ing?.name ?? id}</td>
         ${showCategory  ? `<td>${ing?.category ?? ''}</td>` : ''}
-        ${showLevel     ? `<td style="text-align:right">${count}</td>` : ''}
+        ${showLevel     ? `<td style="text-align:right">${displayLevel}</td>` : ''}
+        ${showRecordedWastage ? `<td style="text-align:right">${displayWasted}</td>` : ''}
         ${showValue     ? `<td style="text-align:right">£${value.toFixed(2)}</td>` : ''}
+        ${(showRecordedWastage && showValue) ? `<td style="text-align:right;font-weight:bold">£${netValue.toFixed(2)}</td>` : ''}
         ${showWaste     ? `<td style="text-align:right">${ing?.wastePercent ?? 0}%</td>` : ''}
         ${showAllergens ? `<td>${(ing?.allergens ?? []).join(', ') || '—'}</td>` : ''}
         ${showKcal      ? `<td style="text-align:right">${ing?.kcalPer100 ?? '—'}</td>` : ''}
@@ -991,7 +1071,31 @@ export const Stock: React.FC = () => {
 
     const win = window.open('', '_blank');
     if (!win) return;
-    const colSpan = [true, showCategory, showLevel, showValue, showWaste, showAllergens, showKcal, showSupplier].filter(Boolean).length;
+
+    let footerRow = '';
+    if (showValue) {
+      const colsBeforeValue = [
+        true, // Ingredient
+        showCategory,
+        showLevel,
+        showRecordedWastage
+      ].filter(Boolean).length;
+      
+      const colsAfterValue = [
+        showWaste,
+        showAllergens,
+        showKcal,
+        showSupplier
+      ].filter(Boolean).length;
+
+      footerRow = `<tfoot><tr>
+        <td colspan="${colsBeforeValue}">Total</td>
+        <td style="text-align:right">£${report.totalValue.toFixed(2)}</td>
+        ${showRecordedWastage ? `<td style="text-align:right">£${totalNetValue.toFixed(2)}</td>` : ''}
+        ${colsAfterValue > 0 ? `<td colspan="${colsAfterValue}"></td>` : ''}
+      </tr></tfoot>`;
+    }
+
     win.document.write(`<!DOCTYPE html><html><head><title>${report.type === 'snapshot' ? 'Stock Report' : 'Stock Take'} ${report.date}</title>
       <style>body{font-family:sans-serif;font-size:12px;padding:20px}h1{font-size:16px}h2{font-size:14px}table{width:100%;border-collapse:collapse;margin-top:8px}th,td{border:1px solid #ccc;padding:6px 8px}th{background:#f5f5f5;text-align:left}tfoot td{font-weight:bold}</style>
       </head><body>
@@ -999,7 +1103,7 @@ export const Stock: React.FC = () => {
       <p>${report.itemCount} items · ${scopeLabel} · Stock value: £${report.totalValue.toFixed(2)}</p>
       <table><thead><tr>${headerCells}</tr></thead>
       <tbody>${rows}</tbody>
-      ${showValue ? `<tfoot><tr><td colspan="${colSpan - 1}">Total</td><td style="text-align:right">£${report.totalValue.toFixed(2)}</td></tr></tfoot>` : ''}
+      ${footerRow}
       </table>
       ${wastageSection}
       </body></html>`);
@@ -1070,8 +1174,11 @@ export const Stock: React.FC = () => {
   const handleSaveSingleAdjustment = async (ing: Ingredient) => {
     const typedVal = editingCounts[ing.id];
     if (typedVal === undefined) return;
-    const newCount = parseFloat(typedVal) || 0;
-    const delta = newCount - (ing.stockLevel || 0);
+    const newCountInDisplayUnit = parseFloat(typedVal) || 0;
+    const pref = ing.suppliers?.find(s => s.isPreferred) || ing.suppliers?.[0];
+    const displayUnit = (pref?.packUnit || 'g') as StocktakeEntryUnit;
+    const newCountInGrams = unitToGrams(newCountInDisplayUnit, displayUnit, ing);
+    const delta = newCountInGrams - (ing.stockLevel || 0);
     if (delta !== 0) {
       try {
         await logMovement.mutateAsync({
@@ -1082,8 +1189,8 @@ export const Stock: React.FC = () => {
         // ingredient's own stockLevel field, so without this the edit "saves"
         // (toast + movement logged) but the displayed figure reverts to the
         // stale value as soon as editingCounts clears.
-        await updateIngredient.mutateAsync({ id: ing.id, data: { stockLevel: newCount } });
-        showToast(`Adjusted ${ing.name} to ${newCount}`, 'success');
+        await updateIngredient.mutateAsync({ id: ing.id, data: { stockLevel: newCountInGrams } });
+        showToast(`Adjusted ${ing.name} to ${formatUnitValue(newCountInDisplayUnit, displayUnit)} ${displayUnit}`, 'success');
         setEditingCounts(prev => { const n = { ...prev }; delete n[ing.id]; return n; });
         selectIngredient(null);
       } catch (err: any) {
@@ -1154,6 +1261,8 @@ export const Stock: React.FC = () => {
   return (
     <div className="p-4 sm:p-8 h-full overflow-y-auto flex flex-col gap-4 sm:gap-8 bg-surface-container-lowest">
 
+      {section === 'directory' && (
+      <>
       {/* 1. CONTROL BAR */}
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-outline-variant pb-4">
         <div>
@@ -1161,22 +1270,6 @@ export const Stock: React.FC = () => {
           <span className="text-xs text-outline label-caps">EPOS COMPONENT WATERFALL</span>
         </div>
         <div className="flex gap-3 flex-wrap sm:justify-end">
-          <button onClick={() => setShowReports(true)}
-            className="h-10 px-4 border border-outline-variant text-xs font-bold label-caps rounded-sm hover:bg-surface-container flex items-center gap-1.5">
-            <BookOpen className="h-4 w-4" /> Reports
-          </button>
-          <button onClick={() => setShowWastageHistory(true)}
-            className="h-10 px-4 border border-outline-variant text-xs font-bold label-caps rounded-sm hover:bg-surface-container flex items-center gap-1.5">
-            <Filter className="h-4 w-4" /> Waste History
-          </button>
-          <button onClick={() => setShowEposImport(true)}
-            className="h-10 px-4 border border-outline text-xs font-bold label-caps rounded-sm hover:bg-surface-container">
-            Import EPOS Sales
-          </button>
-          <button onClick={() => setShowWastePanel(true)}
-            className="h-10 px-4 border border-error text-error text-xs font-bold label-caps rounded-sm hover:bg-error-container">
-            Log Waste
-          </button>
           <button onClick={() => setShowStockTake(true)}
             className="relative h-10 px-6 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90">
             {stocktakeDraft ? 'Resume Stock Take' : 'Stock Take'}
@@ -1232,8 +1325,14 @@ export const Stock: React.FC = () => {
             {filteredStockIngredients.map((ing, idx) => {
               const pref = ing.suppliers?.find(s => s.isPreferred) || ing.suppliers?.[0];
               const displayUnit = pref?.packUnit || 'g';
-              const displayVal = editingCounts[ing.id] !== undefined ? editingCounts[ing.id] : (ing.stockLevel ?? '');
-              const hasChanged = editingCounts[ing.id] !== undefined && parseFloat(editingCounts[ing.id]) !== (ing.stockLevel || 0);
+              const displayVal = editingCounts[ing.id] !== undefined
+                ? editingCounts[ing.id]
+                : ing.stockLevel !== undefined
+                  ? formatUnitValue(gramsToUnit(ing.stockLevel, displayUnit as StocktakeEntryUnit, ing), displayUnit as StocktakeEntryUnit)
+                  : '';
+              const currentValInDisplayUnit = gramsToUnit(ing.stockLevel || 0, displayUnit as StocktakeEntryUnit, ing);
+              const parsedTypedVal = parseFloat(editingCounts[ing.id] || '0') || 0;
+              const hasChanged = editingCounts[ing.id] !== undefined && parsedTypedVal !== currentValInDisplayUnit;
               const isHighlighted = selectedIngredientId === ing.id;
               return (
                 <div key={ing.id} id={`stock-row-${ing.id}`}
@@ -1244,7 +1343,7 @@ export const Stock: React.FC = () => {
                       {isHighlighted && <span className="bg-primary text-white text-[9px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wider animate-pulse flex-shrink-0">Target</span>}
                     </div>
                     <div className="text-[10px] text-outline uppercase tracking-wider mt-1">
-                      {ing.category} • Current: {ing.stockLevel || 0} {displayUnit}
+                      {ing.category} • Current: {formatUnitValue(gramsToUnit(ing.stockLevel || 0, displayUnit as StocktakeEntryUnit, ing), displayUnit as StocktakeEntryUnit)} {displayUnit}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
@@ -1266,6 +1365,8 @@ export const Stock: React.FC = () => {
           </div>
         )}
       </div>
+      </>
+      )}
 
       {/* ── MODALS ─────────────────────────────────────────────────────────── */}
 
@@ -1282,6 +1383,37 @@ export const Stock: React.FC = () => {
                   <option value="">-- Choose Ingredient --</option>
                   {ingredients.map(ing => <option key={ing.id} value={ing.id}>{ing.name}</option>)}
                 </select>
+              </div>
+              <div className="flex items-end gap-3 bg-surface border border-outline-variant p-3 rounded-sm">
+                {isWebBluetoothSupported() ? (
+                  <button type="button" onClick={() => scaleConnected ? bleScale.disconnect() : bleScale.connect()}
+                    className={`h-9 px-4 text-xs font-bold label-caps rounded-sm flex items-center gap-2 border transition-colors flex-shrink-0 ${scaleConnected ? 'bg-secondary-container border-[#90a8ff] text-primary' : 'border-outline text-outline bg-surface-container-lowest hover:bg-surface-container'}`}>
+                    <Scale className="h-4 w-4" />
+                    {scaleConnected ? 'Scale Connected' : 'Link Scale'}
+                  </button>
+                ) : (
+                  <span title="Bluetooth scale linking needs Chrome (Android) or the Bluefy browser (iPhone)"
+                    className="h-9 px-4 text-xs font-bold label-caps rounded-sm flex items-center gap-2 border border-outline-variant text-outline/50 cursor-not-allowed flex-shrink-0">
+                    <Scale className="h-4 w-4" />
+                    Scale Unavailable
+                  </span>
+                )}
+                {scaleConnected && (
+                  <>
+                    <div className="flex-1">
+                      <label className="label-caps text-outline text-[9px] block mb-1">Container / Tub</label>
+                      <select value={wasteTareId} onChange={e => setWasteTareId(e.target.value)}
+                        className="w-full px-2 py-2 border border-outline-variant bg-surface-container-lowest text-xs rounded-sm">
+                        <option value="none">No tub</option>
+                        {CONTAINER_PROFILES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </div>
+                    <button type="button" onClick={handleReadWasteFromScale}
+                      className="h-10 px-4 border border-primary text-primary text-xs font-bold label-caps rounded-sm hover:bg-primary/5 flex items-center gap-1.5 flex-shrink-0">
+                      <Scale className="h-4 w-4" /> Read Scale
+                    </button>
+                  </>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -1330,16 +1462,22 @@ export const Stock: React.FC = () => {
 
       {/* FEATURE 2: WASTAGE HISTORY */}
       {showWastageHistory && (
-        <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-3 sm:p-8">
-          <div className="w-full max-w-3xl h-[85vh] bg-surface-container-lowest border border-outline-variant rounded-sm flex flex-col">
+        <div className={section === 'waste' ? 'w-full h-full flex flex-col' : 'fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-3 sm:p-8'}>
+          <div className={section === 'waste' ? 'w-full h-full bg-surface-container-lowest border border-outline-variant rounded-sm flex flex-col' : 'w-full max-w-3xl h-[85vh] bg-surface-container-lowest border border-outline-variant rounded-sm flex flex-col'}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant bg-surface flex-shrink-0">
               <div>
                 <h2 className="font-bold text-on-surface">Wastage History</h2>
                 <span className="text-[10px] text-outline label-caps">{filteredWaste.length} entries · Total cost: <span className="text-error font-bold">£{wasteTotalCost.toFixed(2)}</span></span>
               </div>
-              <button onClick={() => setShowWastageHistory(false)} className="p-1 text-outline hover:text-on-surface">
-                <X className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-3">
+                <button onClick={() => setShowWastePanel(true)}
+                  className="h-8 px-4 border border-error text-error text-[10px] font-bold label-caps rounded-sm hover:bg-error-container">
+                  Log Waste
+                </button>
+                <button onClick={() => section === 'waste' ? goBackToStock() : setShowWastageHistory(false)} className="p-1 text-outline hover:text-on-surface">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
             {/* Filters */}
@@ -1414,8 +1552,8 @@ export const Stock: React.FC = () => {
 
       {/* FEATURE 3: REPORTS */}
       {showReports && (
-        <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-3 sm:p-8">
-          <div className="w-full max-w-2xl h-[80vh] bg-surface-container-lowest border border-outline-variant rounded-sm flex flex-col">
+        <div className={section === 'reports' ? 'w-full h-full flex flex-col' : 'fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-3 sm:p-8'}>
+          <div className={section === 'reports' ? 'w-full h-full bg-surface-container-lowest border border-outline-variant rounded-sm flex flex-col' : 'w-full max-w-2xl h-[80vh] bg-surface-container-lowest border border-outline-variant rounded-sm flex flex-col'}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant bg-surface flex-shrink-0">
               <h2 className="font-bold text-on-surface">Stocktake Reports</h2>
               <div className="flex items-center gap-3">
@@ -1449,7 +1587,7 @@ export const Stock: React.FC = () => {
                   <Mail className="h-3.5 w-3.5" />
                   Email Compliance Log
                 </button>
-                <button onClick={() => setShowReports(false)} className="p-1 text-outline hover:text-on-surface">
+                <button onClick={() => section === 'reports' ? goBackToStock() : setShowReports(false)} className="p-1 text-outline hover:text-on-surface">
                   <X className="h-4 w-4" />
                 </button>
               </div>
@@ -1469,14 +1607,18 @@ export const Stock: React.FC = () => {
                   return (
                     <div key={report.id}
                       onClick={() => {
-                        if (!mergeMode || !isMergeable) return;
-                        setSelectedForMerge(prev => {
-                          const next = new Set(prev);
-                          next.has(report.id) ? next.delete(report.id) : next.add(report.id);
-                          return next;
-                        });
+                        if (mergeMode) {
+                          if (!isMergeable) return;
+                          setSelectedForMerge(prev => {
+                            const next = new Set(prev);
+                            next.has(report.id) ? next.delete(report.id) : next.add(report.id);
+                            return next;
+                          });
+                        } else {
+                          setSelectedReportForPreview(report);
+                        }
                       }}
-                      className={`px-6 py-4 flex items-center justify-between hover:bg-surface-container-low ${mergeMode && isMergeable ? 'cursor-pointer' : ''} ${isSelected ? 'bg-primary/5' : ''}`}>
+                      className="px-6 py-4 flex items-center justify-between hover:bg-surface-container-low cursor-pointer">
                       <div className="flex items-center gap-3">
                         {mergeMode && (
                           <input type="checkbox" checked={isSelected} disabled={!isMergeable}
@@ -1498,18 +1640,7 @@ export const Stock: React.FC = () => {
                         </div>
                       </div>
                       {!mergeMode && (
-                        <div className="flex gap-2">
-                          <button onClick={() => handlePrintReport(report)}
-                            title="Print report"
-                            className="h-8 px-3 border border-outline-variant text-xs font-bold label-caps rounded-sm hover:bg-surface-container flex items-center gap-1.5">
-                            <Printer className="h-3.5 w-3.5" /> Print
-                          </button>
-                          <button onClick={() => handleEmailReport(report)}
-                            title="Email report"
-                            className="h-8 px-3 border border-outline-variant text-xs font-bold label-caps rounded-sm hover:bg-surface-container flex items-center gap-1.5">
-                            <Mail className="h-3.5 w-3.5" /> Email
-                          </button>
-                        </div>
+                        <ChevronRight className="h-4 w-4 text-outline" />
                       )}
                     </div>
                   );
@@ -1533,10 +1664,169 @@ export const Stock: React.FC = () => {
         </div>
       )}
 
+      {/* REPORT PREVIEW MODAL */}
+      {selectedReportForPreview && (() => {
+        const report = selectedReportForPreview;
+        const cols = report.columns ?? ['stockLevel', 'stockValue', 'category'];
+        const showCategory  = cols.includes('category');
+        const showLevel     = cols.includes('stockLevel');
+        const showValue     = cols.includes('stockValue');
+        const showWaste     = cols.includes('wastePercent');
+        const showAllergens = cols.includes('allergens');
+        const showKcal      = cols.includes('kcal');
+        const showSupplier  = cols.includes('supplier');
+        const showRecordedWastage = cols.includes('recordedWastage') && !!report.wastageCounts;
+
+        const scopeLabel = report.scope === 'menu' ? 'Menu items only' : report.scope === 'nonzero' ? 'Items with stock' : 'All ingredients';
+        let totalNetValue = 0;
+
+        return (
+          <div className="fixed inset-0 z-[120] bg-black/60 flex items-center justify-center p-3 sm:p-8">
+            <div className="w-full max-w-4xl h-full sm:h-[90vh] bg-surface-container-lowest border border-outline-variant rounded-sm flex flex-col overflow-hidden shadow-2xl">
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant bg-surface flex-shrink-0">
+                <div>
+                  <h2 className="font-bold text-lg text-on-surface">
+                    {report.type === 'snapshot' ? 'Stock Report' : 'Stock Take'} — {report.date}
+                  </h2>
+                  <span className="text-[10px] text-outline label-caps mt-0.5 block">Report Preview</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => handlePrintReport(report)}
+                    className="h-10 px-4 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90 flex items-center gap-1.5">
+                    <Printer className="h-4 w-4" /> Print
+                  </button>
+                  <button onClick={() => handleEmailReport(report)}
+                    className="h-10 px-4 border border-outline-variant text-xs font-bold label-caps rounded-sm hover:bg-surface-container flex items-center gap-1.5">
+                    <Mail className="h-4 w-4" /> Email
+                  </button>
+                  <button onClick={() => setSelectedReportForPreview(null)}
+                    className="h-10 w-10 border border-outline-variant text-outline hover:text-on-surface rounded-sm hover:bg-surface-container flex items-center justify-center">
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Paper Body */}
+              <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-surface-container-low flex justify-center">
+                <div className="w-full max-w-3xl bg-surface-container-lowest border border-outline-variant rounded-sm p-6 sm:p-8 shadow-sm flex flex-col gap-6 text-on-surface text-xs leading-relaxed">
+                  <div className="border-b border-outline-variant pb-4">
+                    <h1 className="text-xl font-bold text-on-surface">{report.type === 'snapshot' ? 'Stock Report' : 'Stock Take'} — {report.date}</h1>
+                    <p className="text-xs text-outline label-caps mt-1">
+                      {report.itemCount} items · {scopeLabel} · Stock value: £{report.totalValue.toFixed(2)}
+                    </p>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-outline bg-surface-container-low font-bold">
+                          <th className="p-2.5">Ingredient</th>
+                          {showCategory && <th className="p-2.5">Category</th>}
+                          {showLevel && <th className="p-2.5 text-right">Stock Level</th>}
+                          {showRecordedWastage && <th className="p-2.5 text-right text-error">Recorded Wastage</th>}
+                          {showValue && <th className="p-2.5 text-right">Value (£)</th>}
+                          {(showRecordedWastage && showValue) && <th className="p-2.5 text-right">Value - Waste (£)</th>}
+                          {showWaste && <th className="p-2.5 text-right">Waste %</th>}
+                          {showAllergens && <th className="p-2.5">Allergens</th>}
+                          {showKcal && <th className="p-2.5 text-right">kcal/100g</th>}
+                          {showSupplier && <th className="p-2.5">Supplier</th>}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-outline-variant">
+                        {Object.entries(report.counts).map(([id, count]) => {
+                          const ing = ingMap.get(id);
+                          const val = (ing && showValue) ? calculateIngredientCost(ing, count, 'g', ingredients) : 0;
+                          const pref = ing?.suppliers?.find(s => s.isPreferred) ?? ing?.suppliers?.[0];
+                          const displayUnit = pref?.packUnit || 'g';
+                          const displayLevel = ing ? `${formatUnitValue(gramsToUnit(count, displayUnit as StocktakeEntryUnit, ing), displayUnit as StocktakeEntryUnit)} ${displayUnit}` : `${count}`;
+                          
+                          let displayWasted = '—';
+                          let netValue = val;
+                          let hasWasted = false;
+                          
+                          if (showRecordedWastage && report.wastageCounts) {
+                            const wastedGrams = report.wastageCounts[id] || 0;
+                            if (wastedGrams > 0 && ing) {
+                              hasWasted = true;
+                              displayWasted = `${formatUnitValue(gramsToUnit(wastedGrams, displayUnit as StocktakeEntryUnit, ing), displayUnit as StocktakeEntryUnit)} ${displayUnit}`;
+                              const wasteValue = calculateIngredientCost(ing, wastedGrams, 'g', ingredients);
+                              netValue = Math.max(0, val - wasteValue);
+                            }
+                          }
+                          
+                          totalNetValue += netValue;
+
+                          return (
+                            <tr key={id} className="hover:bg-black/[0.01]">
+                              <td className="p-2.5 font-semibold">{ing?.name ?? id}</td>
+                              {showCategory && <td className="p-2.5 text-outline">{ing?.category ?? ''}</td>}
+                              {showLevel && <td className="p-2.5 text-right data-tabular">{displayLevel}</td>}
+                              {showRecordedWastage && (
+                                <td className={`p-2.5 text-right data-tabular font-bold ${hasWasted ? 'text-error' : 'text-outline'}`}>
+                                  {displayWasted}
+                                </td>
+                              )}
+                              {showValue && <td className="p-2.5 text-right data-tabular font-semibold">£{val.toFixed(2)}</td>}
+                              {(showRecordedWastage && showValue) && (
+                                <td className="p-2.5 text-right data-tabular font-bold">£{netValue.toFixed(2)}</td>
+                              )}
+                              {showWaste && <td className="p-2.5 text-right data-tabular">{ing?.wastePercent ?? 0}%</td>}
+                              {showAllergens && <td className="p-2.5">{(ing?.allergens ?? []).join(', ') || '—'}</td>}
+                              {showKcal && <td className="p-2.5 text-right data-tabular">{ing?.kcalPer100 ?? '—'}</td>}
+                              {showSupplier && <td className="p-2.5">{pref?.name ?? '—'}</td>}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      {showValue && (() => {
+                        const colsBeforeValue = [
+                          true, // Ingredient
+                          showCategory,
+                          showLevel,
+                          showRecordedWastage
+                        ].filter(Boolean).length;
+                        
+                        const colsAfterValue = [
+                          showWaste,
+                          showAllergens,
+                          showKcal,
+                          showSupplier
+                        ].filter(Boolean).length;
+
+                        return (
+                          <tfoot className="border-t border-outline bg-surface-container-low font-bold">
+                            <tr>
+                              <td colSpan={colsBeforeValue} className="p-2.5">Total</td>
+                              <td className="p-2.5 text-right data-tabular">£{report.totalValue.toFixed(2)}</td>
+                              {showRecordedWastage && <td className="p-2.5 text-right data-tabular">£{totalNetValue.toFixed(2)}</td>}
+                              {colsAfterValue > 0 && <td colSpan={colsAfterValue} className="p-2.5"></td>}
+                            </tr>
+                          </tfoot>
+                        );
+                      })()}
+                    </table>
+                  </div>
+
+                  {report.wastageTotal !== undefined && (
+                    <div className="border-t border-outline-variant pt-4 mt-2">
+                      <h3 className="label-caps font-bold text-error mb-1">Wastage (last 7 days)</h3>
+                      <p className="text-xs text-outline">
+                        {report.wastageCount ?? 0} entries · Total wastage cost: <strong className="text-error">£{report.wastageTotal.toFixed(2)}</strong>
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* EPOS IMPORTER */}
       {showEposImport && (
-        <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-3 sm:p-8">
-          <div className="w-full max-w-3xl bg-surface-container-lowest border border-outline-variant rounded-sm flex flex-col p-6 max-h-[90vh]">
+        <div className={section === 'import' ? 'w-full h-full flex flex-col' : 'fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-3 sm:p-8'}>
+          <div className={section === 'import' ? 'w-full h-full bg-surface-container-lowest border border-outline-variant rounded-sm flex flex-col p-6' : 'w-full max-w-3xl bg-surface-container-lowest border border-outline-variant rounded-sm flex flex-col p-6 max-h-[90vh]'}>
             <h2 className="headline-sm font-semibold border-b border-outline-variant pb-3 mb-4 flex items-center gap-2">
               <FileText className="h-5 w-5 text-primary" />EPOS Sales Importer & Variance Auditor
             </h2>
@@ -1577,7 +1867,7 @@ export const Stock: React.FC = () => {
                 </div>
               )}
               <div className="flex justify-end gap-3 border-t border-outline-variant pt-4">
-                <button onClick={() => { setShowEposImport(false); setEposFile(null); setVarianceReport(null); }}
+                <button onClick={() => { section === 'import' ? goBackToStock() : setShowEposImport(false); setEposFile(null); setVarianceReport(null); }}
                   className="h-10 px-4 border border-outline text-xs font-bold label-caps rounded-sm hover:bg-surface-container">Close</button>
                 <button onClick={handleRunEposImport} disabled={!eposFile || importing}
                   className="h-10 px-6 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90 disabled:opacity-50">
@@ -1631,6 +1921,7 @@ export const Stock: React.FC = () => {
                     ['allergens',    'Allergens'],
                     ['kcal',         'Calories (kcal/100g)'],
                     ['supplier',     'Preferred supplier'],
+                    ['recordedWastage', 'Recorded wastage'],
                   ] as const).map(([key, label]) => (
                     <label key={key} className="flex items-center gap-2 cursor-pointer text-sm">
                       <input type="checkbox" checked={reportConfig[key] as boolean}

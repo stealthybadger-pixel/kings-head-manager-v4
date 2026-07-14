@@ -4,7 +4,7 @@ echo ==================================================
 echo         SETUP WHOLESALER SCRAPER LOGIN
 echo ==================================================
 echo.
-cd /d "E:\Projects\kings-head-manager-v4\kings-head-manager-v4"
+cd /d "E:\Projects\kings-head-manager-v4"
 call npm run scrape:login
 if errorlevel 1 (
     echo.
