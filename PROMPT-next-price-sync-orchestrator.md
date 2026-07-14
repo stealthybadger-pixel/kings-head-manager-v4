@@ -14,21 +14,23 @@ across our entire active menu:
    - Collect the list of unique `ingredientId`s currently in use.
    - Query the `ingredients` collection to get those active items.
 
-2. **Loop and Scrape:**
+2. **Loop and Scrape (with Filters):**
    - For each active ingredient, iterate through its defined `suppliers`.
-   - If a supplier has a product page URL (or we can generate one), run the exact
-     single-product scraper logic we just wrote to fetch its current price.
-   - Skip/ignore items under the 'Meat' or 'Fish' categories (or any suppliers that don't
-     have a valid product URL), since those local suppliers don't have online portal pricing
-     anyway.
+   - Skip/Ignore the item if:
+     - It falls under 'Meat' or 'Fish' categories (local suppliers without online portals).
+     - It does not have a valid supplier product URL.
+     - The price was recently checked (e.g., if `priceLastCheckedAt` is within the last 24 or
+       48 hours, skip it to prevent spamming the wholesaler's site).
+   - For items that pass the filters, run our single-product scraper logic on the URL.
 
 3. **Update Firestore:**
-   - Write the fresh scraped price directly back to the ingredient's supplier options.
+   - Save the fresh price back to the ingredient's supplier options.
+   - Set the `priceLastCheckedAt` timestamp to the current date/time.
    - This will trigger the cascade that automatically updates our recipe costs and dish
      margins in the app.
 
 Please write the script/orchestration layer to loop our single-product scraper across this
-active ingredient list. Thanks!
+filtered active ingredient list. Thanks!
 
 ---
 
@@ -65,17 +67,27 @@ and can reuse existing helpers:
   - The `menuIngredientIds` memo in Stock.tsx is exactly this cascade (live dishes → recipes →
     sub-recipes → ingredient IDs); reuse the shape.
 
-**Product URL generation (step 2)**: `src/utils/supplierUrls.ts` `getSupplierUrl()` already
-builds a product URL from `{ supplier, bookerProductCode, urbanProductId, name }`. As of
-2026-07-15, linked supplier records now also store a `sourceUrl` (see `IngredientSupplierSchema`
-in `src/types.ts`) — prefer that exact URL, fall back to `getSupplierUrl`.
+**Filters (step 2):**
+  - Skip ingredients whose `category` is `Meat` or `Fish` (local suppliers, no online portal).
+  - Skip suppliers with no usable product URL (see URL note below).
+  - Skip if `priceLastCheckedAt` is within the last 24–48h (rate-limit the wholesaler). NOTE:
+    `priceLastCheckedAt` is a NEW field — add it (per-supplier is more precise than
+    per-ingredient, since an ingredient can have several suppliers). If per-supplier, extend
+    `IngredientSupplierSchema` in `src/types.ts` with an optional `priceLastCheckedAt?: string`
+    (ISO string — the app stores timestamps as ISO strings, NOT Firestore Timestamps).
+
+**Product URL (step 2/3)**: `src/utils/supplierUrls.ts` `getSupplierUrl()` builds a product
+URL from `{ supplier, bookerProductCode, urbanProductId, name }`. As of 2026-07-15, linked
+supplier records also store `sourceUrl` (see `IngredientSupplierSchema`). Prefer the exact
+`sourceUrl`; a `getSupplierUrl` result that's only a Google-search fallback is NOT a "valid
+product URL" for scraping — treat those as skip.
 
 **Update (step 3)**: write back into `ingredients/<id>.suppliers[]` (match by supplier name),
-updating `packCost` (and `packSize`/`packUnit`/`unitPrice` if changed). Costing cascades
-automatically in the app — no dish/recipe writes needed. Use the Admin SDK batched-write
-pattern from `scripts/apply_*.mjs`. **Mind Firestore quota** (it was exhausted repeatedly on
-2026-07-15) and back up before mass writes.
+updating `packCost` (+ `packSize`/`packUnit`/`unitPrice` if changed) and set
+`priceLastCheckedAt`. Costing cascades automatically in the app — no dish/recipe writes needed.
+Use the Admin SDK batched-write pattern from `scripts/apply_*.mjs`. **Mind Firestore quota**
+(exhausted repeatedly on 2026-07-15) and back up before mass writes.
 
-**Safety:** consider a dry-run mode that logs old→new prices and flags large swings (e.g. a
-scrape that returns £0.00 or a >50% jump) for review before committing — the scrapers can grab
-a wrong price on layout changes.
+**Safety:** include a dry-run mode that logs old→new prices and flags large swings (e.g. a
+scrape returning £0.00, or a >50% jump) for review before committing — the scrapers can grab a
+wrong price if a site's layout changes.
