@@ -20,20 +20,45 @@ function normalizePackFromText(packSizeText) {
   return { packSize: 1, packUnit: 'ea' };
 }
 
+// Which scraper file handles which supplier host.
+const SCRAPER_FOR_HOST = [
+  { match: 'booker.co.uk', file: 'content-scripts/booker.js' },
+  { match: 'fresho.com', file: 'content-scripts/fresho.js' },
+  { match: 'urbanfoodservice.co.uk', file: 'content-scripts/urban.js' }
+];
+
 scrapeBtn.addEventListener('click', async () => {
   status.textContent = '';
   status.className = '';
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
-  const results = await chrome.scripting.executeScript({
-    target: { tabId: tab.id },
-    func: () => {
-      if (window.khkmScrapeBooker) return window.khkmScrapeBooker();
-      if (window.khkmScrapeFresho) return window.khkmScrapeFresho();
-      if (window.khkmScrapeUrban) return window.khkmScrapeUrban();
-      return null;
-    }
-  });
+  const scraper = SCRAPER_FOR_HOST.find((s) => (tab.url || '').includes(s.match));
+  if (!scraper) {
+    status.textContent = 'This is not a supported supplier page (Booker, Fresho/David Catt, or Urban).';
+    status.className = 'error';
+    return;
+  }
+
+  let results;
+  try {
+    // Inject the scraper file fresh, then invoke it. Injecting on demand means it works
+    // even right after the extension is reloaded, without needing to refresh the supplier
+    // tab (a declarative content script would be stripped from already-open tabs on reload).
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: [scraper.file] });
+    results = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: () => {
+        if (window.khkmScrapeBooker) return window.khkmScrapeBooker();
+        if (window.khkmScrapeFresho) return window.khkmScrapeFresho();
+        if (window.khkmScrapeUrban) return window.khkmScrapeUrban();
+        return null;
+      }
+    });
+  } catch (err) {
+    status.textContent = 'Could not read this page: ' + (err && err.message ? err.message : String(err));
+    status.className = 'error';
+    return;
+  }
 
   const raw = results && results[0] ? results[0].result : null;
   if (!raw) {
