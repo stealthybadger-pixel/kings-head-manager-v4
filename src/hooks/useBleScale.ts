@@ -15,6 +15,11 @@ const SCALE_CHARACTERISTIC = '0000ffe1-0000-1000-8000-00805f9b34fb';
 // it into state on this cadence.
 const FLUSH_INTERVAL_MS = 180;
 
+// The Web Bluetooth device.id that was last paired via the chooser, remembered so we can
+// silently reconnect to the same scale after a refresh via getDevices() (which returns
+// every granted device — we can't tell the scale from the thermometer without this).
+const SAVED_DEVICE_KEY = 'bleScaleDeviceId';
+
 export function isWebBluetoothSupported(): boolean {
   return typeof navigator !== 'undefined' && 'bluetooth' in navigator;
 }
@@ -31,6 +36,7 @@ export function useBleScale({ onWeight }: UseBleScaleOptions) {
   const characteristicRef = useRef<BluetoothRemoteGATTCharacteristic | null>(null);
   const latestReadingRef = useRef<{ grams: number; stable: boolean } | null>(null);
   const flushTimerRef = useRef<number>();
+  const wantConnectedRef = useRef(false); // true between connect()/autoConnect() and disconnect()
 
   // Keep the latest onWeight callback in a ref so the flush loop always calls the
   // current version without needing to restart the interval when it changes identity.
@@ -51,12 +57,45 @@ export function useBleScale({ onWeight }: UseBleScaleOptions) {
     if (flushTimerRef.current) window.clearTimeout(flushTimerRef.current);
     characteristicRef.current?.removeEventListener('characteristicvaluechanged', handleNotification);
     characteristicRef.current = null;
-    deviceRef.current = null;
   }, [handleNotification]);
 
+  // Open the GATT session + subscribe to weight notifications. Shared by connect() and
+  // autoConnect() so both go through identical setup.
+  const openSession = useCallback(async (device: BluetoothDevice) => {
+    const server = await device.gatt!.connect();
+    const service = await server.getPrimaryService(SCALE_SERVICE);
+    const characteristic = await service.getCharacteristic(SCALE_CHARACTERISTIC);
+    await characteristic.startNotifications();
+    characteristic.addEventListener('characteristicvaluechanged', handleNotification);
+    characteristicRef.current = characteristic;
+    setConnected(true);
+  }, [handleNotification]);
+
+  const registerAndOpen = useCallback(async (device: BluetoothDevice) => {
+    wantConnectedRef.current = true;
+    deviceRef.current = device;
+    try { if (device.id) localStorage.setItem(SAVED_DEVICE_KEY, device.id); } catch { /* ignore */ }
+    device.addEventListener('gattserverdisconnected', () => {
+      cleanupConnection();
+      setConnected(false);
+      // Silently reconnect while the user still wants the scale (e.g. it dropped mid-weigh),
+      // rather than forcing a manual re-link.
+      if (wantConnectedRef.current && deviceRef.current) {
+        setTimeout(() => {
+          if (wantConnectedRef.current && deviceRef.current) {
+            openSession(deviceRef.current).catch((e) => setError(e?.message || 'Reconnect failed'));
+          }
+        }, 1000);
+      }
+    });
+    await openSession(device);
+  }, [cleanupConnection, openSession]);
+
   const disconnect = useCallback(() => {
+    wantConnectedRef.current = false;
     deviceRef.current?.gatt?.disconnect();
     cleanupConnection();
+    deviceRef.current = null;
     setConnected(false);
   }, [cleanupConnection]);
 
@@ -68,27 +107,59 @@ export function useBleScale({ onWeight }: UseBleScaleOptions) {
         filters: [{ services: [SCALE_SERVICE] }],
         optionalServices: [SCALE_SERVICE],
       });
-      device.addEventListener('gattserverdisconnected', () => {
-        cleanupConnection();
-        setConnected(false);
-      });
-
-      const server = await device.gatt!.connect();
-      const service = await server.getPrimaryService(SCALE_SERVICE);
-      const characteristic = await service.getCharacteristic(SCALE_CHARACTERISTIC);
-      await characteristic.startNotifications();
-      characteristic.addEventListener('characteristicvaluechanged', handleNotification);
-
-      deviceRef.current = device;
-      characteristicRef.current = characteristic;
-      setConnected(true);
+      await registerAndOpen(device);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to connect to scale');
       setConnected(false);
     } finally {
       setConnecting(false);
     }
-  }, [handleNotification, cleanupConnection]);
+  }, [registerAndOpen]);
+
+  // Silent reconnect to the previously-paired scale with no chooser popup — matches the
+  // saved device.id against getDevices(). Returns false (without hard error) when the API
+  // is unavailable or the scale hasn't been paired on this device yet, so the caller can
+  // fall back to connect(). Waits for one advertisement if a direct connect fails (device
+  // asleep / freshly out of range).
+  const autoConnect = useCallback(async (): Promise<boolean> => {
+    if (connected || connecting) return true;
+    const bt = navigator.bluetooth as any;
+    if (!bt || typeof bt.getDevices !== 'function') return false;
+    let savedId: string | null = null;
+    try { savedId = localStorage.getItem(SAVED_DEVICE_KEY); } catch { /* ignore */ }
+    if (!savedId) return false;
+    try {
+      const devices: BluetoothDevice[] = await bt.getDevices();
+      const known = devices.find((d) => d.id === savedId);
+      if (!known) return false;
+      setError(null);
+      setConnecting(true);
+      try {
+        await registerAndOpen(known);
+        return true;
+      } catch {
+        const anyKnown = known as any;
+        if (typeof anyKnown.watchAdvertisements === 'function') {
+          const abort = new AbortController();
+          const appeared = await new Promise<boolean>((resolve) => {
+            known.addEventListener('advertisementreceived', () => resolve(true), { once: true } as any);
+            anyKnown.watchAdvertisements({ signal: abort.signal }).catch(() => resolve(false));
+            setTimeout(() => resolve(false), 8000);
+          });
+          abort.abort();
+          if (appeared) {
+            await registerAndOpen(known);
+            return true;
+          }
+        }
+        return false;
+      }
+    } catch {
+      return false;
+    } finally {
+      setConnecting(false);
+    }
+  }, [connected, connecting, registerAndOpen]);
 
   // Throttled flush loop: only runs while connected, pushes at most one update per interval.
   useEffect(() => {
@@ -106,11 +177,27 @@ export function useBleScale({ onWeight }: UseBleScaleOptions) {
   // Full teardown on unmount (e.g. navigating away, tablet sleeping mid-connection).
   useEffect(() => {
     return () => {
+      wantConnectedRef.current = false;
       deviceRef.current?.gatt?.disconnect();
       cleanupConnection();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { connect, disconnect, connected, connecting, error };
+  // Cleanly release the connection when the page is refreshed/closed so the scale frees its
+  // slot and keeps advertising — otherwise it can need a power-cycle to be re-found (same
+  // issue as the ThermoPro probe).
+  useEffect(() => {
+    const releaseOnUnload = () => {
+      try { deviceRef.current?.gatt?.disconnect(); } catch { /* best-effort on unload */ }
+    };
+    window.addEventListener('pagehide', releaseOnUnload);
+    window.addEventListener('beforeunload', releaseOnUnload);
+    return () => {
+      window.removeEventListener('pagehide', releaseOnUnload);
+      window.removeEventListener('beforeunload', releaseOnUnload);
+    };
+  }, []);
+
+  return { connect, autoConnect, disconnect, connected, connecting, error };
 }

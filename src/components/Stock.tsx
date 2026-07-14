@@ -391,6 +391,16 @@ export const Stock: React.FC<StockProps> = ({ section = 'directory' }) => {
   const [showReportConfig, setShowReportConfig] = useState(false);
   const [reportConfig, setReportConfig] = useState<ReportConfig>(DEFAULT_REPORT_CONFIG);
 
+  // When the stock-take or waste-log panel opens, silently reconnect to an already-paired
+  // scale (no chooser popup) so a weight is just there — same UX as the temperature probe.
+  // First-ever pairing still uses the explicit Link Scale button (browser gesture requirement).
+  useEffect(() => {
+    if ((showStockTake || showWastePanel) && !bleScale.connected && !bleScale.connecting) {
+      void bleScale.autoConnect();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showStockTake, showWastePanel]);
+
   // Stock on hand directory
   const [stockSearchQuery, setStockSearchQuery] = useState('');
   const [selectedStockCategory, setSelectedStockCategory] = useState('All');
