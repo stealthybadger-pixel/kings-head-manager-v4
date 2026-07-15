@@ -7,6 +7,7 @@ import { Search, Plus, Trash2, Camera, AlertCircle, Check, HelpCircle, ExternalL
 import { Recipe, RecipeItem, Ingredient, Unit } from '../types';
 import { calculatePlateCost } from '../utils/costing';
 import { tokenizeSearchQuery, matchesSearchTokens } from '../utils/search';
+import ItemPicker from './ItemPicker';
 
 async function scanRecipeWithGemini(base64Image: string, mimeType: string): Promise<{
   name: string;
@@ -135,7 +136,6 @@ export const Kitchen: React.FC = () => {
     instructions: ''
   });
 
-  const [itemSearchQuery, setItemSearchQuery] = useState('');
   const [scalingEnabled, setScalingEnabled] = useState(false);
 
   // Filtered + sorted recipe list
@@ -883,81 +883,13 @@ export const Kitchen: React.FC = () => {
               {/* Add row search block */}
               <div className="bg-surface p-4 border border-outline-variant rounded-sm flex flex-col gap-3">
                 <span className="text-xs label-caps text-outline font-bold">Add Ingredient or Recipe to Recipe</span>
-                <div className="flex gap-2">
-                  <div className="relative flex-1 flex items-center bg-surface-container-lowest border border-outline-variant rounded-sm px-3 py-1.5 focus-within:border-primary">
-                    <Search className="h-4 w-4 text-outline mr-2" />
-                    <input
-                      type="text"
-                      placeholder="Search ingredients or recipes..."
-                      value={itemSearchQuery}
-                      onChange={(e) => setItemSearchQuery(e.target.value)}
-                      className="flex-1 text-xs bg-transparent outline-none border-none focus:ring-0 p-0"
-                    />
-                  </div>
-                </div>
-
-                {itemSearchQuery.trim().length > 1 && (() => {
-                  const queryTokens = tokenizeSearchQuery(itemSearchQuery);
-                  const matchingIngredients = ingredients
-                    .filter(i => matchesSearchTokens(i.name, queryTokens))
-                    .slice(0, 5);
-                  const matchingRecipes = recipes
-                    .filter(r =>
-                      matchesSearchTokens(r.name, queryTokens) &&
-                      r.id !== formState.id &&
-                      !(formState.id && wouldCreateCircularReference(formState.id, r.id))
-                    )
-                    .slice(0, 5);
-
-                  if (matchingIngredients.length === 0 && matchingRecipes.length === 0) {
-                    return (
-                      <div className="p-3 text-xs text-outline bg-surface-container-lowest border border-outline-variant rounded-sm">
-                        No matching ingredients or recipes.
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div className="max-h-64 overflow-y-auto bg-surface-container-lowest border border-outline-variant rounded-sm">
-                      {matchingIngredients.length > 0 && (
-                        <div className="divide-y divide-outline-variant">
-                          <div className="px-3 py-1 text-[9px] label-caps text-outline font-bold bg-surface-container-low">Ingredients</div>
-                          {matchingIngredients.map(ing => (
-                            <div
-                              key={`ing-${ing.id}`}
-                              onClick={() => {
-                                handleAddIngredientRow(ing);
-                                setItemSearchQuery('');
-                              }}
-                              className="p-3 hover:bg-surface-container text-xs cursor-pointer flex justify-between font-semibold"
-                            >
-                              <span>{ing.name}</span>
-                              <span className="text-primary label-caps">+ Add</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {matchingRecipes.length > 0 && (
-                        <div className="divide-y divide-outline-variant">
-                          <div className="px-3 py-1 text-[9px] label-caps text-outline font-bold bg-surface-container-low">Recipes</div>
-                          {matchingRecipes.map(rec => (
-                            <div
-                              key={`rec-${rec.id}`}
-                              onClick={() => {
-                                handleAddSubRecipeRow(rec);
-                                setItemSearchQuery('');
-                              }}
-                              className="p-3 hover:bg-surface-container text-xs cursor-pointer flex justify-between font-semibold"
-                            >
-                              <span>{rec.name}</span>
-                              <span className="text-primary label-caps">+ Add</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
+                <ItemPicker
+                  ingredients={ingredients}
+                  recipes={recipes}
+                  onSelectIngredient={handleAddIngredientRow}
+                  onSelectRecipe={handleAddSubRecipeRow}
+                  excludeRecipe={r => r.id === formState.id || !!(formState.id && wouldCreateCircularReference(formState.id, r.id))}
+                />
               </div>
 
             </div>

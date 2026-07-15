@@ -304,13 +304,19 @@ export type StockMovementType = z.infer<typeof StockMovementTypeSchema>;
 
 export const StockMovementSchema = z.object({
   id: z.string(),
-  ingredientId: z.string(),
+  // Exactly one of these identifies what the movement is against — an
+  // ingredient, or a mid-tier prep recipe (e.g. a batch of Mash Potato)
+  // wasted the same way Stocktake counts it, by weight.
+  ingredientId: z.string().optional(),
+  recipeId: z.string().optional(),
   type: StockMovementTypeSchema,
   quantity: z.number(),
   date: z.string(),
   costValue: z.number(),
   notes: z.string().optional(),
   createdAt: z.string().optional()
+}).refine(m => !!m.ingredientId !== !!m.recipeId, {
+  message: 'Exactly one of ingredientId or recipeId must be set'
 });
 export type StockMovement = z.infer<typeof StockMovementSchema>;
 
