@@ -88,7 +88,12 @@ export const IngredientSupplierSchema = z.object({
   productName: z.string().optional(),
   // ISO timestamp of the last time this supplier's price was set/refreshed (manually or via
   // a catalogue link/rescrape) — shown in Pantry so stale prices are visible at a glance.
-  priceUpdatedAt: z.string().optional()
+  priceUpdatedAt: z.string().optional(),
+  // ISO timestamp of the last time the active-menu price-sync orchestrator (see
+  // scripts/reconcile_active_menu_prices.ts) checked this supplier's live price, whether or
+  // not it had actually changed — distinct from priceUpdatedAt, which only stamps on a real
+  // change. Used to rate-limit re-scraping the same product within a rolling window.
+  priceLastCheckedAt: z.string().optional()
 });
 export type IngredientSupplier = z.infer<typeof IngredientSupplierSchema>;
 

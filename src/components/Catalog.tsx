@@ -13,7 +13,8 @@ import {
   Sparkles,
   ArrowRight,
   ExternalLink,
-  Trash2
+  Trash2,
+  RefreshCw
 } from 'lucide-react';
 import { SupplierProduct, Ingredient, IngredientSupplier } from '../types';
 import { findBestIngredientMatch, cleanProductName } from '../utils/matching';
@@ -31,6 +32,41 @@ export const Catalog: React.FC = () => {
   const [activeSearch, setActiveSearch] = useState('');
   const [selectedSupplier, setSelectedSupplier] = useState<string>('All');
   const [showCheaperOnly, setShowCheaperOnly] = useState(false);
+
+  // Local-only "Sync Active-Menu Prices" panel — talks to scripts/priceSyncServer.mjs,
+  // which only ever runs on a laptop (npm run price-sync:server), never deployed. Only
+  // shown in local dev (import.meta.env.DEV) since there's no such server in production.
+  const [showPriceSync, setShowPriceSync] = useState(false);
+  const [priceSyncStatus, setPriceSyncStatus] = useState<'idle' | 'no-server' | 'no-auth' | 'ready' | 'running' | 'done'>('idle');
+  const [priceSyncOutput, setPriceSyncOutput] = useState('');
+  const PRICE_SYNC_URL = 'http://localhost:5175';
+
+  const openPriceSync = async () => {
+    setShowPriceSync(true);
+    setPriceSyncOutput('');
+    setPriceSyncStatus('idle');
+    try {
+      const res = await fetch(`${PRICE_SYNC_URL}/status`);
+      const data = await res.json();
+      setPriceSyncStatus(data.authReady ? 'ready' : 'no-auth');
+    } catch {
+      setPriceSyncStatus('no-server');
+    }
+  };
+
+  const runPriceSync = async (write: boolean) => {
+    setPriceSyncStatus('running');
+    setPriceSyncOutput('');
+    try {
+      const res = await fetch(`${PRICE_SYNC_URL}/run?write=${write}`, { method: 'POST' });
+      const data = await res.json();
+      setPriceSyncOutput(data.output || data.error || 'No output.');
+      setPriceSyncStatus('done');
+    } catch {
+      setPriceSyncOutput('Could not reach the local price-sync server.');
+      setPriceSyncStatus('no-server');
+    }
+  };
 
   const storeSearchTerm = useStore((state) => state.searchTerm);
 
@@ -320,6 +356,65 @@ export const Catalog: React.FC = () => {
 
   return (
     <div className="flex h-full w-full bg-surface-container-lowest overflow-hidden">
+      {showPriceSync && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-6">
+          <div className="bg-surface w-full max-w-2xl max-h-[80vh] rounded-sm shadow-xl flex flex-col">
+            <div className="p-4 border-b border-outline-variant flex items-center justify-between">
+              <h3 className="font-bold text-sm">Sync Active-Menu Prices</h3>
+              <button onClick={() => setShowPriceSync(false)} className="text-outline hover:text-on-surface text-xs font-bold">
+                Close
+              </button>
+            </div>
+            <div className="p-4 flex-1 overflow-y-auto flex flex-col gap-3">
+              {priceSyncStatus === 'no-server' && (
+                <p className="text-xs text-red-600">
+                  Can't reach the local price-sync server. Run <code>npm run price-sync:server</code> in a terminal, then try again.
+                </p>
+              )}
+              {priceSyncStatus === 'no-auth' && (
+                <p className="text-xs text-red-600">
+                  No saved wholesaler login sessions found. Run <code>npm run scrape:login</code> in a terminal first (log in to Booker/Urban/David Catt when the browser opens).
+                </p>
+              )}
+              {priceSyncStatus === 'ready' && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => runPriceSync(false)}
+                    className="flex-1 h-9 border border-primary text-primary text-xs font-bold rounded-sm hover:bg-primary/5"
+                  >
+                    Dry Run (Check Only)
+                  </button>
+                  <button
+                    onClick={() => runPriceSync(true)}
+                    className="flex-1 h-9 bg-primary text-white text-xs font-bold rounded-sm hover:bg-primary/90"
+                  >
+                    Run &amp; Apply Updates
+                  </button>
+                </div>
+              )}
+              {priceSyncStatus === 'running' && (
+                <div className="flex items-center gap-2 text-xs text-outline">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  Checking active-menu supplier prices — this can take a few minutes...
+                </div>
+              )}
+              {priceSyncOutput && (
+                <pre className="text-[11px] leading-relaxed bg-surface-container-lowest border border-outline-variant rounded-sm p-3 whitespace-pre-wrap overflow-x-auto">
+                  {priceSyncOutput}
+                </pre>
+              )}
+              {priceSyncStatus === 'done' && (
+                <button
+                  onClick={() => runPriceSync(false)}
+                  className="h-8 text-xs font-semibold text-outline hover:text-on-surface border border-outline rounded-sm px-3 self-start"
+                >
+                  Run Again
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       {/* LEFT COLUMN: Search & Product Registry List */}
       <div className="w-7/12 border-r border-outline-variant flex flex-col h-full bg-surface-container-lowest">
         {linkBackIngredient && (
@@ -393,16 +488,27 @@ export const Catalog: React.FC = () => {
               </label>
             </div>
 
-            {isManager && selectedForDelete.size > 0 && (
-              <button
-                onClick={handleBulkDelete}
-                disabled={bulkDeleteSupplierProducts.isPending}
-                className="flex items-center gap-1.5 text-xs font-bold text-red-600 bg-red-500/10 border border-red-500/30 px-3 py-1.5 rounded-sm hover:bg-red-500/20 transition-colors disabled:opacity-50"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                Delete Selected ({selectedForDelete.size})
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {isManager && import.meta.env.DEV && (
+                <button
+                  onClick={openPriceSync}
+                  className="flex items-center gap-1.5 text-xs font-bold text-primary bg-primary/10 border border-primary/30 px-3 py-1.5 rounded-sm hover:bg-primary/20 transition-colors"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Sync Active-Menu Prices
+                </button>
+              )}
+              {isManager && selectedForDelete.size > 0 && (
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={bulkDeleteSupplierProducts.isPending}
+                  className="flex items-center gap-1.5 text-xs font-bold text-red-600 bg-red-500/10 border border-red-500/30 px-3 py-1.5 rounded-sm hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete Selected ({selectedForDelete.size})
+                </button>
+              )}
+            </div>
           </div>
         </div>
 

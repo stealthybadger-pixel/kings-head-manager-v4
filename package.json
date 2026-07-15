@@ -11,7 +11,10 @@
     "test": "vitest run",
     "scrape:login": "npx tsx scripts/reconcile_prices.ts --setup",
     "scrape:check": "npx tsx scripts/reconcile_prices.ts",
-    "scrape:update": "npx tsx scripts/reconcile_prices.ts --write"
+    "scrape:update": "npx tsx scripts/reconcile_prices.ts --write",
+    "scrape:menu-check": "npx tsx scripts/reconcile_active_menu_prices.ts",
+    "scrape:menu-update": "npx tsx scripts/reconcile_active_menu_prices.ts --write",
+    "price-sync:server": "node scripts/priceSyncServer.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.28.4",
