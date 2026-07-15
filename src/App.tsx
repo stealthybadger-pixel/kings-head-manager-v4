@@ -49,23 +49,23 @@ export type ViewType = 'dashboard' | 'pantry' | 'catalog' | 'kitchen' | 'service
 
 // Views rendered on the floor during a shift — get the primary mobile tab bar slots.
 const MOBILE_TAB_ITEMS = [
-  { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
-  { id: 'stock', label: 'Stock', icon: Boxes },
   { id: 'pantry', label: 'Pantry', icon: Database },
+  { id: 'kitchen', label: 'Recipes', icon: ChefHat },
   { id: 'service', label: 'Dishes', icon: Utensils },
-  { id: 'foh', label: 'FOH', icon: MonitorPlay },
+  { id: 'food-temp', label: 'Food Temps', icon: Thermometer },
+  { id: 'equipment-temp', label: 'Equip Temps', icon: Refrigerator },
 ] as const;
 
 // Everything else lives behind the "More" sheet on mobile.
 const MOBILE_MORE_ITEMS = [
+  { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
+  { id: 'stock', label: 'Stock', icon: Boxes },
+  { id: 'foh', label: 'FOH', icon: MonitorPlay },
   { id: 'catalog', label: 'Supplier Catalogue', icon: BookOpen },
-  { id: 'kitchen', label: 'Recipes', icon: ChefHat },
   { id: 'stock-reports', label: 'Stock Reports', icon: BookOpen },
   { id: 'stock-waste', label: 'Stock Waste', icon: AlertCircle },
   { id: 'stock-import', label: 'Import EPOS', icon: ScanLine },
   { id: 'suppliers', label: 'Suppliers', icon: Truck },
-  { id: 'food-temp', label: 'Food Temp Checks', icon: Thermometer },
-  { id: 'equipment-temp', label: 'Equipment Temp Checks', icon: Refrigerator },
   { id: 'temp-records', label: 'Temp Check Records', icon: ClipboardList },
   { id: 'settings', label: 'Help', icon: HelpCircle },
 ] as const;
@@ -106,9 +106,9 @@ const App: React.FC = () => {
 
   const kitchenItems = [
     { id: 'pantry', label: 'Pantry', icon: Database },
-    { id: 'catalog', label: 'Supplier Catalogue', icon: BookOpen },
     { id: 'kitchen', label: 'Recipes', icon: ChefHat },
     { id: 'service', label: 'Dishes', icon: Utensils },
+    { id: 'catalog', label: 'Supplier Catalogue', icon: BookOpen },
   ] as const;
 
   const complianceItems = [
@@ -354,10 +354,10 @@ const App: React.FC = () => {
             onClick={() => { if (!navCollapsed) setKitchenOpen(o => !o); }}
             className={`relative h-10 flex items-center transition-colors duration-150 mt-1 text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface ${navCollapsed ? 'justify-center' : 'px-6 gap-3'}`}
           >
-            <UtensilsCrossed className="h-5 w-5 flex-shrink-0 text-outline" />
+            <UtensilsCrossed className="h-5 w-5 flex-shrink-0 text-primary" />
             {!navCollapsed && (
               <>
-                <span className="text-[10px] font-bold label-caps tracking-widest text-outline flex-1">Kitchen</span>
+                <span className="text-[11px] font-bold label-caps tracking-widest text-primary flex-1">Kitchen</span>
                 <ChevronDown className={`h-3.5 w-3.5 text-outline transition-transform duration-200 ${kitchenOpen ? '' : '-rotate-90'}`} />
               </>
             )}
@@ -386,10 +386,10 @@ const App: React.FC = () => {
             onClick={() => { if (!navCollapsed) setComplianceOpen(o => !o); }}
             className={`relative h-10 flex items-center transition-colors duration-150 mt-1 text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface ${navCollapsed ? 'justify-center' : 'px-6 gap-3'}`}
           >
-            <ShieldCheck className="h-5 w-5 flex-shrink-0 text-outline" />
+            <ShieldCheck className="h-5 w-5 flex-shrink-0 text-primary" />
             {!navCollapsed && (
               <>
-                <span className="text-[10px] font-bold label-caps tracking-widest text-outline flex-1">Compliance</span>
+                <span className="text-[11px] font-bold label-caps tracking-widest text-primary flex-1">Compliance</span>
                 <ChevronDown className={`h-3.5 w-3.5 text-outline transition-transform duration-200 ${complianceOpen ? '' : '-rotate-90'}`} />
               </>
             )}
@@ -418,10 +418,10 @@ const App: React.FC = () => {
             onClick={() => { if (!navCollapsed) setStockOpen(o => !o); }}
             className={`relative h-10 flex items-center transition-colors duration-150 mt-1 text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface ${navCollapsed ? 'justify-center' : 'px-6 gap-3'}`}
           >
-            <Boxes className="h-5 w-5 flex-shrink-0 text-outline" />
+            <Boxes className="h-5 w-5 flex-shrink-0 text-primary" />
             {!navCollapsed && (
               <>
-                <span className="text-[10px] font-bold label-caps tracking-widest text-outline flex-1">Stock</span>
+                <span className="text-[11px] font-bold label-caps tracking-widest text-primary flex-1">Stock</span>
                 <ChevronDown className={`h-3.5 w-3.5 text-outline transition-transform duration-200 ${stockOpen ? '' : '-rotate-90'}`} />
               </>
             )}

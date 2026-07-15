@@ -38,3 +38,12 @@ export const getSupplierUrl = (item: SupplierUrlItem): string => {
   const query = `${item.supplier || ''} ${item.name || ''}`.trim();
   return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
 };
+
+const MAIN_SUPPLIERS = ['Booker', 'Urban', 'David Catt'] as const;
+
+/**
+ * Search links for the three main suppliers, keyed by supplier name.
+ * Used to quickly look up a new ingredient across all wholesalers before pricing is known.
+ */
+export const getSupplierSearchLinks = (name: string): { supplier: string; url: string }[] =>
+  MAIN_SUPPLIERS.map((supplier) => ({ supplier, url: getSupplierUrl({ name, supplier }) }));

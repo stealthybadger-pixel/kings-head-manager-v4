@@ -81,7 +81,14 @@ export const IngredientSupplierSchema = z.object({
   isPreferred: z.boolean(),
   // Deep link to this product on the wholesaler's site, captured when linked from the
   // catalogue. Optional — falls back to a supplier-site search when absent.
-  sourceUrl: z.string().optional()
+  sourceUrl: z.string().optional(),
+  // The catalogue product's own name (e.g. "Parmesan - Vegan - Violife"), captured when linked
+  // from the catalogue. Wholesaler search fallbacks must search by this, not the Pantry
+  // ingredient's name — a Pantry name like "Cheese - Parmesan - Vegan" won't match their listing.
+  productName: z.string().optional(),
+  // ISO timestamp of the last time this supplier's price was set/refreshed (manually or via
+  // a catalogue link/rescrape) — shown in Pantry so stale prices are visible at a glance.
+  priceUpdatedAt: z.string().optional()
 });
 export type IngredientSupplier = z.infer<typeof IngredientSupplierSchema>;
 

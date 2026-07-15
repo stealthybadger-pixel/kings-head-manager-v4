@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { X, PackagePlus } from 'lucide-react';
 import { useCatalogCapture } from '../hooks/useCatalogCapture';
-import { useSupplierProductMutations } from '../hooks/useKitchenData';
+import { useSupplierProductMutations, useIngredients, useIngredientMutations } from '../hooks/useKitchenData';
 import { useAuth } from '../hooks/useAuth';
 import { useStore } from '../store/useStore';
+import { findBestIngredientMatch } from '../utils/matching';
 import type { SupplierProduct } from '../types';
 
 export default function CatalogCaptureModal() {
@@ -11,6 +12,8 @@ export default function CatalogCaptureModal() {
   const isManager = appUser?.role === 'manager';
   const { state, clear } = useCatalogCapture();
   const { addSupplierProduct, updateSupplierProduct } = useSupplierProductMutations();
+  const { data: ingredients = [] } = useIngredients();
+  const { updateIngredient } = useIngredientMutations();
   const showToast = useStore((s) => s.showToast);
 
   const [name, setName] = useState('');
@@ -52,7 +55,28 @@ export default function CatalogCaptureModal() {
             urbanProductId: captured.supplier === 'Urban' ? captured.productCode : existingMatch.urbanProductId
           }
         });
-        showToast(`Updated "${name.trim()}" in catalogue`, 'success');
+
+        // This is a re-scrape of a catalogue item that's already used as a supplier option on
+        // a Pantry ingredient — push the fresh price into that linked entry too, otherwise the
+        // catalogue and the ingredient's cached price silently drift apart.
+        const match = findBestIngredientMatch(name.trim(), ingredients);
+        const linkedIndex = match?.ingredient.suppliers?.findIndex(s => s.name === captured.supplier) ?? -1;
+        if (match && linkedIndex >= 0) {
+          const updatedSuppliers = [...match.ingredient.suppliers];
+          updatedSuppliers[linkedIndex] = {
+            ...updatedSuppliers[linkedIndex],
+            packCost: cost,
+            packSize: size,
+            packUnit,
+            sourceUrl: captured.sourceUrl || updatedSuppliers[linkedIndex].sourceUrl,
+            productName: name.trim(),
+            priceUpdatedAt: new Date().toISOString()
+          };
+          await updateIngredient.mutateAsync({ id: match.ingredient.id, data: { suppliers: updatedSuppliers } });
+          showToast(`Updated "${name.trim()}" in catalogue and synced the price to "${match.ingredient.name}" in Pantry`, 'success');
+        } else {
+          showToast(`Updated "${name.trim()}" in catalogue`, 'success');
+        }
       } else {
         await addSupplierProduct.mutateAsync({
           name: name.trim(),

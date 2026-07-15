@@ -3,7 +3,7 @@ import { supplierBadgeClass } from '../utils/supplierColors';
 import { useIngredients, useIngredientMutations, useSupplierProducts, useDishes, useSuppliers } from '../hooks/useKitchenData';
 import { useStore } from '../store/useStore';
 import { Search, Plus, Trash2, AlertCircle, FileText, CheckCircle2, ListTodo, Check, ArrowRight, ArrowLeft, ExternalLink } from 'lucide-react';
-import { getSupplierUrl } from '../utils/supplierUrls';
+import { getSupplierUrl, getSupplierSearchLinks } from '../utils/supplierUrls';
 import { Ingredient, IngredientCategory, SupplierName, Unit, Allergen, IngredientSupplier } from '../types';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { useAuth } from '../hooks/useAuth';
@@ -62,6 +62,17 @@ const formatSupplierUnitPrice = (cost: number, size: number, unit: string): stri
     return `£${perL.toFixed(2)} / l`;
   }
   return `£${(cost / size).toFixed(2)} / ea`;
+};
+
+const PRICE_STALE_DAYS = 30;
+
+const formatPriceAge = (priceUpdatedAt: string | undefined): { label: string; isStale: boolean } | null => {
+  if (!priceUpdatedAt) return null;
+  const then = new Date(priceUpdatedAt).getTime();
+  if (Number.isNaN(then)) return null;
+  const daysAgo = Math.floor((Date.now() - then) / 86400000);
+  const label = daysAgo <= 0 ? 'Priced today' : daysAgo === 1 ? 'Priced 1d ago' : `Priced ${daysAgo}d ago`;
+  return { label, isStale: daysAgo > PRICE_STALE_DAYS };
 };
 
 export interface AuditTask {
@@ -377,7 +388,12 @@ export const Pantry: React.FC = () => {
     setFormState(prev => {
       const updated = [...prev.suppliers];
       updated[index] = { ...updated[index], [field]: value };
-      
+      // Price fields changing is what "how old is this price" should track — renaming the
+      // supplier or flipping preferred shouldn't reset the age.
+      if (field === 'packCost' || field === 'packSize' || field === 'packUnit') {
+        updated[index].priceUpdatedAt = new Date().toISOString();
+      }
+
       // If setting preferred, unset preferred on all others
       if (field === 'isPreferred' && value === true) {
         updated.forEach((sup, i) => {
@@ -778,8 +794,18 @@ export const Pantry: React.FC = () => {
                 {parent ? (
                   <div className="data-tabular text-xs text-outline">derived</div>
                 ) : preferred && (
-                  <div className="data-tabular text-sm text-primary font-bold">
-                    £{preferred.packCost.toFixed(2)} / {preferred.packSize} {preferred.packUnit}
+                  <div className="text-right">
+                    <div className="data-tabular text-sm text-primary font-bold">
+                      £{preferred.packCost.toFixed(2)} / {preferred.packSize} {preferred.packUnit}
+                    </div>
+                    {(() => {
+                      const age = formatPriceAge(preferred.priceUpdatedAt);
+                      return age && (
+                        <div className={`text-[10px] mt-0.5 ${age.isStale ? 'text-amber-600 font-semibold' : 'text-outline'}`}>
+                          {age.label}
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
@@ -911,6 +937,23 @@ export const Pantry: React.FC = () => {
                   placeholder="e.g., Maris Piper Potatoes"
                 />
                 {isNew && <span className="text-[10px] text-outline mt-1 block">Category, waste %, calories and allergens auto-fill as you type — edit any field to override.</span>}
+                {isNew && formState.name.trim() && (
+                  <div className="flex items-center gap-3 mt-2">
+                    <span className="text-[10px] text-outline">Search:</span>
+                    {getSupplierSearchLinks(formState.name.trim()).map(({ supplier, url }) => (
+                      <a
+                        key={supplier}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`${supplierBadgeClass(supplier)} hover:underline inline-flex items-center gap-1`}
+                      >
+                        {supplier}
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div>
@@ -1241,7 +1284,7 @@ export const Pantry: React.FC = () => {
                           Wholesale Partner
                           {sup.sourceUrl || sup.name !== 'Internal' ? (
                             <a
-                              href={sup.sourceUrl || getSupplierUrl({ name: formState.name, supplier: sup.name })}
+                              href={sup.sourceUrl || getSupplierUrl({ name: sup.productName || formState.name, supplier: sup.name })}
                               target="_blank"
                               rel="noopener noreferrer"
                               title={sup.sourceUrl ? 'View this product on the supplier site' : `Search ${sup.name} for "${formState.name}"`}
@@ -1297,6 +1340,14 @@ export const Pantry: React.FC = () => {
                         <span className="text-[11px] font-mono font-semibold text-primary mt-0.5">
                           {formatSupplierUnitPrice(sup.packCost, sup.packSize, sup.packUnit)}
                         </span>
+                        {(() => {
+                          const age = formatPriceAge(sup.priceUpdatedAt);
+                          return age && (
+                            <span className={`text-[9px] mt-0.5 ${age.isStale ? 'text-amber-600 font-semibold' : 'text-outline'}`}>
+                              {age.label}
+                            </span>
+                          );
+                        })()}
                       </div>
 
                       <div className="flex items-center gap-1.5 mt-4 w-[75px] flex-shrink-0">

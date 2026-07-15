@@ -224,7 +224,9 @@ export const Catalog: React.FC = () => {
       packSize: prod.packSize,
       packUnit: prod.packUnit,
       isPreferred: makePreferred,
-      sourceUrl: getSupplierUrl(prod)
+      sourceUrl: getSupplierUrl(prod),
+      productName: prod.name,
+      priceUpdatedAt: new Date().toISOString()
     };
 
     // Merge into the ingredient's supplier array
@@ -293,7 +295,10 @@ export const Catalog: React.FC = () => {
         packCost: prod.packCost,
         packSize: prod.packSize,
         packUnit: prod.packUnit,
-        isPreferred: true
+        isPreferred: true,
+        sourceUrl: getSupplierUrl(prod),
+        productName: prod.name,
+        priceUpdatedAt: new Date().toISOString()
       }],
       audited: false,
       incomplete: true // Marked as incomplete stub requiring review
