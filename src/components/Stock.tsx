@@ -1432,7 +1432,7 @@ export const Stock: React.FC<StockProps> = ({ section = 'directory' }) => {
                   }}
                 />
               </div>
-              <div className="flex items-end gap-3 bg-surface border border-outline-variant p-3 rounded-sm">
+              <div className="flex flex-wrap items-end gap-3 bg-surface border border-outline-variant p-3 rounded-sm">
                 {isWebBluetoothSupported() ? (
                   <button type="button" onClick={() => scaleConnected ? bleScale.disconnect() : bleScale.connect()}
                     className={`h-9 px-4 text-xs font-bold label-caps rounded-sm flex items-center gap-2 border transition-colors flex-shrink-0 ${scaleConnected ? 'bg-secondary-container border-[#90a8ff] text-primary' : 'border-outline text-outline bg-surface-container-lowest hover:bg-surface-container'}`}>
@@ -1448,7 +1448,7 @@ export const Stock: React.FC<StockProps> = ({ section = 'directory' }) => {
                 )}
                 {scaleConnected && (
                   <>
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-[140px]">
                       <label className="label-caps text-outline text-[9px] block mb-1">Container / Tub</label>
                       <select value={wasteTareId} onChange={e => setWasteTareId(e.target.value)}
                         className="w-full px-2 py-2 border border-outline-variant bg-surface-container-lowest text-xs rounded-sm">
