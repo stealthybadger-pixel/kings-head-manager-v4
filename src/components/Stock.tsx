@@ -34,7 +34,8 @@ const DEFAULT_REPORT_CONFIG: ReportConfig = {
   recordedWastage: true,
   scope: 'nonzero'
 };
-import { calculateIngredientCost, toBaseQuantity } from '../utils/costing';
+import { calculateIngredientCost, calculatePlateCost, toBaseQuantity } from '../utils/costing';
+import ItemPicker from './ItemPicker';
 
 // Word-order-independent search for the stocktake list — a plain substring
 // match ("coconut oil".includes(name)) misses items named e.g. "Oil - Coconut",
@@ -155,6 +156,16 @@ function formatUnitValue(value: number, unit: StocktakeEntryUnit): string {
   if (unit === 'g' || unit === 'ml') return String(Math.round(value));
   if (unit === 'ea') return value.toFixed(value % 1 === 0 ? 0 : 1);
   return value.toFixed(2);
+}
+// Recipes have no pieceWeight/eaWeight, so unlike ingredients they can only
+// be wasted by weight/volume — same as how Stocktake counts them (scale
+// reading -> grams, converted into the recipe's own batchUnit).
+function calculateRecipeWasteCost(rec: Recipe, grams: number, ingredients: Ingredient[], recipes: Recipe[]): number {
+  if (!rec.batchSize) return 0;
+  const batchSizeG = toBaseQuantity(rec.batchSize, rec.batchUnit);
+  if (!batchSizeG) return 0;
+  const batchCost = calculatePlateCost(rec.items ?? [], ingredients, recipes);
+  return (batchCost / batchSizeG) * grams;
 }
 
 // Reads the live scale weight directly from the store so only this small status bar
@@ -408,6 +419,7 @@ export const Stock: React.FC<StockProps> = ({ section = 'directory' }) => {
 
   // Waste log entry
   const [wasteIngId, setWasteIngId] = useState('');
+  const [wasteRecipeId, setWasteRecipeId] = useState('');
   const [wasteQty, setWasteQty] = useState(0);
   const [wasteUnit, setWasteUnit] = useState<Unit>('g');
   const [wasteReason, setWasteReason] = useState('Spoil');
@@ -499,27 +511,39 @@ export const Stock: React.FC<StockProps> = ({ section = 'directory' }) => {
 
   // ── Feature 2: wastage history calculations ────────────────────────────────
   const ingMap = useMemo(() => new Map(ingredients.map(i => [i.id, i])), [ingredients]);
+  const recMap = useMemo(() => new Map(recipes.map(r => [r.id, r])), [recipes]);
+
+  // A movement is against exactly one of an ingredient or a mid-tier prep
+  // recipe (see StockMovementSchema) — these resolve either side so callers
+  // don't need to branch on which one it is.
+  const movementItemName = useCallback((m: { ingredientId?: string; recipeId?: string }): string | undefined => {
+    return m.ingredientId ? ingMap.get(m.ingredientId)?.name : recMap.get(m.recipeId!)?.name;
+  }, [ingMap, recMap]);
+  const movementCost = useCallback((m: { ingredientId?: string; recipeId?: string; quantity: number }): number => {
+    const qty = Math.abs(m.quantity);
+    if (m.ingredientId) {
+      const ing = ingMap.get(m.ingredientId);
+      return ing ? calculateIngredientCost(ing, qty, 'g', ingredients) : 0;
+    }
+    const rec = recMap.get(m.recipeId!);
+    return rec ? calculateRecipeWasteCost(rec, qty, ingredients, recipes) : 0;
+  }, [ingMap, recMap, ingredients, recipes]);
 
   const filteredWaste = useMemo(() => {
     return wasteMovements.filter(m => {
       if (wasteDateFrom && m.date < wasteDateFrom) return false;
       if (wasteDateTo && m.date > wasteDateTo) return false;
       if (wasteIngFilter) {
-        const name = ingMap.get(m.ingredientId)?.name?.toLowerCase() ?? '';
+        const name = movementItemName(m)?.toLowerCase() ?? '';
         if (!name.includes(wasteIngFilter.toLowerCase())) return false;
       }
       return true;
     });
-  }, [wasteMovements, wasteDateFrom, wasteDateTo, wasteIngFilter, ingMap]);
+  }, [wasteMovements, wasteDateFrom, wasteDateTo, wasteIngFilter, movementItemName]);
 
   const wasteTotalCost = useMemo(() => {
-    return filteredWaste.reduce((sum, m) => {
-      const ing = ingMap.get(m.ingredientId);
-      if (!ing) return sum;
-      const qty = Math.abs(m.quantity);
-      return sum + calculateIngredientCost(ing, qty, 'g', ingredients);
-    }, 0);
-  }, [filteredWaste, ingMap]);
+    return filteredWaste.reduce((sum, m) => sum + movementCost(m), 0);
+  }, [filteredWaste, movementCost]);
 
   // ── Stocktake helpers ──────────────────────────────────────────────────────
   const stocktakeIngredients = useMemo(() => {
@@ -685,22 +709,25 @@ export const Stock: React.FC<StockProps> = ({ section = 'directory' }) => {
   };
 
   const handleSaveWaste = async () => {
-    if (!wasteIngId || wasteQty <= 0) return;
-    const ing = ingredients.find(i => i.id === wasteIngId);
-    if (!ing) return;
-    const baseQty = unitToGrams(wasteQty, wasteUnit as StocktakeEntryUnit, ing);
+    if ((!wasteIngId && !wasteRecipeId) || wasteQty <= 0) return;
+    const ing = wasteIngId ? ingredients.find(i => i.id === wasteIngId) : undefined;
+    const rec = wasteRecipeId ? recipes.find(r => r.id === wasteRecipeId) : undefined;
+    if (!ing && !rec) return;
+    const baseQty = ing
+      ? unitToGrams(wasteQty, wasteUnit as StocktakeEntryUnit, ing)
+      : toBaseQuantity(wasteQty, wasteUnit);
     try {
       await logMovement.mutateAsync({
-        ingredientId: wasteIngId,
+        ...(ing ? { ingredientId: wasteIngId } : { recipeId: wasteRecipeId }),
         type: 'waste',
         quantity: -Math.abs(baseQty),
         date: new Date().toISOString().slice(0, 10),
         costValue: 0,
         notes: wasteReason
       });
-      showToast(`Waste logged: ${ing.name} (${wasteQty}${wasteUnit})`, 'success');
+      showToast(`Waste logged: ${(ing ?? rec)!.name} (${wasteQty}${wasteUnit})`, 'success');
       setShowWastePanel(false);
-      setWasteIngId(''); setWasteQty(0);
+      setWasteIngId(''); setWasteRecipeId(''); setWasteQty(0);
     } catch (err: any) {
       showToast(err.message || 'Failed to log waste', 'error');
     }
@@ -755,14 +782,17 @@ export const Stock: React.FC<StockProps> = ({ section = 'directory' }) => {
         }
       }
 
-      // Sum up waste movements recorded today for each ingredient
+      // Sum up waste movements recorded today for each ingredient. Recipe-sourced
+      // waste is excluded here — this report's `counts` only ever tracks
+      // ingredient stock levels, so there's no per-item row for a recipe to
+      // attach a "Recorded Wastage" figure to.
       const wastageCounts: Record<string, number> = {};
       const todayStr = new Date().toISOString().slice(0, 10);
       wasteMovements
-        .filter(m => m.date === todayStr)
+        .filter(m => m.date === todayStr && m.ingredientId)
         .forEach(m => {
           const qty = Math.abs(m.quantity);
-          wastageCounts[m.ingredientId] = (wastageCounts[m.ingredientId] || 0) + qty;
+          wastageCounts[m.ingredientId!] = (wastageCounts[m.ingredientId!] || 0) + qty;
         });
 
       // Save the report snapshot
@@ -974,15 +1004,14 @@ export const Stock: React.FC<StockProps> = ({ section = 'directory' }) => {
       const recentWaste = wasteMovements.filter(m => m.date >= cutoffStr);
       if (cfg.includeWastage) {
         wastageCount = recentWaste.length;
-        wastageTotal = recentWaste.reduce((sum, m) => {
-          const ing = ingMap.get(m.ingredientId);
-          return sum + (ing ? calculateIngredientCost(ing, Math.abs(m.quantity), 'g', ingredients) : 0);
-        }, 0);
+        wastageTotal = recentWaste.reduce((sum, m) => sum + movementCost(m), 0);
       }
       if (cfg.recordedWastage) {
-        recentWaste.forEach(m => {
+        // Recipe-sourced waste is excluded here — `counts` (and this
+        // per-item column) only ever tracks ingredient stock levels.
+        recentWaste.filter(m => m.ingredientId).forEach(m => {
           const qty = Math.abs(m.quantity);
-          wastageCounts[m.ingredientId] = (wastageCounts[m.ingredientId] || 0) + qty;
+          wastageCounts[m.ingredientId!] = (wastageCounts[m.ingredientId!] || 0) + qty;
         });
       }
     }
@@ -1388,11 +1417,20 @@ export const Stock: React.FC<StockProps> = ({ section = 'directory' }) => {
             <div className="flex flex-col gap-6">
               <div>
                 <label className="label-caps text-outline block mb-2">Select Waste Item</label>
-                <select value={wasteIngId} onChange={e => setWasteIngId(e.target.value)}
-                  className="w-full px-3 py-3 border border-outline-variant bg-surface-container-lowest text-sm">
-                  <option value="">-- Choose Ingredient --</option>
-                  {ingredients.map(ing => <option key={ing.id} value={ing.id}>{ing.name}</option>)}
-                </select>
+                <ItemPicker
+                  ingredients={ingredients}
+                  recipes={recipes}
+                  placeholder="Search ingredients or recipes..."
+                  actionLabel="Select"
+                  selected={wasteIngId ? ingredients.find(i => i.id === wasteIngId)?.name : wasteRecipeId ? recipes.find(r => r.id === wasteRecipeId)?.name : undefined}
+                  onClear={() => { setWasteIngId(''); setWasteRecipeId(''); }}
+                  onSelectIngredient={ing => { setWasteIngId(ing.id); setWasteRecipeId(''); }}
+                  onSelectRecipe={rec => {
+                    setWasteRecipeId(rec.id);
+                    setWasteIngId('');
+                    if (wasteUnit === 'ea') setWasteUnit('g');
+                  }}
+                />
               </div>
               <div className="flex items-end gap-3 bg-surface border border-outline-variant p-3 rounded-sm">
                 {isWebBluetoothSupported() ? (
@@ -1440,7 +1478,7 @@ export const Stock: React.FC<StockProps> = ({ section = 'directory' }) => {
                     <option value="oz">ounces (oz)</option>
                     <option value="ml">milliliters (ml)</option>
                     <option value="l">liters (l)</option>
-                    <option value="ea">each (ea)</option>
+                    {!wasteRecipeId && <option value="ea">each (ea)</option>}
                   </select>
                 </div>
               </div>
@@ -1460,7 +1498,7 @@ export const Stock: React.FC<StockProps> = ({ section = 'directory' }) => {
                   className="h-12 px-6 border border-outline text-xs font-bold label-caps rounded-sm hover:bg-surface-container">
                   Discard [ESC]
                 </button>
-                <button onClick={handleSaveWaste} disabled={isSaving || !wasteIngId || wasteQty <= 0}
+                <button onClick={handleSaveWaste} disabled={isSaving || (!wasteIngId && !wasteRecipeId) || wasteQty <= 0}
                   className="h-12 px-8 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:bg-opacity-90 disabled:opacity-50 flex items-center gap-2">
                   {isSaving ? <><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />Saving...</> : 'Save Waste'}
                 </button>
@@ -1503,8 +1541,8 @@ export const Stock: React.FC<StockProps> = ({ section = 'directory' }) => {
                   className="px-2 py-1.5 border border-outline-variant text-xs rounded-sm bg-surface-container-lowest" />
               </div>
               <div className="flex-1 min-w-32">
-                <label className="label-caps text-outline text-[9px] block mb-1">Ingredient</label>
-                <input type="text" placeholder="Filter by ingredient..." value={wasteIngFilter} onChange={e => setWasteIngFilter(e.target.value)}
+                <label className="label-caps text-outline text-[9px] block mb-1">Item</label>
+                <input type="text" placeholder="Filter by ingredient or recipe..." value={wasteIngFilter} onChange={e => setWasteIngFilter(e.target.value)}
                   className="w-full px-2 py-1.5 border border-outline-variant text-xs rounded-sm bg-surface-container-lowest" />
               </div>
               {(wasteDateFrom || wasteDateTo || wasteIngFilter) && (
@@ -1524,7 +1562,7 @@ export const Stock: React.FC<StockProps> = ({ section = 'directory' }) => {
                   <thead className="sticky top-0 bg-surface-container border-b border-outline-variant">
                     <tr>
                       <th className="p-3 text-left label-caps text-[10px] text-outline font-bold">Date</th>
-                      <th className="p-3 text-left label-caps text-[10px] text-outline font-bold">Ingredient</th>
+                      <th className="p-3 text-left label-caps text-[10px] text-outline font-bold">Item</th>
                       <th className="p-3 text-left label-caps text-[10px] text-outline font-bold">Category</th>
                       <th className="p-3 text-center label-caps text-[10px] text-outline font-bold">Qty (g)</th>
                       <th className="p-3 text-left label-caps text-[10px] text-outline font-bold">Reason</th>
@@ -1533,13 +1571,14 @@ export const Stock: React.FC<StockProps> = ({ section = 'directory' }) => {
                   </thead>
                   <tbody className="divide-y divide-outline-variant">
                     {filteredWaste.map(m => {
-                      const ing = ingMap.get(m.ingredientId);
-                      const cost = ing ? calculateIngredientCost(ing, Math.abs(m.quantity), 'g', ingredients) : 0;
+                      const ing = m.ingredientId ? ingMap.get(m.ingredientId) : undefined;
+                      const rec = m.recipeId ? recMap.get(m.recipeId) : undefined;
+                      const cost = movementCost(m);
                       return (
                         <tr key={m.id} className="hover:bg-surface-container-low">
                           <td className="p-3 data-tabular text-on-surface">{m.date}</td>
-                          <td className="p-3 font-semibold text-on-surface">{ing?.name ?? m.ingredientId}</td>
-                          <td className="p-3 text-outline">{ing?.category ?? '—'}</td>
+                          <td className="p-3 font-semibold text-on-surface">{ing?.name ?? rec?.name ?? m.ingredientId ?? m.recipeId}</td>
+                          <td className="p-3 text-outline">{ing?.category ?? (rec ? 'Prep Recipe' : '—')}</td>
                           <td className="p-3 text-center data-tabular text-on-surface">{Math.abs(m.quantity).toFixed(0)}</td>
                           <td className="p-3 text-outline">{m.notes ?? '—'}</td>
                           <td className="p-3 text-right data-tabular font-bold text-error">£{cost.toFixed(2)}</td>

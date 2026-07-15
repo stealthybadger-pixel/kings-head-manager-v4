@@ -204,18 +204,12 @@ export const useStockMutations = () => {
       
       batch.set(docRef, fullMovement);
 
-      // Increment/Decrement the current stock cache value on the ingredient
-      const ingRef = doc(db, 'ingredients', movement.ingredientId);
-      // NOTE: We do not read the database first. The UI state or local cache keeps track, 
-      // but in Firestore we increment the field value atomically to prevent concurrent race conditions.
-      // However, Firestore doesn't provide a direct relative increment in standard Client SDK without transaction,
-      // but we update it via set/merge.
-      // To keep it simple, we do the updateDoc on the query success or transaction:
       await batch.commit();
       return fullMovement;
     },
-    onSuccess: () => {
+    onSuccess: (fullMovement) => {
       queryClient.invalidateQueries({ queryKey: ['ingredients'] });
+      if (fullMovement.recipeId) queryClient.invalidateQueries({ queryKey: ['recipes'] });
     }
   });
 
