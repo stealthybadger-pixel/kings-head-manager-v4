@@ -474,6 +474,47 @@ export const useSupplierProducts = () => {
   });
 };
 
+// Scoped catalogue lookup for a single ingredient (Pantry's "suggested
+// catalogue matches" panel) — narrows the ~3,500-doc supplierProducts
+// collection to a prefix-range query on the ingredient's first word instead
+// of downloading every product. Note: this matches products whose name
+// STARTS WITH the word (case-folded), whereas the old client-side
+// `.includes()` scan also matched the word appearing mid-name — a
+// deliberate, small behaviour change traded for the read reduction.
+export const useSupplierProductsForIngredient = (ingredientName: string) => {
+  const firstWord = ingredientName
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(t => t.length > 1 && /[a-z0-9]/i.test(t))[0] ?? '';
+
+  return useQuery<SupplierProduct[]>({
+    queryKey: ['supplier_products_prefix', firstWord],
+    queryFn: async () => {
+      const variations = [firstWord, firstWord.charAt(0).toUpperCase() + firstWord.slice(1)];
+      const resultsMap = new Map<string, SupplierProduct>();
+
+      for (const term of variations) {
+        const q = query(
+          collection(db, 'supplierProducts'),
+          where('name', '>=', term),
+          where('name', '<=', term + ''),
+          limit(200)
+        );
+        const snap = await getDocs(q);
+        snap.forEach(docSnapshot => {
+          const rawData = { id: docSnapshot.id, ...docSnapshot.data() };
+          const result = SupplierProductSchema.safeParse(rawData);
+          if (result.success) resultsMap.set(result.data.id, result.data);
+        });
+      }
+
+      return Array.from(resultsMap.values());
+    },
+    enabled: firstWord.length > 0,
+    staleTime: 5 * 60 * 1000
+  });
+};
+
 export const useSupplierSearchQuery = (searchTerm: string, supplier: string) => {
   return useQuery<SupplierProduct[]>({
     queryKey: ['supplier_search', searchTerm, supplier],

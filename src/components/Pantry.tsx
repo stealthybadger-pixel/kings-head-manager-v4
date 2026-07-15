@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { supplierBadgeClass } from '../utils/supplierColors';
-import { useIngredients, useIngredientMutations, useSupplierProducts, useDishes, useSuppliers } from '../hooks/useKitchenData';
+import { useIngredients, useIngredientMutations, useSupplierProductsForIngredient, useDishes, useSuppliers } from '../hooks/useKitchenData';
 import { useStore } from '../store/useStore';
 import { Search, Plus, Trash2, AlertCircle, FileText, CheckCircle2, ListTodo, Check, ArrowRight, ArrowLeft, ExternalLink } from 'lucide-react';
 import { getSupplierUrl, getSupplierSearchLinks } from '../utils/supplierUrls';
@@ -171,14 +171,7 @@ export const Pantry: React.FC = () => {
     }
   }, [activeIngredient]);
 
-  const { data: allProducts = [] } = useSupplierProducts();
-  const catalogProducts = useMemo(() => {
-    if (!activeIngredient) return [];
-    const words = activeIngredient.name.toLowerCase().split(/\s+/).filter(t => t.length > 1 && /[a-z0-9]/i.test(t));
-    if (words.length === 0) return [];
-    const firstWord = words[0];
-    return allProducts.filter(p => p.name.toLowerCase().includes(firstWord));
-  }, [allProducts, activeIngredient]);
+  const { data: catalogProducts = [] } = useSupplierProductsForIngredient(activeIngredient?.name ?? '');
 
   const cheaperCatalogOption = useMemo(() => {
     if (!activeIngredient) return null;

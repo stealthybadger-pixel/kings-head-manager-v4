@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { useIngredients, useRecipes, useDishes, useStockMutations, useStockMovements, useStocktakeReports, useStocktakeMutations, useStocktakeDraft, useStocktakeDraftMutations, useRecipeMutations, useIngredientMutations, useFoodTempChecksHistory, useEquipmentChecksHistory, todayCheckDate } from '../hooks/useKitchenData';
+import { useIngredients, useRecipes, useDishes, useStockMutations, useStockMovements, useStocktakeReports, useStocktakeMutations, useStocktakeDraft, useStocktakeDraftMutations, useRecipeMutations, useIngredientMutations, useFoodTempChecksToday, useEquipmentChecksToday, todayCheckDate } from '../hooks/useKitchenData';
 import { useStore } from '../store/useStore';
 import { useAuth } from '../hooks/useAuth';
 import { useBleScale, isWebBluetoothSupported } from '../hooks/useBleScale';
@@ -366,8 +366,8 @@ export const Stock: React.FC<StockProps> = ({ section = 'directory' }) => {
   const { saveDraft, clearDraft } = useStocktakeDraftMutations();
   const { updateRecipe } = useRecipeMutations();
   const { updateIngredient } = useIngredientMutations();
-  const { data: foodTempChecks = [] } = useFoodTempChecksHistory();
-  const { data: equipmentTempChecks = [] } = useEquipmentChecksHistory();
+  const { data: foodTempChecks = [] } = useFoodTempChecksToday();
+  const { data: equipmentTempChecks = [] } = useEquipmentChecksToday();
   const { appUser } = useAuth();
 
   const scaleConnected = useStore((state) => state.scaleConnected);
