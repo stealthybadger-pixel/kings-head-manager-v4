@@ -210,6 +210,10 @@ export const useStockMutations = () => {
     onSuccess: (fullMovement) => {
       queryClient.invalidateQueries({ queryKey: ['ingredients'] });
       if (fullMovement.recipeId) queryClient.invalidateQueries({ queryKey: ['recipes'] });
+      // useStockMovements keys on ['stock_movements', type] — partial
+      // matching on the prefix catches every type-filtered variant
+      // (e.g. the Wastage History list), not just the exact movement's type.
+      queryClient.invalidateQueries({ queryKey: ['stock_movements'] });
     }
   });
 
