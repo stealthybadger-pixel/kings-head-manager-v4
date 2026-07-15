@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { collection, getDocs, getDoc, doc, setDoc, deleteDoc, updateDoc, deleteField, writeBatch, query, where, limit } from 'firebase/firestore';
+import { collection, getDocs, getDoc, getCountFromServer, doc, setDoc, deleteDoc, updateDoc, deleteField, writeBatch, query, where, limit } from 'firebase/firestore';
 import { db } from '../firebase';
 import { tokenizeSearchQuery, matchesSearchTokens } from '../utils/search';
 import {
@@ -81,6 +81,65 @@ export const useContainerProfiles = () => {
   });
 };
 
+// --- DASHBOARD SUMMARY COUNTS ---
+// Firestore aggregate count() queries — for screens that only need a total
+// document count (e.g. the Dashboard's stat tiles), not the documents
+// themselves. Billed as a small fraction of a full collection read
+// regardless of collection size, unlike fetchCollection's getDocs().
+//
+// A document count only changes when a document is added or deleted, never
+// on an in-place edit — so these are cached long and refetched only via the
+// explicit invalidation in useIngredientMutations/useRecipeMutations/
+// useDishMutations' add/delete (not update) onSuccess handlers, rather than
+// on every mount/focus/reconnect like the rest of the app's queries.
+//
+// refetchOnMount is deliberately left at its default (true = "refetch if
+// stale", not "always refetch") rather than disabled: the add/delete that
+// invalidates a count almost always happens on a different screen (e.g.
+// adding an ingredient from Pantry), so Dashboard has no active observer at
+// invalidation time — invalidateQueries only marks the query stale then,
+// it can't refetch something nobody's watching. refetchOnMount:true is what
+// makes the *next* Dashboard mount notice that staleness and catch up.
+const DASHBOARD_COUNT_QUERY_OPTIONS = {
+  staleTime: 30 * 60 * 1000, // 30 minutes
+  gcTime: 60 * 60 * 1000, // 1 hour
+  refetchOnWindowFocus: false,
+  refetchOnReconnect: false
+} as const;
+
+export const useIngredientsCount = () => {
+  return useQuery<number>({
+    queryKey: ['ingredients_count'],
+    queryFn: async () => {
+      const snap = await getCountFromServer(collection(db, 'ingredients'));
+      return snap.data().count;
+    },
+    ...DASHBOARD_COUNT_QUERY_OPTIONS
+  });
+};
+
+export const useRecipesCount = () => {
+  return useQuery<number>({
+    queryKey: ['recipes_count'],
+    queryFn: async () => {
+      const snap = await getCountFromServer(collection(db, 'recipes'));
+      return snap.data().count;
+    },
+    ...DASHBOARD_COUNT_QUERY_OPTIONS
+  });
+};
+
+export const useDishesCount = () => {
+  return useQuery<number>({
+    queryKey: ['dishes_count'],
+    queryFn: async () => {
+      const snap = await getCountFromServer(collection(db, 'dishes'));
+      return snap.data().count;
+    },
+    ...DASHBOARD_COUNT_QUERY_OPTIONS
+  });
+};
+
 // --- MUTATIONS ---
 
 export const useIngredientMutations = () => {
@@ -96,7 +155,11 @@ export const useIngredientMutations = () => {
       await setDoc(docRef, fullItem);
       return fullItem;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ingredients'] })
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ingredients'] });
+      // Adding a document changes the Dashboard's count tile — updates don't.
+      queryClient.invalidateQueries({ queryKey: ['ingredients_count'] });
+    }
   });
 
   const updateMutation = useMutation({
@@ -113,7 +176,11 @@ export const useIngredientMutations = () => {
     mutationFn: async (id: string) => {
       await deleteDoc(doc(db, 'ingredients', id));
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ingredients'] })
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ingredients'] });
+      // Deleting a document changes the Dashboard's count tile too.
+      queryClient.invalidateQueries({ queryKey: ['ingredients_count'] });
+    }
   });
 
   return { addIngredient: addMutation, updateIngredient: updateMutation, deleteIngredient: deleteMutation };
@@ -131,7 +198,10 @@ export const useRecipeMutations = () => {
       await setDoc(docRef, fullItem);
       return fullItem;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['recipes'] })
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['recipes'] });
+      queryClient.invalidateQueries({ queryKey: ['recipes_count'] });
+    }
   });
 
   const updateMutation = useMutation({
@@ -148,7 +218,10 @@ export const useRecipeMutations = () => {
     mutationFn: async (id: string) => {
       await deleteDoc(doc(db, 'recipes', id));
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['recipes'] })
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['recipes'] });
+      queryClient.invalidateQueries({ queryKey: ['recipes_count'] });
+    }
   });
 
   return { addRecipe: addMutation, updateRecipe: updateMutation, deleteRecipe: deleteMutation };
@@ -166,7 +239,10 @@ export const useDishMutations = () => {
       await setDoc(docRef, fullItem);
       return fullItem;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['dishes'] })
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dishes'] });
+      queryClient.invalidateQueries({ queryKey: ['dishes_count'] });
+    }
   });
 
   const updateMutation = useMutation({
@@ -183,7 +259,10 @@ export const useDishMutations = () => {
     mutationFn: async (id: string) => {
       await deleteDoc(doc(db, 'dishes', id));
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['dishes'] })
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dishes'] });
+      queryClient.invalidateQueries({ queryKey: ['dishes_count'] });
+    }
   });
 
   return { addDish: addMutation, updateDish: updateMutation, deleteDish: deleteMutation };
@@ -521,52 +600,6 @@ export const useSupplierProductMutations = () => {
     deleteSupplierProduct: deleteMutation,
     bulkDeleteSupplierProducts: bulkDeleteMutation
   };
-};
-
-export interface ScrapeLogEntry {
-  id: string;
-  supplier: string;
-  count: number;
-  added: number;
-  updated: number;
-  scrapedAt: string;
-  source: string;
-}
-
-export const useScrapeLogs = () => {
-  return useQuery<ScrapeLogEntry[]>({
-    queryKey: ['scrape_logs'],
-    queryFn: async () => {
-      const snapshot = await getDocs(collection(db, 'scrapeLog'));
-      const items: ScrapeLogEntry[] = [];
-      snapshot.forEach(d => items.push({ id: d.id, ...d.data() } as ScrapeLogEntry));
-      return items.sort((a, b) => b.scrapedAt.localeCompare(a.scrapedAt));
-    },
-    staleTime: 2 * 60 * 1000
-  });
-};
-
-export const useAllSupplierProducts = () => {
-  return useQuery({
-    queryKey: ['all_supplier_products_summary'],
-    queryFn: async () => {
-      const snapshot = await getDocs(collection(db, 'supplierProducts'));
-      const bySupplier: Record<string, { count: number; latestAt: string }> = {};
-      const products: SupplierProduct[] = [];
-      snapshot.forEach(d => {
-        const data = d.data();
-        const sup = data.supplier as string;
-        const ts: string = data.importedAt || data.capturedAt || '';
-        if (!bySupplier[sup]) bySupplier[sup] = { count: 0, latestAt: ts };
-        bySupplier[sup].count++;
-        if (ts > bySupplier[sup].latestAt) bySupplier[sup].latestAt = ts;
-        const result = SupplierProductSchema.safeParse({ id: d.id, ...data });
-        if (result.success) products.push(result.data);
-      });
-      return { bySupplier, products };
-    },
-    staleTime: 5 * 60 * 1000
-  });
 };
 
 // --- FOOD TEMP CHECKS ---
