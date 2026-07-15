@@ -202,7 +202,7 @@ const StocktakeRecipeRow = React.memo(function StocktakeRecipeRow({
 }: StocktakeRecipeRowProps) {
   return (
     <div className="flex flex-col gap-2 p-3 sm:p-4 border border-primary/30 bg-secondary-container/20 rounded-sm">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <span className="font-semibold text-sm text-on-surface truncate flex items-center gap-1.5">
             <ChefHat className="h-3.5 w-3.5 text-primary flex-shrink-0" /> {rec.name}
@@ -211,7 +211,7 @@ const StocktakeRecipeRow = React.memo(function StocktakeRecipeRow({
             Prep Recipe • Current: {rec.stockLevel ?? 0} {rec.batchUnit}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {scaleConnected && (
             <>
               <select value={tareId} onChange={e => onTareChange(rec.id, e.target.value)}
@@ -285,14 +285,14 @@ const StocktakeIngredientRow = React.memo(function StocktakeIngredientRow({
   const displayValue = gramsToUnit(gramsValue, unit, ing);
   return (
     <div className={`flex flex-col gap-2 p-3 sm:p-4 border border-outline-variant rounded-sm ${isAlternateRow ? 'bg-black/[0.0075]' : 'bg-transparent'}`}>
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <span className="font-semibold text-sm text-on-surface truncate block">{ing.name}</span>
           <div className="text-[10px] text-outline uppercase tracking-wider mt-0.5">
             {ing.category} • Current: {formatUnitValue(gramsToUnit(ing.stockLevel ?? 0, unit, ing), unit)}{unit}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {scaleConnected && (
             <>
               <select value={tareId} onChange={e => onTareChange(ing.id, e.target.value)}
