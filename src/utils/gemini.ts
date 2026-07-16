@@ -2,7 +2,11 @@
 // — one place for the model name, retry behaviour, and image prep so a fix to one
 // (e.g. the gemini-1.5-flash -> gemini-3.5-flash retirement) doesn't need repeating.
 
-const GEMINI_MODEL = 'gemini-3.5-flash';
+// Tried in order — gemini-3.5-flash is the primary model, but its image-processing
+// path in particular has been seen returning a genuine Google-side 503 ("high demand")
+// for extended stretches, not just a one-off blip. Falls back to gemini-2.5-flash
+// (an older, likely less demand-contended model) rather than failing the scan outright.
+const GEMINI_MODELS = ['gemini-3.5-flash', 'gemini-2.5-flash'];
 const MAX_IMAGE_DIMENSION = 1600; // px — plenty for OCR-quality text extraction
 const JPEG_QUALITY = 0.85;
 const RETRYABLE_STATUSES = new Set([503, 429]);
@@ -57,48 +61,54 @@ export async function prepareImageForGemini(file: File): Promise<{ base64: strin
   return { base64: compressedDataUrl.split(',')[1], mimeType: 'image/jpeg' };
 }
 
-// Calls Gemini's generateContent with a short retry for transient errors (503
-// overloaded, 429 rate-limited) — anything else fails immediately since retrying
-// a bad request/key/model just wastes the same error three times.
+async function callGeminiModel(model: string, key: string, prompt: string, base64Image: string, mimeType: string): Promise<string> {
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64Image } }] }],
+        // 'low' thinking is plenty for straightforward extraction tasks like this —
+        // the model can't fully disable its hidden reasoning step, but this avoids
+        // paying for deep multi-step reasoning it doesn't need here.
+        generationConfig: { temperature: 0.1, maxOutputTokens: 4096, thinkingConfig: { thinkingLevel: 'low' } }
+      })
+    }
+  );
+
+  if (!response.ok) {
+    const error = new Error(`Gemini API error: ${response.status}`) as Error & { status?: number };
+    error.status = response.status;
+    throw error;
+  }
+
+  const data = await response.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+}
+
+// Tries each model in GEMINI_MODELS in order, retrying transient errors (503
+// overloaded, 429 rate-limited) a couple of times per model before moving on to the
+// next — anything else (bad key, bad request) fails immediately rather than wasting
+// the same error across every model.
 export async function callGeminiVision(prompt: string, base64Image: string, mimeType: string): Promise<string> {
   const key = localStorage.getItem('geminiApiKey');
   if (!key) throw new Error('No Gemini API key set. Add it in Settings.');
 
   let lastError: Error | null = null;
 
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    if (attempt > 0) await sleep(RETRY_DELAY_MS * attempt);
+  for (const model of GEMINI_MODELS) {
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      if (attempt > 0) await sleep(RETRY_DELAY_MS * attempt);
 
-    try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64Image } }] }],
-            // 'low' thinking is plenty for straightforward extraction tasks like this —
-            // the model can't fully disable its hidden reasoning step, but this avoids
-            // paying for deep multi-step reasoning it doesn't need here.
-            generationConfig: { temperature: 0.1, maxOutputTokens: 4096, thinkingConfig: { thinkingLevel: 'low' } }
-          })
-        }
-      );
-
-      if (!response.ok) {
-        const error = new Error(`Gemini API error: ${response.status}`);
-        if (RETRYABLE_STATUSES.has(response.status) && attempt < MAX_RETRIES) {
-          lastError = error;
-          continue;
-        }
-        throw error;
+      try {
+        return await callGeminiModel(model, key, prompt, base64Image, mimeType);
+      } catch (err) {
+        const error = err as Error & { status?: number };
+        lastError = error;
+        const isRetryable = error.status !== undefined && RETRYABLE_STATUSES.has(error.status);
+        if (!isRetryable) break; // move on to the next model immediately, don't burn retries on a non-transient error
       }
-
-      const data = await response.json();
-      return data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-    } catch (err) {
-      lastError = err as Error;
-      if (attempt >= MAX_RETRIES) throw lastError;
     }
   }
 
