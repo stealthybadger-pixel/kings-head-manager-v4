@@ -396,7 +396,12 @@ export const SupplierProductSchema = z.object({
   bookerProductCode: z.string().optional(),
   urbanProductId: z.string().optional(),
   sku: z.string().optional(),
-  productCode: z.string().optional()
+  productCode: z.string().optional(),
+  // Set by the Catalogue Matcher tool — links this supplier product to the
+  // Pantry Ingredient it represents. Identity only (this product "is" that
+  // ingredient); NOT the same as being set as the ingredient's preferred
+  // supplier/pricing, which stays a separate decision made in Pantry/Catalog.
+  ingredientId: z.string().optional()
 });
 export type SupplierProduct = z.infer<typeof SupplierProductSchema>;
 

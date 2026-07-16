@@ -3,6 +3,11 @@ export default {
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
+    // tools/catalogue-matcher is a standalone dev-only entry (own index.html,
+    // never part of the production build — see vite.config.ts, which has no
+    // rollupOptions.input for it) but still uses Tailwind utility classes
+    // and shares components with src/, so it needs to be scanned too.
+    "./tools/**/*.{js,ts,jsx,tsx,html}",
   ],
   theme: {
     extend: {
