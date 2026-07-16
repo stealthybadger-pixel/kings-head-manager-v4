@@ -36,7 +36,7 @@ Units must be one of: "g", "kg", "ml", "l", "ea"
 - parsedName should be the ingredient only, no quantity or unit`;
 
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${key}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
