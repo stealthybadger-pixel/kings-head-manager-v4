@@ -7,6 +7,8 @@ import { Search, Plus, Trash2, Camera, AlertCircle, Check, HelpCircle, ExternalL
 import { Recipe, RecipeItem, Ingredient, Unit } from '../types';
 import { calculatePlateCost } from '../utils/costing';
 import { tokenizeSearchQuery, matchesSearchTokens } from '../utils/search';
+import { findBestIngredientMatch } from '../utils/matching';
+import { prepareImageForGemini, callGeminiVision, parseGeminiJson } from '../utils/gemini';
 import ItemPicker from './ItemPicker';
 
 async function scanRecipeWithGemini(base64Image: string, mimeType: string): Promise<{
@@ -14,9 +16,6 @@ async function scanRecipeWithGemini(base64Image: string, mimeType: string): Prom
   ingredients: { rawName: string; parsedName: string; qty: number; unit: RecipeItem['unit'] }[];
   instructions: string;
 }> {
-  const key = localStorage.getItem('geminiApiKey');
-  if (!key) throw new Error('No Gemini API key set. Add it in Settings.');
-
   const prompt = `You are analysing a recipe card, handwritten recipe, printed recipe, or cookbook page.
 Extract the recipe name, all ingredients with quantities, and the preparation instructions.
 
@@ -35,23 +34,8 @@ Units must be one of: "g", "kg", "ml", "l", "ea"
 - For "each" items like eggs use "ea"
 - parsedName should be the ingredient only, no quantity or unit`;
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${key}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64Image } }] }],
-        generationConfig: { temperature: 0.1, maxOutputTokens: 4096 }
-      })
-    }
-  );
-
-  if (!response.ok) throw new Error(`Gemini API error: ${response.status}`);
-  const data = await response.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-  return JSON.parse(cleaned);
+  const text = await callGeminiVision(prompt, base64Image, mimeType);
+  return parseGeminiJson(text);
 }
 
 const calculateDynamicBatchSize = (items: RecipeItem[], targetUnit: string) => {
@@ -346,24 +330,13 @@ export const Kitchen: React.FC = () => {
     setScanning(true);
 
     try {
-      const mimeType = file.type || 'image/jpeg';
-      const base64 = await new Promise<string>((res, rej) => {
-        const reader = new FileReader();
-        reader.onload = () => res((reader.result as string).split(',')[1]);
-        reader.onerror = rej;
-        reader.readAsDataURL(file);
-      });
+      const { base64, mimeType } = await prepareImageForGemini(file);
 
       const extracted = await scanRecipeWithGemini(base64, mimeType);
 
       const mapped = extracted.ingredients.map(item => {
-        const nameLower = item.parsedName.toLowerCase();
-        const match = ingredients.find(i =>
-          i.name.toLowerCase() === nameLower ||
-          i.name.toLowerCase().includes(nameLower) ||
-          nameLower.includes(i.name.toLowerCase())
-        );
-        return { ...item, matchedId: match?.id };
+        const match = findBestIngredientMatch(item.parsedName, ingredients);
+        return { ...item, matchedId: match?.ingredient.id };
       });
 
       setScanResults({ ...extracted, ingredients: mapped });

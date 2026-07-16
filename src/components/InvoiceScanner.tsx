@@ -4,6 +4,8 @@ import { useStore } from '../store/useStore';
 import { useAuth } from '../hooks/useAuth';
 import { Upload, ScanLine, CheckCircle2, AlertTriangle, X, RefreshCw, ShieldAlert } from 'lucide-react';
 import { supplierBadgeClass } from '../utils/supplierColors';
+import { prepareImageForGemini, callGeminiVision, parseGeminiJson } from '../utils/gemini';
+import { findBestIngredientMatch } from '../utils/matching';
 
 interface InvoiceLine {
   rawText: string;
@@ -19,12 +21,7 @@ interface InvoiceLine {
   diffPct?: number;
 }
 
-const GEMINI_API_KEY = localStorage.getItem('geminiApiKey') || '';
-
 async function scanInvoiceWithGemini(base64Image: string, mimeType: string): Promise<InvoiceLine[]> {
-  const key = localStorage.getItem('geminiApiKey');
-  if (!key) throw new Error('No Gemini API key set. Add it in Settings.');
-
   const prompt = `You are analysing a UK wholesale food supplier invoice or delivery note.
 Extract every line item product. For each product return a JSON array with objects containing:
 - name: product name (string, clean title case)
@@ -41,29 +38,8 @@ Rules:
 Example output:
 [{"name":"Double Cream","packCost":4.85,"packSize":2,"packUnit":"l","supplier":"David Catt"},...]`;
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${key}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: prompt },
-            { inline_data: { mime_type: mimeType, data: base64Image } }
-          ]
-        }],
-        generationConfig: { temperature: 0.1, maxOutputTokens: 4096 }
-      })
-    }
-  );
-
-  if (!response.ok) throw new Error(`Gemini API error: ${response.status}`);
-  const data = await response.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-
-  const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-  return JSON.parse(cleaned) as InvoiceLine[];
+  const text = await callGeminiVision(prompt, base64Image, mimeType);
+  return parseGeminiJson<InvoiceLine[]>(text);
 }
 
 export const InvoiceScanner: React.FC = () => {
@@ -94,24 +70,16 @@ export const InvoiceScanner: React.FC = () => {
     setUpdated(new Set());
 
     try {
-      const mimeType = file.type || 'image/jpeg';
-      const base64 = await new Promise<string>((res, rej) => {
-        const reader = new FileReader();
-        reader.onload = () => res((reader.result as string).split(',')[1]);
-        reader.onerror = rej;
-        reader.readAsDataURL(file);
-      });
+      const { base64, mimeType } = await prepareImageForGemini(file);
 
       const extracted = await scanInvoiceWithGemini(base64, mimeType);
 
-      // Match against pantry ingredients
+      // Match against pantry ingredients using the same fuzzy matcher Catalog/Pantry
+      // use elsewhere, rather than a plain substring check — handles this app's
+      // "Item - Descriptor" naming (e.g. Gemini's "Dill" matching Pantry's "Dill - Fresh").
       const matched = extracted.map(line => {
-        const nameLower = line.name.toLowerCase();
-        const ing = ingredients.find(i =>
-          i.name.toLowerCase() === nameLower ||
-          i.name.toLowerCase().includes(nameLower) ||
-          nameLower.includes(i.name.toLowerCase())
-        );
+        const match = findBestIngredientMatch(line.name, ingredients);
+        const ing = match?.ingredient;
         if (!ing) return line;
 
         const pref = ing.suppliers?.find(s => s.isPreferred) || ing.suppliers?.[0];
