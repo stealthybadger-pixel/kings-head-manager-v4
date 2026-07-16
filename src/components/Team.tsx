@@ -35,7 +35,7 @@ export const Team: React.FC = () => {
         createdAt: new Date().toISOString()
       };
       await setDoc(doc(db, 'users', uid), newUser);
-      await queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.setQueryData<AppUser[]>(['users'], (old) => (old ? [...old, newUser] : old));
       showToast(`${newUser.displayName} added as ${role}`, 'success');
       setDisplayName('');
       setEmail('');

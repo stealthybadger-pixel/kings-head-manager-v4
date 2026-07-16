@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, QueryClient } from '@tanstack/react-query';
 import { collection, getDocs, getDoc, getCountFromServer, doc, setDoc, deleteDoc, updateDoc, deleteField, writeBatch, query, where, limit } from 'firebase/firestore';
 import { db } from '../firebase';
 import { tokenizeSearchQuery, matchesSearchTokens } from '../utils/search';
@@ -31,6 +31,39 @@ function withDeleteFieldForUndefined(payload: Record<string, any>): Record<strin
     result[key] = value === undefined ? deleteField() : value;
   }
   return result;
+}
+
+// --- CACHE-PATCHING HELPERS (Firestore Optimisation Phase 2) ---
+// Applied to an already-cached array without triggering a refetch. Every
+// helper is a no-op when the target query isn't currently cached (`old` is
+// undefined) — nothing gets seeded for a screen nobody has visited yet, so
+// it fetches fresh (and correctly) the first time it's actually mounted.
+
+// Strips `id`/`createdAt` from an update payload and stamps a fresh
+// `updatedAt` — the same shape used for both the Firestore write (after
+// withDeleteFieldForUndefined) and the local cache patch, so the two never
+// drift apart.
+function buildPatch<T extends { id: string; createdAt?: string }>(data: Partial<T>): Partial<T> & { updatedAt: string } {
+  const { id: _id, createdAt: _createdAt, ...rest } = data as any;
+  return { ...rest, updatedAt: new Date().toISOString() };
+}
+
+function patchArrayItem<T extends { id: string }>(queryClient: QueryClient, queryKey: readonly unknown[], id: string, patch: Partial<T>) {
+  queryClient.setQueryData<T[]>(queryKey as any, (old) =>
+    old ? old.map((item) => (item.id === id ? { ...item, ...patch } : item)) : old
+  );
+}
+
+function appendArrayItem<T>(queryClient: QueryClient, queryKey: readonly unknown[], item: T) {
+  queryClient.setQueryData<T[]>(queryKey as any, (old) => (old ? [...old, item] : old));
+}
+
+function prependArrayItem<T>(queryClient: QueryClient, queryKey: readonly unknown[], item: T) {
+  queryClient.setQueryData<T[]>(queryKey as any, (old) => (old ? [item, ...old] : old));
+}
+
+function removeArrayItem<T extends { id: string }>(queryClient: QueryClient, queryKey: readonly unknown[], id: string) {
+  queryClient.setQueryData<T[]>(queryKey as any, (old) => (old ? old.filter((item) => item.id !== id) : old));
 }
 
 // Generic fetcher that parses and validates with Zod
@@ -155,9 +188,12 @@ export const useIngredientMutations = () => {
       await setDoc(docRef, fullItem);
       return fullItem;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ingredients'] });
+    onSuccess: (fullItem) => {
+      appendArrayItem<Ingredient>(queryClient, ['ingredients'], fullItem);
       // Adding a document changes the Dashboard's count tile — updates don't.
+      // Left as invalidate (not a client-side +1) since the count is a
+      // server aggregate and invalidate is the safest way to stay exactly
+      // correct if two people add from different devices at once.
       queryClient.invalidateQueries({ queryKey: ['ingredients_count'] });
     }
   });
@@ -165,19 +201,19 @@ export const useIngredientMutations = () => {
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<Ingredient> }) => {
       const docRef = doc(db, 'ingredients', id);
-      const { id: _, createdAt: __, ...updatePayload } = data as any;
-      const updateData = withDeleteFieldForUndefined({ ...updatePayload, updatedAt: new Date().toISOString() });
-      await updateDoc(docRef, updateData);
+      const patch = buildPatch<Ingredient>(data);
+      await updateDoc(docRef, withDeleteFieldForUndefined(patch));
+      return patch;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ingredients'] })
+    onSuccess: (patch, { id }) => patchArrayItem<Ingredient>(queryClient, ['ingredients'], id, patch)
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       await deleteDoc(doc(db, 'ingredients', id));
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ingredients'] });
+    onSuccess: (_data, id) => {
+      removeArrayItem<Ingredient>(queryClient, ['ingredients'], id);
       // Deleting a document changes the Dashboard's count tile too.
       queryClient.invalidateQueries({ queryKey: ['ingredients_count'] });
     }
@@ -198,8 +234,8 @@ export const useRecipeMutations = () => {
       await setDoc(docRef, fullItem);
       return fullItem;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['recipes'] });
+    onSuccess: (fullItem) => {
+      appendArrayItem<Recipe>(queryClient, ['recipes'], fullItem);
       queryClient.invalidateQueries({ queryKey: ['recipes_count'] });
     }
   });
@@ -207,19 +243,19 @@ export const useRecipeMutations = () => {
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<Recipe> }) => {
       const docRef = doc(db, 'recipes', id);
-      const { id: _, createdAt: __, ...updatePayload } = data as any;
-      const updateData = withDeleteFieldForUndefined({ ...updatePayload, updatedAt: new Date().toISOString() });
-      await updateDoc(docRef, updateData);
+      const patch = buildPatch<Recipe>(data);
+      await updateDoc(docRef, withDeleteFieldForUndefined(patch));
+      return patch;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['recipes'] })
+    onSuccess: (patch, { id }) => patchArrayItem<Recipe>(queryClient, ['recipes'], id, patch)
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       await deleteDoc(doc(db, 'recipes', id));
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['recipes'] });
+    onSuccess: (_data, id) => {
+      removeArrayItem<Recipe>(queryClient, ['recipes'], id);
       queryClient.invalidateQueries({ queryKey: ['recipes_count'] });
     }
   });
@@ -239,8 +275,8 @@ export const useDishMutations = () => {
       await setDoc(docRef, fullItem);
       return fullItem;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dishes'] });
+    onSuccess: (fullItem) => {
+      appendArrayItem<Dish>(queryClient, ['dishes'], fullItem);
       queryClient.invalidateQueries({ queryKey: ['dishes_count'] });
     }
   });
@@ -248,19 +284,19 @@ export const useDishMutations = () => {
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<Dish> }) => {
       const docRef = doc(db, 'dishes', id);
-      const { id: _, createdAt: __, ...updatePayload } = data as any;
-      const updateData = withDeleteFieldForUndefined({ ...updatePayload, updatedAt: new Date().toISOString() });
-      await updateDoc(docRef, updateData);
+      const patch = buildPatch<Dish>(data);
+      await updateDoc(docRef, withDeleteFieldForUndefined(patch));
+      return patch;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['dishes'] })
+    onSuccess: (patch, { id }) => patchArrayItem<Dish>(queryClient, ['dishes'], id, patch)
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       await deleteDoc(doc(db, 'dishes', id));
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dishes'] });
+    onSuccess: (_data, id) => {
+      removeArrayItem<Dish>(queryClient, ['dishes'], id);
       queryClient.invalidateQueries({ queryKey: ['dishes_count'] });
     }
   });
@@ -286,13 +322,23 @@ export const useStockMutations = () => {
       await batch.commit();
       return fullMovement;
     },
+    // NOTE: this mutation only ever writes a stock_movements ledger entry —
+    // it never touches the ingredient or recipe document (stockLevel is
+    // written separately, only by Stock Take's updateIngredient/
+    // updateRecipe calls, which already invalidate ['ingredients']/
+    // ['recipes'] themselves). There's also no Cloud Function in this
+    // project (no functions/ dir, no "functions" key in firebase.json)
+    // that could be doing it server-side. So the ['ingredients']/['recipes']
+    // invalidation this used to do on every waste/goods-in log was a full
+    // collection re-read for data that never actually changed — removed.
     onSuccess: (fullMovement) => {
-      queryClient.invalidateQueries({ queryKey: ['ingredients'] });
-      if (fullMovement.recipeId) queryClient.invalidateQueries({ queryKey: ['recipes'] });
-      // useStockMovements keys on ['stock_movements', type] — partial
-      // matching on the prefix catches every type-filtered variant
-      // (e.g. the Wastage History list), not just the exact movement's type.
-      queryClient.invalidateQueries({ queryKey: ['stock_movements'] });
+      // Precisely targets whichever cache(s) this movement actually belongs
+      // in (['stock_movements', <its type>] and/or ['stock_movements','all']
+      // if either is currently cached) instead of invalidating the whole
+      // ['stock_movements'] prefix, which used to refetch every type-filtered
+      // list regardless of whether the new movement matched it.
+      prependArrayItem<StockMovement>(queryClient, ['stock_movements', fullMovement.type], fullMovement);
+      prependArrayItem<StockMovement>(queryClient, ['stock_movements', 'all'], fullMovement);
     }
   });
 
@@ -357,11 +403,20 @@ export const useStocktakeMutations = () => {
       await setDoc(docRef, full);
       return full;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['stocktake_reports'] })
+    // Reports sort newest-date-first and a freshly saved report's date is
+    // always "today" (see handleCommitStockTake), so it always belongs at
+    // the front — safe to prepend instead of refetching the whole list.
+    onSuccess: (full) => prependArrayItem<StocktakeReport>(queryClient, ['stocktake_reports'], full)
   });
   // Combines several reports (e.g. one stocktake accidentally committed in
   // pieces) into a single new report, then removes the originals — done as
   // one atomic batch so a failure partway never leaves duplicates or a gap.
+  // Left on invalidateQueries deliberately: this is a rare, manually
+  // triggered recovery action (not a hot path), it changes multiple
+  // documents in one batch, and the merged report's `date` isn't guaranteed
+  // to be the newest (it could combine reports from different days) — a
+  // precise cache patch could put it in the wrong sort position, so a plain
+  // refetch is the safest way to keep the sort order correct here.
   const mergeReports = useMutation({
     mutationFn: async ({ sourceIds, merged }: { sourceIds: string[]; merged: Omit<StocktakeReport, 'id'> }) => {
       const batch = writeBatch(db);
@@ -457,7 +512,12 @@ export const searchSupplierProducts = async (searchTerm: string, supplier: strin
   return filteredResults;
 };
 
-export const useSupplierProducts = () => {
+// `enabled` defaults to true so existing no-argument callers (e.g.
+// useCatalogCapture) are unaffected. Catalog.tsx passes it explicitly so
+// this full-collection download only happens for the one case that
+// genuinely needs it: searching across every supplier at once (see
+// useSupplierProductsBySupplier below for the supplier-scoped case).
+export const useSupplierProducts = (enabled: boolean = true) => {
   return useQuery<SupplierProduct[]>({
     queryKey: ['supplier_products_all'],
     queryFn: async () => {
@@ -470,6 +530,7 @@ export const useSupplierProducts = () => {
       });
       return items.sort((a, b) => a.name.localeCompare(b.name));
     },
+    enabled,
     staleTime: 5 * 60 * 1000
   });
 };
@@ -564,23 +625,24 @@ export const useSupplierMutations = () => {
       await setDoc(docRef, fullItem);
       return fullItem;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['suppliers'] })
+    onSuccess: (fullItem) => appendArrayItem<Supplier>(queryClient, ['suppliers'], fullItem)
   });
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<Supplier> }) => {
       const docRef = doc(db, 'suppliers', id);
-      const { id: _, createdAt: __, ...updatePayload } = data as any;
-      await updateDoc(docRef, withDeleteFieldForUndefined({ ...updatePayload, updatedAt: new Date().toISOString() }));
+      const patch = buildPatch<Supplier>(data);
+      await updateDoc(docRef, withDeleteFieldForUndefined(patch));
+      return patch;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['suppliers'] })
+    onSuccess: (patch, { id }) => patchArrayItem<Supplier>(queryClient, ['suppliers'], id, patch)
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       await deleteDoc(doc(db, 'suppliers', id));
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['suppliers'] })
+    onSuccess: (_data, id) => removeArrayItem<Supplier>(queryClient, ['suppliers'], id)
   });
 
   return { addSupplier: addMutation, updateSupplier: updateMutation, deleteSupplier: deleteMutation };
@@ -589,11 +651,29 @@ export const useSupplierMutations = () => {
 export const useSupplierProductMutations = () => {
   const queryClient = useQueryClient();
 
-  const invalidateCatalogQueries = () => {
+  // The canonical full list (['supplier_products_all']) is patched directly
+  // below in each mutation, since we always know exactly which document
+  // changed. The narrower derived views — search results, per-supplier
+  // browse, and Pantry's ingredient-prefix lookup — are still invalidated:
+  // whether a given product now belongs in one of THOSE filtered results
+  // can change (e.g. editing a product's name can move it in or out of a
+  // cached prefix match), and there's no reliable way to patch every
+  // possible cached variant of those without risking a stale/incorrect
+  // result, so correctness wins here per Task 5.
+  //
+  // Also fixes two pre-existing bugs found during this audit:
+  //  - 'all_supplier_products_summary' was invalidated here but no hook has
+  //    used that query key since useAllSupplierProducts was removed in the
+  //    Dashboard Phase 1 cleanup — a dead invalidation, removed.
+  //  - 'supplier_products_prefix' (Pantry's catalogue-match hook, added
+  //    alongside this same Phase 2 work) was never invalidated here at all,
+  //    so editing/adding/deleting a supplier product wouldn't refresh
+  //    Pantry's "suggested catalogue matches" panel until its 5-minute
+  //    staleTime lapsed — added.
+  const invalidateDerivedCatalogQueries = () => {
     queryClient.invalidateQueries({ queryKey: ['supplier_search'] });
-    queryClient.invalidateQueries({ queryKey: ['supplier_products_all'] });
-    queryClient.invalidateQueries({ queryKey: ['all_supplier_products_summary'] });
     queryClient.invalidateQueries({ queryKey: ['supplier_browse'] });
+    queryClient.invalidateQueries({ queryKey: ['supplier_products_prefix'] });
   };
 
   const addMutation = useMutation({
@@ -604,7 +684,10 @@ export const useSupplierProductMutations = () => {
       await setDoc(docRef, fullItem);
       return fullItem;
     },
-    onSuccess: invalidateCatalogQueries
+    onSuccess: (fullItem) => {
+      appendArrayItem<SupplierProduct>(queryClient, ['supplier_products_all'], fullItem);
+      invalidateDerivedCatalogQueries();
+    }
   });
 
   const updateMutation = useMutation({
@@ -612,15 +695,22 @@ export const useSupplierProductMutations = () => {
       const docRef = doc(db, 'supplierProducts', id);
       const { id: _, ...updatePayload } = data as any;
       await updateDoc(docRef, withDeleteFieldForUndefined(updatePayload));
+      return updatePayload as Partial<SupplierProduct>;
     },
-    onSuccess: invalidateCatalogQueries
+    onSuccess: (patch, { id }) => {
+      patchArrayItem<SupplierProduct>(queryClient, ['supplier_products_all'], id, patch);
+      invalidateDerivedCatalogQueries();
+    }
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       await deleteDoc(doc(db, 'supplierProducts', id));
     },
-    onSuccess: invalidateCatalogQueries
+    onSuccess: (_data, id) => {
+      removeArrayItem<SupplierProduct>(queryClient, ['supplier_products_all'], id);
+      invalidateDerivedCatalogQueries();
+    }
   });
 
   const bulkDeleteMutation = useMutation({
@@ -632,7 +722,13 @@ export const useSupplierProductMutations = () => {
         await batch.commit();
       }
     },
-    onSuccess: invalidateCatalogQueries
+    onSuccess: (_data, ids) => {
+      const idSet = new Set(ids);
+      queryClient.setQueryData<SupplierProduct[]>(['supplier_products_all'], (old) =>
+        old ? old.filter((item) => !idSet.has(item.id)) : old
+      );
+      invalidateDerivedCatalogQueries();
+    }
   });
 
   return {
@@ -703,8 +799,13 @@ export const useFoodTempCheckMutations = () => {
       return fullItem;
     },
     onSuccess: (fullItem) => {
-      queryClient.invalidateQueries({ queryKey: ['food_temp_checks', fullItem.checkDate] });
-      queryClient.invalidateQueries({ queryKey: ['food_temp_checks', 'history'] });
+      // useFoodTempChecksToday doesn't sort (Firestore's return order for a
+      // single-day filtered query), so appending at the end matches natural
+      // insertion order. useFoodTempChecksHistory sorts newest-checkedAt
+      // first, so the just-recorded check (checkedAt = now) is prepended to
+      // stay correctly ordered without a full re-sort.
+      appendArrayItem<FoodTempCheck>(queryClient, ['food_temp_checks', fullItem.checkDate], fullItem);
+      prependArrayItem<FoodTempCheck>(queryClient, ['food_temp_checks', 'history'], fullItem);
     }
   });
 
@@ -731,23 +832,24 @@ export const useEquipmentMutations = () => {
       await setDoc(docRef, fullItem);
       return fullItem;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['equipment'] })
+    onSuccess: (fullItem) => appendArrayItem<Equipment>(queryClient, ['equipment'], fullItem)
   });
 
   const updateEquipment = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<Equipment> }) => {
       const docRef = doc(db, 'equipment', id);
-      const { id: _, createdAt: __, ...updatePayload } = data as any;
-      await updateDoc(docRef, withDeleteFieldForUndefined({ ...updatePayload, updatedAt: new Date().toISOString() }));
+      const patch = buildPatch<Equipment>(data);
+      await updateDoc(docRef, withDeleteFieldForUndefined(patch));
+      return patch;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['equipment'] })
+    onSuccess: (patch, { id }) => patchArrayItem<Equipment>(queryClient, ['equipment'], id, patch)
   });
 
   const deleteEquipment = useMutation({
     mutationFn: async (id: string) => {
       await deleteDoc(doc(db, 'equipment', id));
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['equipment'] })
+    onSuccess: (_data, id) => removeArrayItem<Equipment>(queryClient, ['equipment'], id)
   });
 
   return { addEquipment, updateEquipment, deleteEquipment };
@@ -803,8 +905,8 @@ export const useEquipmentCheckMutations = () => {
       return fullItem;
     },
     onSuccess: (fullItem) => {
-      queryClient.invalidateQueries({ queryKey: ['equipment_temp_checks', fullItem.checkDate] });
-      queryClient.invalidateQueries({ queryKey: ['equipment_temp_checks', 'history'] });
+      appendArrayItem<EquipmentTempCheck>(queryClient, ['equipment_temp_checks', fullItem.checkDate], fullItem);
+      prependArrayItem<EquipmentTempCheck>(queryClient, ['equipment_temp_checks', 'history'], fullItem);
     }
   });
 

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { supplierBadgeClass } from '../utils/supplierColors';
-import { useSupplierProducts, useIngredients, useIngredientMutations, useSupplierProductMutations, useSuppliers } from '../hooks/useKitchenData';
+import { useSupplierProducts, useSupplierProductsBySupplier, useIngredients, useIngredientMutations, useSupplierProductMutations, useSuppliers } from '../hooks/useKitchenData';
 import { useStore } from '../store/useStore';
 import { useAuth } from '../hooks/useAuth';
 import { 
@@ -98,9 +98,28 @@ export const Catalog: React.FC = () => {
 
   React.useEffect(() => { setPage(0); }, [selectedSupplier, activeSearch, selectedCategory, selectedSubCategory]);
 
-  const { data: allProducts = [], isLoading: loadingCatalog } = useSupplierProducts();
+  // Data source depends on mode, and only one of these two queries is ever
+  // actually enabled at a time:
+  //  - a supplier selected -> useSupplierProductsBySupplier (that supplier's
+  //    products only, via a Firestore where() clause)
+  //  - no supplier, but 2+ chars typed -> useSupplierProducts (full
+  //    collection) — searching across every supplier's inconsistent product
+  //    names has no server-side equivalent, so this is the one case that
+  //    still needs everything (see Task 2 of the Phase 3 optimisation).
+  //  - neither -> nothing fetched, matches the existing empty-state message.
+  // `hasSearchTerm` intentionally uses the raw (undebounced) searchQuery,
+  // not the debounced `activeSearch` used for the placeholder text below —
+  // otherwise deep-links like Pantry's "cheaper option" nudge (which sets
+  // the search term programmatically via the store, not by typing) would
+  // sit on an empty product list for the length of the debounce before the
+  // fetch even started.
+  const hasSearchTerm = searchQuery.trim().length >= 2;
 
-  const catalogProducts = allProducts;
+  const { data: supplierScopedProducts = [], isLoading: loadingSupplierProducts } = useSupplierProductsBySupplier(selectedSupplier);
+  const { data: allProducts = [], isLoading: loadingAllProducts } = useSupplierProducts(!isBrowsingSupplier && hasSearchTerm);
+
+  const catalogProducts = isBrowsingSupplier ? supplierScopedProducts : (hasSearchTerm ? allProducts : []);
+  const loadingCatalog = isBrowsingSupplier ? loadingSupplierProducts : (hasSearchTerm ? loadingAllProducts : false);
 
   const { data: ingredients = [], isLoading: loadingIngredients } = useIngredients();
   const { updateIngredient, addIngredient } = useIngredientMutations();
