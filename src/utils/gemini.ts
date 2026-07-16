@@ -2,11 +2,14 @@
 // — one place for the model name, retry behaviour, and image prep so a fix to one
 // (e.g. the gemini-1.5-flash -> gemini-3.5-flash retirement) doesn't need repeating.
 
-// Tried in order — gemini-3.5-flash is the primary model, but its image-processing
-// path in particular has been seen returning a genuine Google-side 503 ("high demand")
-// for extended stretches, not just a one-off blip. Falls back to gemini-2.5-flash
-// (an older, likely less demand-contended model) rather than failing the scan outright.
-const GEMINI_MODELS = ['gemini-3.5-flash', 'gemini-2.5-flash'];
+// Tried in order. Deliberately does NOT lead with gemini-3.5-flash — as the newest
+// model it has a very tight (near-zero, observed) free-tier rate limit and its
+// image-processing path has also been seen returning a genuine Google-side 503
+// ("high demand"). gemini-2.5-flash-lite gets a much more generous free allowance
+// (15 req/min, 1,000/day as of 2026-07 — comfortably above this app's real usage of
+// a few scans a day) and is plenty capable for straightforward invoice/recipe text
+// extraction, so it leads; gemini-2.5-flash is the fallback if that's ever busy too.
+const GEMINI_MODELS = ['gemini-2.5-flash-lite', 'gemini-2.5-flash'];
 const MAX_IMAGE_DIMENSION = 1600; // px — plenty for OCR-quality text extraction
 const JPEG_QUALITY = 0.85;
 const RETRYABLE_STATUSES = new Set([503, 429]);
