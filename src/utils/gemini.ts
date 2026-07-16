@@ -77,7 +77,10 @@ export async function callGeminiVision(prompt: string, base64Image: string, mime
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64Image } }] }],
-            generationConfig: { temperature: 0.1, maxOutputTokens: 4096 }
+            // 'low' thinking is plenty for straightforward extraction tasks like this —
+            // the model can't fully disable its hidden reasoning step, but this avoids
+            // paying for deep multi-step reasoning it doesn't need here.
+            generationConfig: { temperature: 0.1, maxOutputTokens: 4096, thinkingConfig: { thinkingLevel: 'low' } }
           })
         }
       );
