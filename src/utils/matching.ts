@@ -70,7 +70,9 @@ const isTransposition = (w1: string, w2: string): boolean => {
 
 // w1 is always a word from the catalog/product name being matched; w2 is always a word
 // from the master pantry ingredient name (see getDistinctWords call order below).
-const areWordsFuzzyEqual = (w1: string, w2: string): boolean => {
+// Exported for reuse by tools/catalogue-matcher's own, more lenient matcher —
+// see that file for why findBestIngredientMatch's stricter rules don't suit it.
+export const areWordsFuzzyEqual = (w1: string, w2: string): boolean => {
   if (w1 === w2) return true;
 
   // Transposition check (e.g., "fluor" vs "flour")

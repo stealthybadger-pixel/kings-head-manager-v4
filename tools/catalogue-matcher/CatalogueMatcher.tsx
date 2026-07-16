@@ -6,12 +6,13 @@ import {
   useIngredientMutations,
   useSupplierProductMutations
 } from '../../src/hooks/useKitchenData';
-import { findBestIngredientMatch, cleanProductName } from '../../src/utils/matching';
+import { cleanProductName } from '../../src/utils/matching';
 import { inferIngredientDefaults } from '../../src/utils/ingredientAutofill';
 import { useStore } from '../../src/store/useStore';
 import ItemPicker from '../../src/components/ItemPicker';
 import { SupplierProduct } from '../../src/types';
 import { AUTO_REJECT_RULES } from './rules';
+import { suggestIngredientMatches } from './suggest';
 
 // Standalone tool — deliberately NOT part of the main app (no route, no nav
 // entry, own Vite HTML entry point at tools/catalogue-matcher/index.html).
@@ -31,8 +32,9 @@ import { AUTO_REJECT_RULES } from './rules';
 
 function scoreToConfidence(score: number): { pct: number; label: string } {
   if (score === 0) return { pct: 99, label: 'Exact match' };
-  if (score === 1) return { pct: 82, label: '1 extra word' };
-  return { pct: 65, label: `${score} extra words` };
+  if (score === 1) return { pct: 85, label: '1 extra word' };
+  if (score === 2) return { pct: 70, label: '2 extra words' };
+  return { pct: 55, label: `${score} extra words` };
 }
 
 export const CatalogueMatcher: React.FC = () => {
@@ -81,7 +83,9 @@ export const CatalogueMatcher: React.FC = () => {
 
   const suggestion = useMemo(() => {
     if (!current) return null;
-    return findBestIngredientMatch(current.name, ingredients);
+    const [best] = suggestIngredientMatches(current.name, ingredients, 1);
+    if (!best) return null;
+    return { ingredient: best.ingredient, score: best.unmatchedProductWords + best.unmatchedIngredientWords };
   }, [current, ingredients]);
 
   const advance = () => setPickingDifferent(false);
