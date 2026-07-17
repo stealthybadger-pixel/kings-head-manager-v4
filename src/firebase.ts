@@ -18,9 +18,15 @@ export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true
 });
 
-if (import.meta.env.DEV) {
+// VITE_USE_PROD_FIRESTORE is a one-off opt-out for a dev server that needs to hit live
+// production data (e.g. verifying a change against real Firestore before merging) instead of
+// the usual local emulator. Unset by default — dev always talks to the emulator unless someone
+// deliberately sets this in their shell/.env for that one run.
+if (import.meta.env.DEV && !import.meta.env.VITE_USE_PROD_FIRESTORE) {
   connectFirestoreEmulator(db, '127.0.0.1', 8080);
   console.log("Connected to local Firestore emulator");
+} else if (import.meta.env.DEV) {
+  console.log("VITE_USE_PROD_FIRESTORE set — dev server is using LIVE production Firestore");
 }
 
 export const auth = getAuth(app);

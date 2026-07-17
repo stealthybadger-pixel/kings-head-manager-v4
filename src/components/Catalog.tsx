@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { supplierBadgeClass } from '../utils/supplierColors';
-import { useSupplierProducts, useSupplierProductsBySupplier, useIngredients, useIngredientMutations, useSupplierProductMutations, useSuppliers } from '../hooks/useKitchenData';
+import { useSupplierProducts, useSupplierProductsBySupplier, useIngredients, useIngredientMutations, useSupplierProductMutations, useSuppliers, resyncIngredientSuppliersFromProducts, fetchLinkedSupplierProducts } from '../hooks/useKitchenData';
+import { useQueryClient } from '@tanstack/react-query';
 import { useStore } from '../store/useStore';
 import { useAuth } from '../hooks/useAuth';
 import { 
@@ -16,7 +17,7 @@ import {
   Trash2,
   RefreshCw
 } from 'lucide-react';
-import { SupplierProduct, Ingredient, IngredientSupplier } from '../types';
+import { SupplierProduct, Ingredient } from '../types';
 import { findBestIngredientMatch, cleanProductName } from '../utils/matching';
 import { tokenizeSearchQuery, matchesSearchTokens } from '../utils/search';
 import { inferCategory, CATEGORY_KEYWORDS, inferIngredientDefaults, DRY_STORE_SUBCATEGORIES, inferDryStoreSubCategory } from '../utils/ingredientAutofill';
@@ -122,7 +123,7 @@ export const Catalog: React.FC = () => {
   const loadingCatalog = isBrowsingSupplier ? loadingSupplierProducts : (hasSearchTerm ? loadingAllProducts : false);
 
   const { data: ingredients = [], isLoading: loadingIngredients } = useIngredients();
-  const { updateIngredient, addIngredient } = useIngredientMutations();
+  const { addIngredient } = useIngredientMutations();
   const showToast = useStore((state) => state.showToast);
 
   // Set when Catalog was opened from Pantry's "Find on Supplier Catalogue" flow — identifies
@@ -267,49 +268,30 @@ export const Catalog: React.FC = () => {
     }
   }, [selectedProductId, selectedProduct]);
 
-  // Action: Apply the catalog product as the preferred supplier for the ingredient
+  // Action: link this catalog product to the ingredient (supplierProducts.ingredientId is the
+  // single source of truth — see Pantry.tsx's "Supplier Products" section). ingredient.suppliers[]
+  // is then regenerated from the full linked set, not written to directly, so this flow can't
+  // diverge from what Pantry shows.
+  const queryClientForLink = useQueryClient();
   const handleApplyCheaperOption = async (prod: typeof processedProducts[0], ing: Ingredient, makePreferred = true) => {
     if (!isManager || !ing) return;
-    
-    // Build the new supplier record. sourceUrl captures a deep link back to this product on
-    // the wholesaler's site (exact product page where a code exists, else a supplier search).
-    const newSupplierRecord: IngredientSupplier = {
-      name: prod.supplier,
-      packCost: prod.packCost,
-      packSize: prod.packSize,
-      packUnit: prod.packUnit,
-      isPreferred: makePreferred,
-      sourceUrl: getSupplierUrl(prod),
-      productName: prod.name,
-      priceUpdatedAt: new Date().toISOString()
-    };
-
-    // Merge into the ingredient's supplier array
-    let updatedSuppliers = [...(ing.suppliers || [])];
-    const existingIndex = updatedSuppliers.findIndex(s => s.name === prod.supplier);
-
-    if (makePreferred) {
-      // Unmark preferred on all existing suppliers
-      updatedSuppliers = updatedSuppliers.map(s => ({ ...s, isPreferred: false }));
-    }
-
-    if (existingIndex >= 0) {
-      // Update existing supplier record
-      const wasPreferred = updatedSuppliers[existingIndex].isPreferred;
-      updatedSuppliers[existingIndex] = {
-        ...newSupplierRecord,
-        isPreferred: makePreferred ? true : wasPreferred
-      };
-    } else {
-      // Add new supplier record
-      updatedSuppliers.push(newSupplierRecord);
-    }
 
     try {
-      await updateIngredient.mutateAsync({
-        id: ing.id,
-        data: { suppliers: updatedSuppliers }
+      if (makePreferred) {
+        // Clear preferred on every other product already linked to this ingredient, same as
+        // Pantry's setPreferred — at most one preferred product per ingredient.
+        const linked = await fetchLinkedSupplierProducts(ing.id);
+        await Promise.all(
+          linked
+            .filter(p => p.id !== prod.id && p.isPreferred)
+            .map(p => updateSupplierProduct.mutateAsync({ id: p.id, data: { isPreferred: false } }))
+        );
+      }
+      await updateSupplierProduct.mutateAsync({
+        id: prod.id,
+        data: { ingredientId: ing.id, isPreferred: makePreferred }
       });
+      await resyncIngredientSuppliersFromProducts(queryClientForLink, ing.id);
       const msg = makePreferred
         ? `Successfully set ${prod.supplier}'s "${prod.name}" as preferred supplier for ${ing.name}!`
         : `Successfully added ${prod.supplier}'s "${prod.name}" as a supplier option for ${ing.name}!`;
@@ -345,22 +327,15 @@ export const Catalog: React.FC = () => {
       kcalPer100: guess.kcalPer100 ?? 0,
       stockLevel: 0,
       allergens: guess.allergens,
-      suppliers: [{
-        name: prod.supplier,
-        packCost: prod.packCost,
-        packSize: prod.packSize,
-        packUnit: prod.packUnit,
-        isPreferred: true,
-        sourceUrl: getSupplierUrl(prod),
-        productName: prod.name,
-        priceUpdatedAt: new Date().toISOString()
-      }],
+      suppliers: [], // populated by resyncIngredientSuppliersFromProducts below, from the linked product
       audited: false,
       incomplete: true // Marked as incomplete stub requiring review
     };
 
     try {
       const created = await addIngredient.mutateAsync(newIngredient);
+      await updateSupplierProduct.mutateAsync({ id: prod.id, data: { ingredientId: created.id, isPreferred: true } });
+      await resyncIngredientSuppliersFromProducts(queryClientForLink, created.id);
       showToast(`Created master pantry item: "${created.name}"`, "success");
     } catch (e: any) {
       console.error(e);

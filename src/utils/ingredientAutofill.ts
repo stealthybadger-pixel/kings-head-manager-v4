@@ -34,6 +34,10 @@ export function inferCategory(name: string): string | null {
 // Dry Store sub-categories — purely a client-side filtering/organisation aid.
 export const DRY_STORE_SUBCATEGORIES = ['Spices', 'Whole Spices', 'Dried Herbs', 'Baking', 'Pasta & Rice', 'Tins & Jars', 'Oils & Vinegars', 'Sauces & Condiments', 'Nuts & Seeds', 'Bread & Bakery', 'Other'] as const;
 
+// Vegetable sub-categories — same purpose, starts with just Herbs (fresh herbs like Basil,
+// Thyme, Parsley — as opposed to Dry Store's "Dried Herbs").
+export const VEGETABLE_SUBCATEGORIES = ['Herbs'] as const;
+
 const DRY_STORE_SUBCATEGORY_KEYWORDS: Record<string, string[]> = {
   'Spices': ['paprika', 'cumin', 'turmeric', 'cinnamon', 'cayenne', 'nutmeg', 'cardamom', 'clove', 'star anise', 'curry', 'chilli powder', 'chili powder', 'spice', 'garam masala', 'five spice'],
   'Dried Herbs': ['oregano', 'thyme', 'basil', 'rosemary', 'coriander', 'bay leaf', 'dried herb', 'mixed herb', 'tarragon', 'sage', 'dill'],

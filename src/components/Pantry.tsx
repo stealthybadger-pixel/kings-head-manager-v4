@@ -1,16 +1,16 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { supplierBadgeClass } from '../utils/supplierColors';
-import { useIngredients, useIngredientMutations, useSupplierProductsForIngredient, useDishes, useSuppliers } from '../hooks/useKitchenData';
+import { useIngredients, useIngredientMutations, useSupplierProductsForIngredient, useLinkedSupplierProductMutations, useDishes, useSuppliers } from '../hooks/useKitchenData';
 import { useStore } from '../store/useStore';
 import { Search, Plus, Trash2, AlertCircle, FileText, CheckCircle2, ListTodo, Check, ArrowRight, ArrowLeft, ExternalLink } from 'lucide-react';
 import { getSupplierUrl, getSupplierSearchLinks } from '../utils/supplierUrls';
-import { Ingredient, IngredientCategory, SupplierName, Unit, Allergen, IngredientSupplier } from '../types';
+import { Ingredient, IngredientCategory, SupplierName, Unit, Allergen, SupplierProduct } from '../types';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { useAuth } from '../hooks/useAuth';
-import { inferIngredientDefaults, DRY_STORE_SUBCATEGORIES } from '../utils/ingredientAutofill';
+import { inferIngredientDefaults, DRY_STORE_SUBCATEGORIES, VEGETABLE_SUBCATEGORIES } from '../utils/ingredientAutofill';
 import { getBaseRate, getBaseUnit } from '../utils/costing';
 
-import { cleanProductName, findBestIngredientMatch } from '../utils/matching';
+import { cleanProductName } from '../utils/matching';
 import { tokenizeSearchQuery, matchesSearchTokens } from '../utils/search';
 import * as pdfjsLib from 'pdfjs-dist';
 
@@ -142,7 +142,7 @@ export const Pantry: React.FC = () => {
     const filtered = ingredients.filter(ing => {
       const matchSearch = matchesSearchTokens(ing.name, queryTokens);
       const matchCat = selectedCategory === 'All' || ing.category === selectedCategory;
-      const matchSubCat = selectedCategory !== 'Dry Store' || selectedSubCategory === 'All' || ing.subCategory === selectedSubCategory;
+      const matchSubCat = (selectedCategory !== 'Dry Store' && selectedCategory !== 'Vegetable') || selectedSubCategory === 'All' || ing.subCategory === selectedSubCategory;
       return matchSearch && matchCat && matchSubCat;
     });
     if (pantrySort === 'date') {
@@ -171,81 +171,44 @@ export const Pantry: React.FC = () => {
     }
   }, [activeIngredient]);
 
-  const { data: catalogProducts = [] } = useSupplierProductsForIngredient(activeIngredient?.name ?? '');
+  // Supplier Products — the single source of truth for this ingredient's supplier options
+  // (supplierProducts docs where ingredientId === this ingredient's id). Replaces the old
+  // name-prefix catalogue lookup and the manually-maintained ingredient.suppliers[] editor;
+  // suppliers[] is still written, but only as an auto-synced cache (see useKitchenData.ts's
+  // useLinkedSupplierProductMutations) for costing.ts to keep reading synchronously.
+  const { data: linkedProducts = [], isLoading: loadingLinkedProducts } = useSupplierProductsForIngredient(formState.id);
+  const { addLinked, updateLinked, deleteLinked, setPreferred } = useLinkedSupplierProductMutations(formState.id || '');
 
-  const cheaperCatalogOption = useMemo(() => {
-    if (!activeIngredient) return null;
-    
-    // Find preferred supplier unit rate
-    const prefSup = activeIngredient.suppliers?.find(s => s.isPreferred) || activeIngredient.suppliers?.[0];
-    if (!prefSup) return null;
+  const preferredLinkedProduct = useMemo(
+    () => linkedProducts.find(p => p.isPreferred) || linkedProducts[0] || null,
+    [linkedProducts]
+  );
 
-    const currentRate = getBaseRate(prefSup.packCost, prefSup.packSize, prefSup.packUnit);
-    const currentBaseUnit = getBaseUnit(prefSup.packUnit);
+  // Flags a cheaper linked alternative to the current preferred product. Replaces the old
+  // two separate checks (catalogue-vs-preferred, and listed-supplier-vs-preferred) — both
+  // collapse into one now that "the catalogue" and "the ingredient's supplier list" are the
+  // same set of linked supplierProducts.
+  const cheaperLinkedOption = useMemo(() => {
+    if (!preferredLinkedProduct || !preferredLinkedProduct.packCost || linkedProducts.length < 2) return null;
+    const prefRate = getBaseRate(preferredLinkedProduct.packCost, preferredLinkedProduct.packSize, preferredLinkedProduct.packUnit);
+    const prefBase = getBaseUnit(preferredLinkedProduct.packUnit);
 
-    // Look for matching product in catalog
-    let bestCheaperProd: any = null;
-    let maxSavingPercent = 0;
-
-    catalogProducts.forEach(prod => {
-      const prodBaseUnit = getBaseUnit(prod.packUnit);
-      if (prodBaseUnit !== currentBaseUnit) return;
-
-      const matched = findBestIngredientMatch(prod.name, [activeIngredient]);
-      if (matched) {
-        const prodRate = getBaseRate(prod.packCost, prod.packSize, prod.packUnit);
-        if (prodRate < currentRate - 0.00001) {
-          const saving = ((currentRate - prodRate) / currentRate) * 100;
-          if (saving > maxSavingPercent) {
-            maxSavingPercent = saving;
-            bestCheaperProd = prod;
-          }
-        }
-      }
-    });
-
-    if (bestCheaperProd) {
-      return {
-        product: bestCheaperProd,
-        savingPercent: maxSavingPercent
-      };
-    }
-
-    return null;
-  }, [activeIngredient, catalogProducts]);
-
-  // Separate from the catalogue check above: is one of the ingredient's OWN listed suppliers
-  // cheaper (per base unit) than the one currently marked preferred? The catalogue detector
-  // only sees scraped supplierProducts, so a manually-added supplier row that undercuts the
-  // preferred one would otherwise go unnoticed.
-  const cheaperListedSupplier = useMemo(() => {
-    const suppliers = activeIngredient?.suppliers ?? [];
-    if (suppliers.length < 2) return null;
-    let prefIdx = suppliers.findIndex(s => s.isPreferred);
-    if (prefIdx < 0) prefIdx = 0;
-    const pref = suppliers[prefIdx];
-    if (!pref || !pref.packCost) return null;
-    const prefRate = getBaseRate(pref.packCost, pref.packSize, pref.packUnit);
-    const prefBase = getBaseUnit(pref.packUnit);
-
-    let best: IngredientSupplier | null = null;
-    let bestIndex = -1;
+    let best: SupplierProduct | null = null;
     let bestSaving = 0;
-    for (let i = 0; i < suppliers.length; i++) {
-      if (i === prefIdx) continue;
-      const s = suppliers[i];
-      if (!s.packCost || s.packCost <= 0) continue;            // skip Internal / no-cost rows
-      if (getBaseUnit(s.packUnit) !== prefBase) continue;      // only compare like-for-like units
-      const rate = getBaseRate(s.packCost, s.packSize, s.packUnit);
+    for (const p of linkedProducts) {
+      if (p.id === preferredLinkedProduct.id) continue;
+      if (!p.packCost || p.packCost <= 0) continue;           // skip Internal / no-cost rows
+      if (getBaseUnit(p.packUnit) !== prefBase) continue;      // only compare like-for-like units
+      const rate = getBaseRate(p.packCost, p.packSize, p.packUnit);
       if (rate < prefRate - 0.00001) {
         const saving = ((prefRate - rate) / prefRate) * 100;
-        if (saving > bestSaving) { bestSaving = saving; best = s; bestIndex = i; }
+        if (saving > bestSaving) { bestSaving = saving; best = p; }
       }
     }
 
     if (!best) return null;
-    return { supplier: best, index: bestIndex, savingPercent: bestSaving, preferredName: pref.name };
-  }, [activeIngredient]);
+    return { product: best, savingPercent: bestSaving, preferredName: preferredLinkedProduct.supplier };
+  }, [preferredLinkedProduct, linkedProducts]);
 
   // Tracks which auto-fillable fields the user has manually overridden for the
   // ingredient currently being created, so typing more of the name doesn't clobber them.
@@ -302,7 +265,12 @@ export const Pantry: React.FC = () => {
         await addIngredient.mutateAsync(formState);
         showToast(`Ingredient "${formState.name}" created successfully!`, "success");
       } else if (formState.id) {
-        await updateIngredient.mutateAsync({ id: formState.id, data: formState });
+        // suppliers[] is excluded here — it's a derived cache regenerated from linked
+        // supplierProducts (see useLinkedSupplierProductMutations), not something this form
+        // edits directly. Saving the stale in-memory copy here would clobber a sync that
+        // happened while this form was open.
+        const { suppliers: _suppliers, ...dataWithoutSuppliers } = formState;
+        await updateIngredient.mutateAsync({ id: formState.id, data: dataWithoutSuppliers });
         showToast(`Ingredient "${formState.name}" updated successfully!`, "success");
       }
       setIsEditing(false);
@@ -374,43 +342,56 @@ export const Pantry: React.FC = () => {
     }
   };
 
-  // Supplier packaging management
+  // Supplier Products management — every action here writes straight to the linked
+  // supplierProducts docs; ingredient.suppliers[] is regenerated automatically afterwards
+  // (see useLinkedSupplierProductMutations), so this is the one place a user manages
+  // supplier data for an ingredient.
   const suppliersListRef = useRef<HTMLDivElement>(null);
+  const [newProductForm, setNewProductForm] = useState({ supplier: 'Internal', name: '', packCost: 0, packSize: 1, packUnit: 'kg' as SupplierProduct['packUnit'] });
 
-  const handleUpdateSupplier = (index: number, field: string, value: any) => {
-    setFormState(prev => {
-      const updated = [...prev.suppliers];
-      updated[index] = { ...updated[index], [field]: value };
-      // Price fields changing is what "how old is this price" should track — renaming the
-      // supplier or flipping preferred shouldn't reset the age.
-      if (field === 'packCost' || field === 'packSize' || field === 'packUnit') {
-        updated[index].priceUpdatedAt = new Date().toISOString();
-      }
-
-      // If setting preferred, unset preferred on all others
-      if (field === 'isPreferred' && value === true) {
-        updated.forEach((sup, i) => {
-          if (i !== index) sup.isPreferred = false;
-        });
-      }
-      
-      return { ...prev, suppliers: updated };
-    });
+  const handleAddSupplierProduct = async () => {
+    if (!formState.id) {
+      showToast("Save this ingredient first, then add supplier products", "error");
+      return;
+    }
+    if (!newProductForm.name.trim()) {
+      showToast("Enter a product name", "error");
+      return;
+    }
+    try {
+      await addLinked.mutateAsync({
+        name: newProductForm.name.trim(),
+        supplier: newProductForm.supplier,
+        packCost: newProductForm.packCost,
+        packSize: newProductForm.packSize,
+        packUnit: newProductForm.packUnit,
+        unitPrice: newProductForm.packSize > 0 ? newProductForm.packCost / newProductForm.packSize : 0,
+        isPreferred: linkedProducts.length === 0
+      });
+      setNewProductForm(prev => ({ ...prev, name: '', packCost: 0, packSize: 1 }));
+      showToast("Supplier product added", "success");
+      setTimeout(() => {
+        suppliersListRef.current?.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 50);
+    } catch (err: any) {
+      showToast(err.message || "Failed to add supplier product", "error");
+    }
   };
 
-  // For items with no external wholesale product (e.g. an in-house/no-cost "Internal" entry) —
-  // the catalogue search flow only helps when a real supplier product exists to link.
-  const handleAddManualSupplier = () => {
-    setFormState(prev => ({
-      ...prev,
-      suppliers: [
-        ...prev.suppliers,
-        { name: 'Internal', packCost: 0, packSize: 1, packUnit: 'kg', isPreferred: prev.suppliers.length === 0 }
-      ]
-    }));
-    setTimeout(() => {
-      suppliersListRef.current?.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }, 50);
+  const handleUpdateLinkedProduct = (id: string, field: 'supplier' | 'name' | 'packCost' | 'packSize' | 'packUnit', value: any) => {
+    const data: Partial<SupplierProduct> = { [field]: value };
+    if (field === 'packCost' || field === 'packSize') {
+      const product = linkedProducts.find(p => p.id === id);
+      const packCost = field === 'packCost' ? value : (product?.packCost ?? 0);
+      const packSize = field === 'packSize' ? value : (product?.packSize ?? 1);
+      data.unitPrice = packSize > 0 ? packCost / packSize : 0;
+    }
+    updateLinked.mutate({ id, data });
+  };
+
+  const handleDeleteLinkedProduct = (product: SupplierProduct) => {
+    if (!confirm(`Remove "${product.name}" (${product.supplier}) as a supplier option for this ingredient?`)) return;
+    deleteLinked.mutate(product.id);
   };
 
   // "Find on Supplier Catalogue" needs a real ingredient id to link back to. For a brand-new,
@@ -437,13 +418,6 @@ export const Pantry: React.FC = () => {
     } finally {
       setIsLinkingNewIngredient(false);
     }
-  };
-
-  const handleRemoveSupplier = (index: number) => {
-    setFormState(prev => ({
-      ...prev,
-      suppliers: prev.suppliers.filter((_, i) => i !== index)
-    }));
   };
 
   // Menu Auditor PDF Scanner Action
@@ -741,14 +715,14 @@ export const Pantry: React.FC = () => {
               {categories.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
 
-            {selectedCategory === 'Dry Store' && (
+            {(selectedCategory === 'Dry Store' || selectedCategory === 'Vegetable') && (
               <select
                 value={selectedSubCategory}
                 onChange={(e) => setSelectedSubCategory(e.target.value)}
                 className="w-full text-xs font-semibold px-2 py-1.5 border border-outline-variant bg-surface-container-lowest"
               >
                 <option value="All">All Sub-Categories</option>
-                {DRY_STORE_SUBCATEGORIES.map(sub => <option key={sub} value={sub}>{sub}</option>)}
+                {(selectedCategory === 'Dry Store' ? DRY_STORE_SUBCATEGORIES : VEGETABLE_SUBCATEGORIES).map(sub => <option key={sub} value={sub}>{sub}</option>)}
               </select>
             )}
           </div>
@@ -960,16 +934,18 @@ export const Pantry: React.FC = () => {
                 </select>
               </div>
 
-              {formState.category === 'Dry Store' && (
+              {(formState.category === 'Dry Store' || formState.category === 'Vegetable') && (
                 <div>
-                  <label className="label-caps text-outline block mb-2">Dry Store Sub-Category</label>
+                  <label className="label-caps text-outline block mb-2">
+                    {formState.category === 'Dry Store' ? 'Dry Store Sub-Category' : 'Vegetable Sub-Category'}
+                  </label>
                   <select
                     value={formState.subCategory || ''}
                     onChange={(e) => { autofillTouched.current.subCategory = true; setFormState(prev => ({ ...prev, subCategory: e.target.value || undefined })); }}
                     className="w-full px-3 py-2 border border-outline-variant rounded-sm text-sm"
                   >
                     <option value="">— None —</option>
-                    {DRY_STORE_SUBCATEGORIES.map(sub => <option key={sub} value={sub}>{sub}</option>)}
+                    {(formState.category === 'Dry Store' ? DRY_STORE_SUBCATEGORIES : VEGETABLE_SUBCATEGORIES).map(sub => <option key={sub} value={sub}>{sub}</option>)}
                   </select>
                 </div>
               )}
@@ -1148,224 +1124,226 @@ export const Pantry: React.FC = () => {
             {/* Child cuts derive their cost from the parent — no supplier
                 pricing section or catalog-price-comparison for them. */}
             {!formState.parentIngredientId && <>
-            {cheaperCatalogOption && (
+            {cheaperLinkedOption && (
               <div className="bg-success-container border border-success p-4 rounded-sm text-on-success-container flex items-center justify-between text-xs mt-4">
                 <div className="flex items-center gap-2">
                   <span className="text-lg">💡</span>
                   <div>
-                    <span className="font-bold">Cheaper Catalog Option Available!</span>
+                    <span className="font-bold">Cheaper Supplier Option Available!</span>
                     <p className="mt-0.5 text-on-success-variant flex items-center flex-wrap gap-1">
-                      {cheaperCatalogOption.product.supplier} offers
-                      <button
-                        onClick={() => navigateToCatalogAndHighlightProduct(cheaperCatalogOption.product.id, cheaperCatalogOption.product.name)}
-                        className="font-bold text-primary hover:underline bg-transparent border-none p-0 cursor-pointer inline-flex items-center gap-0.5 align-baseline"
-                        title="View option in supplier catalogue"
-                      >
-                        "{cheaperCatalogOption.product.name}"
-                        <ArrowRight className="h-3 w-3" />
-                      </button>
-                      at £{cheaperCatalogOption.product.packCost.toFixed(2)} for {cheaperCatalogOption.product.packSize} {cheaperCatalogOption.product.packUnit} (Saves {Math.round(cheaperCatalogOption.savingPercent)}%).
+                      <b>{cheaperLinkedOption.product.supplier}</b>'s "{cheaperLinkedOption.product.name}"
+                      undercuts your preferred <b>{cheaperLinkedOption.preferredName}</b> by {Math.round(cheaperLinkedOption.savingPercent)}%
+                      {' '}({formatSupplierUnitPrice(cheaperLinkedOption.product.packCost, cheaperLinkedOption.product.packSize, cheaperLinkedOption.product.packUnit)}).
                     </p>
                   </div>
                 </div>
                 <button
-                  onClick={() => {
-                    const prod = cheaperCatalogOption.product;
-                    const newSupplier: IngredientSupplier = {
-                      name: prod.supplier,
-                      packCost: prod.packCost,
-                      packSize: prod.packSize,
-                      packUnit: prod.packUnit,
-                      isPreferred: true
-                    };
-                    
-                    setFormState(prev => {
-                      let updated = [...(prev.suppliers || [])];
-                      updated = updated.map(s => ({ ...s, isPreferred: false }));
-                      const existingIndex = updated.findIndex(s => s.name === prod.supplier);
-                      if (existingIndex >= 0) {
-                        updated[existingIndex] = newSupplier;
-                      } else {
-                        updated.push(newSupplier);
-                      }
-                      return { ...prev, suppliers: updated };
-                    });
-                  }}
+                  onClick={() => setPreferred.mutate(cheaperLinkedOption.product.id)}
                   className="h-8 px-3 bg-success text-white font-bold label-caps rounded-sm hover:opacity-90 flex-shrink-0"
-                >
-                  Apply Catalog Price
-                </button>
-              </div>
-            )}
-
-            {cheaperListedSupplier && (
-              <div className="bg-primary/5 border border-primary/30 p-4 rounded-sm flex items-center justify-between text-xs mt-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">🔀</span>
-                  <div>
-                    <span className="font-bold text-on-surface">A listed supplier is cheaper</span>
-                    <p className="mt-0.5 text-on-surface-variant">
-                      <b>{cheaperListedSupplier.supplier.name}</b> undercuts your preferred{' '}
-                      <b>{cheaperListedSupplier.preferredName}</b> by {Math.round(cheaperListedSupplier.savingPercent)}%
-                      {' '}({formatSupplierUnitPrice(cheaperListedSupplier.supplier.packCost, cheaperListedSupplier.supplier.packSize, cheaperListedSupplier.supplier.packUnit)}).
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    const t = cheaperListedSupplier.supplier;
-                    // Match by identity rather than index, in case formState's supplier order
-                    // has diverged from the saved ingredient the nudge was computed from.
-                    setFormState(prev => ({
-                      ...prev,
-                      suppliers: (prev.suppliers || []).map(s => ({
-                        ...s,
-                        isPreferred: s.name === t.name && s.packCost === t.packCost && s.packSize === t.packSize && s.packUnit === t.packUnit
-                      }))
-                    }));
-                  }}
-                  className="h-8 px-3 bg-primary text-white font-bold label-caps rounded-sm hover:opacity-90 flex-shrink-0"
                 >
                   Make Preferred
                 </button>
               </div>
             )}
 
-            {/* Supplier Catalog Sub-Section */}
+            {/* Supplier Products Sub-Section — sourced live from supplierProducts docs whose
+                ingredientId matches this ingredient; see useSupplierProductsForIngredient. */}
             <div className="mt-4 border-t border-outline-variant pt-6">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="label-caps text-on-surface font-bold">Supplier Options & Pricing</h3>
-                <div className="flex items-center gap-2">
+                <h3 className="label-caps text-on-surface font-bold">Supplier Products</h3>
+                {formState.id ? (
                   <button
-                    onClick={handleAddManualSupplier}
-                    title="Add a manual entry (e.g. an in-house 'Internal' item with no external supplier cost)"
-                    className="h-8 px-3 border border-outline text-[10px] label-caps font-bold rounded-sm bg-surface hover:bg-surface-container"
+                    onClick={handleFindOnCatalogue}
+                    title="Search the full supplier catalogue and link a matching product to this ingredient"
+                    className="h-8 px-3 border border-primary text-primary text-[10px] label-caps font-bold rounded-sm bg-surface hover:bg-primary/5"
                   >
-                    + Manual Entry
+                    Find on Supplier Catalogue
                   </button>
-                  {formState.name ? (
-                    <button
-                      onClick={handleFindOnCatalogue}
-                      disabled={isLinkingNewIngredient}
-                      title={formState.id
-                        ? "Search the full supplier catalogue and add a matching product as a supplier option for this ingredient"
-                        : "Saves this ingredient, then searches the supplier catalogue"}
-                      className="h-8 px-3 border border-primary text-primary text-[10px] label-caps font-bold rounded-sm bg-surface hover:bg-primary/5 disabled:opacity-50"
-                    >
-                      {isLinkingNewIngredient ? 'Saving...' : 'Find on Supplier Catalogue'}
-                    </button>
-                  ) : (
-                    <span title="Type an ingredient name first, then you can search the catalogue to add a supplier option"
-                      className="h-8 px-3 border border-outline-variant text-outline/50 text-[10px] label-caps font-bold rounded-sm flex items-center cursor-not-allowed">
-                      Find on Supplier Catalogue
-                    </span>
-                  )}
-                </div>
+                ) : (
+                  <span title="Type an ingredient name first, then save it to add supplier products"
+                    className="h-8 px-3 border border-outline-variant text-outline/50 text-[10px] label-caps font-bold rounded-sm flex items-center cursor-not-allowed">
+                    Find on Supplier Catalogue
+                  </span>
+                )}
               </div>
 
-              {formState.suppliers.length === 0 ? (
+              {!formState.id ? (
                 <div className="p-8 text-center bg-surface border border-outline-variant rounded-sm text-sm text-outline">
-                  No suppliers defined. Add a supplier option to compute recipe costs.
+                  Save this ingredient first, then add supplier products.
+                </div>
+              ) : loadingLinkedProducts ? (
+                <div className="p-8 text-center bg-surface border border-outline-variant rounded-sm text-sm text-outline">
+                  Loading supplier products…
                 </div>
               ) : (
-                <div className="flex flex-col gap-3" ref={suppliersListRef}>
-                  {formState.suppliers.map((sup, idx) => (
-                    <div key={idx} className="flex flex-col gap-3 bg-surface p-4 border border-outline-variant rounded-sm">
-                      <div className="flex flex-wrap md:flex-nowrap gap-2 items-center">
-                      <div className="w-[110px] flex-shrink-0">
-                        <label className="text-[9px] label-caps text-outline flex items-center gap-1 mb-1">
-                          Wholesale Partner
-                          {sup.sourceUrl || sup.name !== 'Internal' ? (
-                            <a
-                              href={sup.sourceUrl || getSupplierUrl({ name: sup.productName || formState.name, supplier: sup.name })}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              title={sup.sourceUrl ? 'View this product on the supplier site' : `Search ${sup.name} for "${formState.name}"`}
-                              className="text-outline hover:text-primary transition-colors"
+                <>
+                {linkedProducts.length === 0 ? (
+                  <div className="p-8 text-center bg-surface border border-outline-variant rounded-sm text-sm text-outline">
+                    No supplier products linked. Add one below to compute recipe costs.
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3" ref={suppliersListRef}>
+                    {linkedProducts.map((prod) => (
+                      <div key={prod.id} className="flex flex-col gap-3 bg-surface p-4 border border-outline-variant rounded-sm">
+                        <div className="flex flex-wrap md:flex-nowrap gap-2 items-center">
+                          <div className="w-[110px] flex-shrink-0">
+                            <label className="text-[9px] label-caps text-outline flex items-center gap-1 mb-1">
+                              Supplier
+                              <a
+                                href={getSupplierUrl(prod)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title="View this product on the supplier site"
+                                className="text-outline hover:text-primary transition-colors"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            </label>
+                            <select
+                              value={prod.supplier}
+                              onChange={(e) => handleUpdateLinkedProduct(prod.id, 'supplier', e.target.value)}
+                              className="w-full px-1.5 py-1 border border-outline-variant bg-surface-container-lowest text-[11px]"
                             >
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
-                          ) : null}
-                        </label>
-                        <select
-                          value={sup.name}
-                          onChange={(e) => handleUpdateSupplier(idx, 'name', e.target.value)}
-                          className="w-full px-1.5 py-1 border border-outline-variant bg-surface-container-lowest text-[11px]"
-                        >
-                          {suppliersList.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                      </div>
+                              {suppliersList.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                          </div>
 
-                      <div className="w-[65px] flex-shrink-0">
-                        <label className="text-[9px] label-caps text-outline block mb-1">Pack Cost (£)</label>
-                        <input 
-                          type="number" 
-                          step="0.01" 
-                          value={sup.packCost}
-                          onChange={(e) => handleUpdateSupplier(idx, 'packCost', Math.max(0, parseFloat(e.target.value) || 0))}
-                          className="w-full px-1.5 py-0.5 border border-outline-variant text-[11px] font-mono font-semibold"
-                        />
-                      </div>
+                          <div className="w-[140px] flex-shrink-0">
+                            <label className="text-[9px] label-caps text-outline block mb-1">Product Name</label>
+                            <input
+                              type="text"
+                              value={prod.name}
+                              onChange={(e) => handleUpdateLinkedProduct(prod.id, 'name', e.target.value)}
+                              className="w-full px-1.5 py-0.5 border border-outline-variant text-[11px]"
+                            />
+                          </div>
 
-                      <div className="w-[55px] flex-shrink-0">
-                        <label className="text-[9px] label-caps text-outline block mb-1">Pack Size</label>
-                        <input 
-                          type="number" 
-                          value={sup.packSize}
-                          onChange={(e) => handleUpdateSupplier(idx, 'packSize', Math.max(1, parseFloat(e.target.value) || 1))}
-                          className="w-full px-1.5 py-0.5 border border-outline-variant text-[11px] font-mono font-semibold"
-                        />
-                      </div>
+                          <div className="w-[65px] flex-shrink-0">
+                            <label className="text-[9px] label-caps text-outline block mb-1">Unit Cost (£)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={prod.packCost}
+                              onChange={(e) => handleUpdateLinkedProduct(prod.id, 'packCost', Math.max(0, parseFloat(e.target.value) || 0))}
+                              className="w-full px-1.5 py-0.5 border border-outline-variant text-[11px] font-mono font-semibold"
+                            />
+                          </div>
 
-                      <div className="w-[60px] flex-shrink-0">
-                        <label className="text-[9px] label-caps text-outline block mb-1">Size Unit</label>
-                        <select 
-                          value={sup.packUnit}
-                          onChange={(e) => handleUpdateSupplier(idx, 'packUnit', e.target.value as any)}
-                          className="w-full px-1.5 py-1 border border-outline-variant bg-surface-container-lowest text-[11px]"
-                        >
-                          {units.map(u => <option key={u} value={u}>{u}</option>)}
-                        </select>
-                      </div>
+                          <div className="w-[55px] flex-shrink-0">
+                            <label className="text-[9px] label-caps text-outline block mb-1">Pack Size</label>
+                            <input
+                              type="number"
+                              value={prod.packSize}
+                              onChange={(e) => handleUpdateLinkedProduct(prod.id, 'packSize', Math.max(1, parseFloat(e.target.value) || 1))}
+                              className="w-full px-1.5 py-0.5 border border-outline-variant text-[11px] font-mono font-semibold"
+                            />
+                          </div>
 
-                      <div className="flex flex-col items-start mt-4 w-[75px] flex-shrink-0">
-                        <span className="text-[9px] label-caps text-outline block mb-1">Unit Rate</span>
-                        <span className="text-[11px] font-mono font-semibold text-primary mt-0.5">
-                          {formatSupplierUnitPrice(sup.packCost, sup.packSize, sup.packUnit)}
-                        </span>
-                        {(() => {
-                          const age = formatPriceAge(sup.priceUpdatedAt);
-                          return age && (
-                            <span className={`text-[9px] mt-0.5 ${age.isStale ? 'text-amber-600 font-semibold' : 'text-outline'}`}>
-                              {age.label}
+                          <div className="w-[60px] flex-shrink-0">
+                            <label className="text-[9px] label-caps text-outline block mb-1">Size Unit</label>
+                            <select
+                              value={prod.packUnit}
+                              onChange={(e) => handleUpdateLinkedProduct(prod.id, 'packUnit', e.target.value as any)}
+                              className="w-full px-1.5 py-1 border border-outline-variant bg-surface-container-lowest text-[11px]"
+                            >
+                              {units.map(u => <option key={u} value={u}>{u}</option>)}
+                            </select>
+                          </div>
+
+                          <div className="flex flex-col items-start mt-4 w-[75px] flex-shrink-0">
+                            <span className="text-[9px] label-caps text-outline block mb-1">Current Price</span>
+                            <span className="text-[11px] font-mono font-semibold text-primary mt-0.5">
+                              {formatSupplierUnitPrice(prod.packCost, prod.packSize, prod.packUnit)}
                             </span>
-                          );
-                        })()}
-                      </div>
+                          </div>
 
-                      <div className="flex items-center gap-1.5 mt-4 w-[75px] flex-shrink-0">
-                        <input 
-                          type="checkbox" 
-                          checked={sup.isPreferred}
-                          onChange={(e) => handleUpdateSupplier(idx, 'isPreferred', e.target.checked)}
-                          className="h-3.5 w-3.5"
-                        />
-                        <span className="text-[11px] font-semibold text-outline">Preferred</span>
-                      </div>
+                          <div className="flex items-center gap-1.5 mt-4 w-[85px] flex-shrink-0">
+                            <input
+                              type="checkbox"
+                              checked={!!prod.isPreferred}
+                              onChange={() => { if (!prod.isPreferred) setPreferred.mutate(prod.id); }}
+                              className="h-3.5 w-3.5"
+                            />
+                            <span className="text-[11px] font-semibold text-outline">Preferred</span>
+                          </div>
 
-                      <button 
-                        onClick={() => handleRemoveSupplier(idx)}
-                        className="p-1 text-error hover:bg-error-container mt-4 w-[24px] flex-shrink-0 flex items-center justify-center"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                    </div>
-                  ))}
+                          <button
+                            onClick={() => handleDeleteLinkedProduct(prod)}
+                            className="p-1 text-error hover:bg-error-container mt-4 w-[24px] flex-shrink-0 flex items-center justify-center"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add Supplier Product — creates the supplierProduct doc with
+                    ingredientId already set to this ingredient; no separate linking step. */}
+                <div className="flex flex-wrap md:flex-nowrap gap-2 items-end bg-surface p-4 border border-dashed border-outline-variant rounded-sm mt-3">
+                  <div className="w-[110px] flex-shrink-0">
+                    <label className="text-[9px] label-caps text-outline block mb-1">Supplier</label>
+                    <select
+                      value={newProductForm.supplier}
+                      onChange={(e) => setNewProductForm(prev => ({ ...prev, supplier: e.target.value }))}
+                      className="w-full px-1.5 py-1 border border-outline-variant bg-surface-container-lowest text-[11px]"
+                    >
+                      {suppliersList.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div className="w-[140px] flex-shrink-0">
+                    <label className="text-[9px] label-caps text-outline block mb-1">Product Name</label>
+                    <input
+                      type="text"
+                      value={newProductForm.name}
+                      onChange={(e) => setNewProductForm(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="e.g. Parmesan - Vegan"
+                      className="w-full px-1.5 py-0.5 border border-outline-variant text-[11px]"
+                    />
+                  </div>
+                  <div className="w-[65px] flex-shrink-0">
+                    <label className="text-[9px] label-caps text-outline block mb-1">Unit Cost (£)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={newProductForm.packCost}
+                      onChange={(e) => setNewProductForm(prev => ({ ...prev, packCost: Math.max(0, parseFloat(e.target.value) || 0) }))}
+                      className="w-full px-1.5 py-0.5 border border-outline-variant text-[11px] font-mono font-semibold"
+                    />
+                  </div>
+                  <div className="w-[55px] flex-shrink-0">
+                    <label className="text-[9px] label-caps text-outline block mb-1">Pack Size</label>
+                    <input
+                      type="number"
+                      value={newProductForm.packSize}
+                      onChange={(e) => setNewProductForm(prev => ({ ...prev, packSize: Math.max(1, parseFloat(e.target.value) || 1) }))}
+                      className="w-full px-1.5 py-0.5 border border-outline-variant text-[11px] font-mono font-semibold"
+                    />
+                  </div>
+                  <div className="w-[60px] flex-shrink-0">
+                    <label className="text-[9px] label-caps text-outline block mb-1">Size Unit</label>
+                    <select
+                      value={newProductForm.packUnit}
+                      onChange={(e) => setNewProductForm(prev => ({ ...prev, packUnit: e.target.value as SupplierProduct['packUnit'] }))}
+                      className="w-full px-1.5 py-1 border border-outline-variant bg-surface-container-lowest text-[11px]"
+                    >
+                      {units.map(u => <option key={u} value={u}>{u}</option>)}
+                    </select>
+                  </div>
+                  <button
+                    onClick={handleAddSupplierProduct}
+                    disabled={addLinked.isPending}
+                    className="h-8 px-3 bg-primary text-white text-[10px] label-caps font-bold rounded-sm hover:bg-opacity-90 disabled:opacity-50 flex-shrink-0"
+                  >
+                    {addLinked.isPending ? 'Adding…' : '+ Add Supplier Product'}
+                  </button>
                 </div>
+                </>
               )}
-              {/* Bottom "Save Changes" removed — the sticky "Save Profile" button at the top
-                  of the detail pane is the single save action. */}
+              {/* Bottom "Save Changes" removed — every Supplier Product edit above commits
+                  immediately; the sticky "Save Profile" button only covers the ingredient's
+                  own fields (name, category, etc). */}
             </div>
             </>}
           </>

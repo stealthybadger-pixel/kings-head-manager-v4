@@ -397,11 +397,15 @@ export const SupplierProductSchema = z.object({
   urbanProductId: z.string().optional(),
   sku: z.string().optional(),
   productCode: z.string().optional(),
-  // Set by the Catalogue Matcher tool — links this supplier product to the
-  // Pantry Ingredient it represents. Identity only (this product "is" that
-  // ingredient); NOT the same as being set as the ingredient's preferred
-  // supplier/pricing, which stays a separate decision made in Pantry/Catalog.
-  ingredientId: z.string().optional()
+  // Set by the Catalogue Matcher tool (or Pantry's "Add Supplier Product") — links this
+  // supplier product to the Pantry Ingredient it represents. This is now the single source
+  // of truth for an ingredient's supplier options (see Pantry.tsx) — ingredient.suppliers[]
+  // is a derived cache regenerated from the set of products sharing this ingredientId.
+  ingredientId: z.string().optional(),
+  // Preferred supplier for its linked ingredient. At most one supplierProduct per
+  // ingredientId should have this true — enforced by useLinkedSupplierProductMutations'
+  // setPreferred, which clears it on every sibling in the same batch write.
+  isPreferred: z.boolean().optional()
 });
 export type SupplierProduct = z.infer<typeof SupplierProductSchema>;
 

@@ -2,8 +2,9 @@ import { useQuery, useMutation, useQueryClient, QueryClient } from '@tanstack/re
 import { collection, getDocs, getDoc, getCountFromServer, doc, setDoc, deleteDoc, updateDoc, deleteField, writeBatch, query, where, limit } from 'firebase/firestore';
 import { db } from '../firebase';
 import { tokenizeSearchQuery, matchesSearchTokens } from '../utils/search';
+import { getSupplierUrl } from '../utils/supplierUrls';
 import {
-  Ingredient, IngredientSchema,
+  Ingredient, IngredientSchema, IngredientSupplier,
   Recipe, RecipeSchema,
   Dish, DishSchema,
   ContainerProfile, ContainerProfileSchema,
@@ -535,45 +536,116 @@ export const useSupplierProducts = (enabled: boolean = true) => {
   });
 };
 
-// Scoped catalogue lookup for a single ingredient (Pantry's "suggested
-// catalogue matches" panel) — narrows the ~3,500-doc supplierProducts
-// collection to a prefix-range query on the ingredient's first word instead
-// of downloading every product. Note: this matches products whose name
-// STARTS WITH the word (case-folded), whereas the old client-side
-// `.includes()` scan also matched the word appearing mid-name — a
-// deliberate, small behaviour change traded for the read reduction.
-export const useSupplierProductsForIngredient = (ingredientName: string) => {
-  const firstWord = ingredientName
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(t => t.length > 1 && /[a-z0-9]/i.test(t))[0] ?? '';
-
+// The linked supplier products for a single Pantry Ingredient — the single source of truth
+// for its supplier options (see Pantry.tsx's "Supplier Products" section). Indexed exact
+// match on ingredientId; no name/fuzzy matching, so this only ever returns products someone
+// has deliberately linked (via the Catalogue Matcher or Pantry's "Add Supplier Product").
+export const useSupplierProductsForIngredient = (ingredientId: string | undefined) => {
   return useQuery<SupplierProduct[]>({
-    queryKey: ['supplier_products_prefix', firstWord],
+    queryKey: ['supplier_products_by_ingredient', ingredientId],
     queryFn: async () => {
-      const variations = [firstWord, firstWord.charAt(0).toUpperCase() + firstWord.slice(1)];
-      const resultsMap = new Map<string, SupplierProduct>();
-
-      for (const term of variations) {
-        const q = query(
-          collection(db, 'supplierProducts'),
-          where('name', '>=', term),
-          where('name', '<=', term + ''),
-          limit(200)
-        );
-        const snap = await getDocs(q);
-        snap.forEach(docSnapshot => {
-          const rawData = { id: docSnapshot.id, ...docSnapshot.data() };
-          const result = SupplierProductSchema.safeParse(rawData);
-          if (result.success) resultsMap.set(result.data.id, result.data);
-        });
-      }
-
-      return Array.from(resultsMap.values());
+      const q = query(collection(db, 'supplierProducts'), where('ingredientId', '==', ingredientId));
+      const snap = await getDocs(q);
+      const items: SupplierProduct[] = [];
+      snap.forEach(docSnapshot => {
+        const rawData = { id: docSnapshot.id, ...docSnapshot.data() };
+        const result = SupplierProductSchema.safeParse(rawData);
+        if (result.success) items.push(result.data);
+      });
+      return items.sort((a, b) => a.name.localeCompare(b.name));
     },
-    enabled: firstWord.length > 0,
+    enabled: !!ingredientId,
     staleTime: 5 * 60 * 1000
   });
+};
+
+// Regenerates ingredient.suppliers[] — the array costing.ts reads synchronously across
+// Kitchen/Stock/Service — from the full set of supplierProducts linked to that ingredient.
+// suppliers[] is no longer user-edited directly; it's a derived cache kept in sync by this
+// helper so costing keeps working unchanged without an app-wide async rewrite.
+function deriveIngredientSuppliers(products: SupplierProduct[]): IngredientSupplier[] {
+  return products.map(p => ({
+    name: p.supplier,
+    packCost: p.packCost,
+    packSize: p.packSize,
+    packUnit: p.packUnit,
+    isPreferred: !!p.isPreferred,
+    sourceUrl: getSupplierUrl(p),
+    productName: p.name,
+    priceUpdatedAt: new Date().toISOString()
+  }));
+}
+
+// Standalone (non-hook) version of the resync, for call sites that don't hold a fixed
+// ingredientId at hook-setup time — e.g. Catalog.tsx's "Add as Supplier Option" flow, which
+// links whichever ingredient the user picked in that moment.
+export async function resyncIngredientSuppliersFromProducts(queryClient: QueryClient, ingredientId: string): Promise<void> {
+  const items = await fetchLinkedSupplierProducts(ingredientId);
+  queryClient.setQueryData(['supplier_products_by_ingredient', ingredientId], items);
+  const patch = buildPatch<Ingredient>({ suppliers: deriveIngredientSuppliers(items) } as Partial<Ingredient>);
+  await updateDoc(doc(db, 'ingredients', ingredientId), withDeleteFieldForUndefined(patch));
+  patchArrayItem<Ingredient>(queryClient, ['ingredients'], ingredientId, patch);
+}
+
+export async function fetchLinkedSupplierProducts(ingredientId: string): Promise<SupplierProduct[]> {
+  const q = query(collection(db, 'supplierProducts'), where('ingredientId', '==', ingredientId));
+  const snap = await getDocs(q);
+  const items: SupplierProduct[] = [];
+  snap.forEach(docSnapshot => {
+    const rawData = { id: docSnapshot.id, ...docSnapshot.data() };
+    const result = SupplierProductSchema.safeParse(rawData);
+    if (result.success) items.push(result.data);
+  });
+  return items.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// Wraps the plain supplierProduct mutations for products linked to a Pantry Ingredient
+// (Pantry's "Supplier Products" section). Every write (add/update/delete/setPreferred) also
+// re-syncs ingredient.suppliers[] from the full linked set afterwards, so supplierProducts +
+// ingredientId stays the one editable relationship — the user never maintains two lists.
+export const useLinkedSupplierProductMutations = (ingredientId: string) => {
+  const queryClient = useQueryClient();
+  const { addSupplierProduct, updateSupplierProduct, deleteSupplierProduct } = useSupplierProductMutations();
+
+  const resync = () => resyncIngredientSuppliersFromProducts(queryClient, ingredientId);
+
+  const addLinked = useMutation({
+    mutationFn: async (data: Omit<SupplierProduct, 'id' | 'ingredientId'>) => {
+      await addSupplierProduct.mutateAsync({ ...data, ingredientId } as Omit<SupplierProduct, 'id'>);
+    },
+    onSuccess: resync
+  });
+
+  const updateLinked = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<SupplierProduct> }) => {
+      await updateSupplierProduct.mutateAsync({ id, data });
+    },
+    onSuccess: resync
+  });
+
+  const deleteLinked = useMutation({
+    mutationFn: async (id: string) => {
+      await deleteSupplierProduct.mutateAsync(id);
+    },
+    onSuccess: resync
+  });
+
+  // Sets exactly one linked product as preferred, clearing the flag on every sibling in the
+  // same batch write — guarantees at most one preferred product per ingredient.
+  const setPreferred = useMutation({
+    mutationFn: async (id: string) => {
+      const q = query(collection(db, 'supplierProducts'), where('ingredientId', '==', ingredientId));
+      const snap = await getDocs(q);
+      const batch = writeBatch(db);
+      snap.forEach(docSnapshot => {
+        batch.update(docSnapshot.ref, { isPreferred: docSnapshot.id === id });
+      });
+      await batch.commit();
+    },
+    onSuccess: resync
+  });
+
+  return { addLinked, updateLinked, deleteLinked, setPreferred };
 };
 
 export const useSupplierSearchQuery = (searchTerm: string, supplier: string) => {
@@ -665,15 +737,16 @@ export const useSupplierProductMutations = () => {
   //  - 'all_supplier_products_summary' was invalidated here but no hook has
   //    used that query key since useAllSupplierProducts was removed in the
   //    Dashboard Phase 1 cleanup — a dead invalidation, removed.
-  //  - 'supplier_products_prefix' (Pantry's catalogue-match hook, added
-  //    alongside this same Phase 2 work) was never invalidated here at all,
-  //    so editing/adding/deleting a supplier product wouldn't refresh
-  //    Pantry's "suggested catalogue matches" panel until its 5-minute
-  //    staleTime lapsed — added.
+  //  - 'supplier_products_by_ingredient' (Pantry's linked-supplier-products
+  //    lookup, keyed by ingredientId) is invalidated broadly here as a
+  //    safety net for writes that land on a product's ingredientId from
+  //    outside useLinkedSupplierProductMutations (e.g. Catalog.tsx's
+  //    "Add as Supplier Option" flow) — those don't know which specific
+  //    ingredientId cache entry to patch, so invalidate every entry.
   const invalidateDerivedCatalogQueries = () => {
     queryClient.invalidateQueries({ queryKey: ['supplier_search'] });
     queryClient.invalidateQueries({ queryKey: ['supplier_browse'] });
-    queryClient.invalidateQueries({ queryKey: ['supplier_products_prefix'] });
+    queryClient.invalidateQueries({ queryKey: ['supplier_products_by_ingredient'] });
   };
 
   const addMutation = useMutation({
