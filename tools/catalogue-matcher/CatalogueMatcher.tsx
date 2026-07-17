@@ -46,6 +46,9 @@ export const CatalogueMatcher: React.FC = () => {
 
   const [skippedIds, setSkippedIds] = useState<Set<string>>(new Set());
   const [pickingDifferent, setPickingDifferent] = useState(false);
+  // Non-null while the "create new ingredient" name-edit panel is open —
+  // holds the editable draft name, pre-filled but not yet confirmed.
+  const [newIngredientName, setNewIngredientName] = useState<string | null>(null);
 
   const undecided = useMemo(() => allProducts.filter((p) => !p.ingredientId), [allProducts]);
 
@@ -88,7 +91,16 @@ export const CatalogueMatcher: React.FC = () => {
     return { ingredient: best.ingredient, score: best.unmatchedProductWords + best.unmatchedIngredientWords };
   }, [current, ingredients]);
 
-  const advance = () => setPickingDifferent(false);
+  const advance = () => {
+    setPickingDifferent(false);
+    setNewIngredientName(null);
+  };
+
+  const deriveDefaultName = (product: SupplierProduct) =>
+    product.originalName || cleanProductName(product.name)
+      .split(' ')
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
 
   const handleReject = async () => {
     if (!current) return;
@@ -121,12 +133,15 @@ export const CatalogueMatcher: React.FC = () => {
     linkTo(suggestion.ingredient.id);
   };
 
-  const handleCreateNew = async () => {
+  const handleOpenCreateNew = () => {
     if (!current) return;
-    const name = current.originalName || cleanProductName(current.name)
-      .split(' ')
-      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(' ');
+    setPickingDifferent(false);
+    setNewIngredientName(deriveDefaultName(current));
+  };
+
+  const handleConfirmCreateNew = async () => {
+    if (!current || !newIngredientName || !newIngredientName.trim()) return;
+    const name = newIngredientName.trim();
     const guess = inferIngredientDefaults(name);
     try {
       const created = await addIngredient.mutateAsync({
@@ -213,79 +228,112 @@ export const CatalogueMatcher: React.FC = () => {
               </div>
             </div>
 
-            {/* Suggestion */}
-            {!pickingDifferent && (
-              <div className="bg-surface border border-outline-variant rounded-sm p-6 flex flex-col gap-4">
-                <span className="label-caps text-outline font-bold text-xs">AI Suggestion</span>
-                {suggestion ? (
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-bold text-on-surface">{suggestion.ingredient.name}</div>
-                      <div className="text-xs text-outline mt-0.5">
-                        {scoreToConfidence(suggestion.score).pct}% confidence — {scoreToConfidence(suggestion.score).label}
-                      </div>
-                    </div>
-                    <button
-                      onClick={handleAcceptSuggestion}
-                      disabled={updateSupplierProduct.isPending}
-                      className="h-10 px-5 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:opacity-90 disabled:opacity-50"
-                    >
-                      Accept
-                    </button>
-                  </div>
-                ) : (
-                  <span className="text-xs text-outline">No confident match found — search manually below.</span>
-                )}
-              </div>
-            )}
-
-            {/* Search / choose different */}
-            {pickingDifferent || !suggestion ? (
-              <div className="bg-surface border border-outline-variant rounded-sm p-6">
-                <span className="label-caps text-outline font-bold text-xs block mb-3">
-                  <Search className="h-3.5 w-3.5 inline mr-1.5" />
-                  Search Pantry
-                </span>
-                <ItemPicker
-                  ingredients={ingredients}
-                  recipes={[]}
-                  placeholder="Search pantry ingredients..."
-                  actionLabel="Link"
-                  onSelectIngredient={(ing) => linkTo(ing.id)}
+            {newIngredientName !== null ? (
+              /* Create-new-ingredient name edit panel — replaces the
+                 suggestion/search sections while open, mirroring how
+                 `pickingDifferent` already hides the suggestion panel. */
+              <div className="bg-surface border border-primary rounded-sm p-6 flex flex-col gap-4">
+                <span className="label-caps text-outline font-bold text-xs">New Pantry Ingredient Name</span>
+                <input
+                  type="text"
+                  autoFocus
+                  value={newIngredientName}
+                  onChange={(e) => setNewIngredientName(e.target.value)}
+                  className="w-full px-3 py-2 border border-outline-variant bg-surface-container-lowest text-sm rounded-sm focus:outline-none focus:border-primary"
                 />
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleConfirmCreateNew}
+                    disabled={addIngredient.isPending || !newIngredientName.trim()}
+                    className="h-10 px-5 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:opacity-90 disabled:opacity-50"
+                  >
+                    Create &amp; Link
+                  </button>
+                  <button
+                    onClick={() => setNewIngredientName(null)}
+                    className="h-10 px-4 border border-outline text-outline text-xs font-bold label-caps rounded-sm hover:bg-surface-container"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             ) : (
-              <button
-                onClick={() => setPickingDifferent(true)}
-                className="self-start text-xs font-bold text-primary hover:underline"
-              >
-                Choose a different ingredient instead
-              </button>
-            )}
+              <>
+                {/* Suggestion */}
+                {!pickingDifferent && (
+                  <div className="bg-surface border border-outline-variant rounded-sm p-6 flex flex-col gap-4">
+                    <span className="label-caps text-outline font-bold text-xs">AI Suggestion</span>
+                    {suggestion ? (
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-bold text-on-surface">{suggestion.ingredient.name}</div>
+                          <div className="text-xs text-outline mt-0.5">
+                            {scoreToConfidence(suggestion.score).pct}% confidence — {scoreToConfidence(suggestion.score).label}
+                          </div>
+                        </div>
+                        <button
+                          onClick={handleAcceptSuggestion}
+                          disabled={updateSupplierProduct.isPending}
+                          className="h-10 px-5 bg-primary text-white text-xs font-bold label-caps rounded-sm hover:opacity-90 disabled:opacity-50"
+                        >
+                          Accept
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-outline">No confident match found — search manually below.</span>
+                    )}
+                  </div>
+                )}
 
-            {/* Actions */}
-            <div className="flex gap-2 flex-wrap">
-              <button
-                onClick={handleCreateNew}
-                disabled={addIngredient.isPending}
-                className="h-10 px-4 border border-primary text-primary text-xs font-bold label-caps rounded-sm hover:bg-primary/5 flex items-center gap-1.5 disabled:opacity-50"
-              >
-                <PlusCircle className="h-3.5 w-3.5" /> Create New Pantry Ingredient
-              </button>
-              <button
-                onClick={handleSkip}
-                className="h-10 px-4 border border-outline text-outline text-xs font-bold label-caps rounded-sm hover:bg-surface-container flex items-center gap-1.5"
-              >
-                <SkipForward className="h-3.5 w-3.5" /> Skip
-              </button>
-              <button
-                onClick={handleReject}
-                disabled={deleteSupplierProduct.isPending}
-                className="h-10 px-4 border border-red-500/40 text-red-600 text-xs font-bold label-caps rounded-sm hover:bg-red-500/10 flex items-center gap-1.5 ml-auto disabled:opacity-50"
-              >
-                <Trash2 className="h-3.5 w-3.5" /> Reject (Delete)
-              </button>
-            </div>
+                {/* Search / choose different */}
+                {pickingDifferent || !suggestion ? (
+                  <div className="bg-surface border border-outline-variant rounded-sm p-6">
+                    <span className="label-caps text-outline font-bold text-xs block mb-3">
+                      <Search className="h-3.5 w-3.5 inline mr-1.5" />
+                      Search Pantry
+                    </span>
+                    <ItemPicker
+                      ingredients={ingredients}
+                      recipes={[]}
+                      placeholder="Search pantry ingredients..."
+                      actionLabel="Link"
+                      onSelectIngredient={(ing) => linkTo(ing.id)}
+                    />
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setPickingDifferent(true)}
+                    className="self-start text-xs font-bold text-primary hover:underline"
+                  >
+                    Choose a different ingredient instead
+                  </button>
+                )}
+
+                {/* Actions */}
+                <div className="flex gap-2 flex-wrap">
+                  <button
+                    onClick={handleOpenCreateNew}
+                    disabled={addIngredient.isPending}
+                    className="h-10 px-4 border border-primary text-primary text-xs font-bold label-caps rounded-sm hover:bg-primary/5 flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    <PlusCircle className="h-3.5 w-3.5" /> Create New Pantry Ingredient
+                  </button>
+                  <button
+                    onClick={handleSkip}
+                    className="h-10 px-4 border border-outline text-outline text-xs font-bold label-caps rounded-sm hover:bg-surface-container flex items-center gap-1.5"
+                  >
+                    <SkipForward className="h-3.5 w-3.5" /> Skip
+                  </button>
+                  <button
+                    onClick={handleReject}
+                    disabled={deleteSupplierProduct.isPending}
+                    className="h-10 px-4 border border-red-500/40 text-red-600 text-xs font-bold label-caps rounded-sm hover:bg-red-500/10 flex items-center gap-1.5 ml-auto disabled:opacity-50"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Reject (Delete)
+                  </button>
+                </div>
+              </>
+            )}
           </>
         )}
       </div>
