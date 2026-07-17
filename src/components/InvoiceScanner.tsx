@@ -4,6 +4,8 @@ import { useStore } from '../store/useStore';
 import { useAuth } from '../hooks/useAuth';
 import { Upload, ScanLine, CheckCircle2, AlertTriangle, X, RefreshCw, ShieldAlert } from 'lucide-react';
 import { supplierBadgeClass } from '../utils/supplierColors';
+import { prepareImageForGemini, callGeminiVision, parseGeminiJson } from '../utils/gemini';
+import { findBestIngredientMatch } from '../utils/matching';
 
 interface InvoiceLine {
   rawText: string;
@@ -19,51 +21,30 @@ interface InvoiceLine {
   diffPct?: number;
 }
 
-const GEMINI_API_KEY = localStorage.getItem('geminiApiKey') || '';
-
 async function scanInvoiceWithGemini(base64Image: string, mimeType: string): Promise<InvoiceLine[]> {
-  const key = localStorage.getItem('geminiApiKey');
-  if (!key) throw new Error('No Gemini API key set. Add it in Settings.');
-
   const prompt = `You are analysing a UK wholesale food supplier invoice or delivery note.
 Extract every line item product. For each product return a JSON array with objects containing:
 - name: product name (string, clean title case)
-- packCost: total price for this line (number, GBP, no currency symbol)
+- packCost: the cost of ONE single pack/unit (number, GBP, no currency symbol) — see rules below
 - packSize: pack size quantity (number)
 - packUnit: unit (string: one of "kg", "g", "l", "ml", "ea")
 - supplier: supplier name if visible on the invoice (string, or "Unknown")
 
 Rules:
-- If the price appears to be per-unit price, set packCost to that value and packSize to 1
+- Invoices typically show a "PRICE" (or "UNIT PRICE") column and a separate "VALUE" (or "TOTAL")
+  column, where VALUE = PRICE × QTY ordered. packCost MUST always be the single-pack PRICE, never
+  the extended VALUE — if QTY is 2 or more, do NOT multiply the price by the quantity ordered. For
+  example a line "QTY 2, PRICE 16.99, VALUE 33.98" means packCost is 16.99, not 33.98.
+- If only one combined price is shown (no separate per-unit and total columns) and QTY is 1, that
+  single price is the packCost
 - Ignore VAT lines, delivery charges, totals, and header rows
 - Return ONLY valid JSON array, no markdown, no explanation
 
 Example output:
 [{"name":"Double Cream","packCost":4.85,"packSize":2,"packUnit":"l","supplier":"David Catt"},...]`;
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: prompt },
-            { inline_data: { mime_type: mimeType, data: base64Image } }
-          ]
-        }],
-        generationConfig: { temperature: 0.1, maxOutputTokens: 4096 }
-      })
-    }
-  );
-
-  if (!response.ok) throw new Error(`Gemini API error: ${response.status}`);
-  const data = await response.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-
-  const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-  return JSON.parse(cleaned) as InvoiceLine[];
+  const text = await callGeminiVision(prompt, base64Image, mimeType);
+  return parseGeminiJson<InvoiceLine[]>(text);
 }
 
 export const InvoiceScanner: React.FC = () => {
@@ -80,6 +61,7 @@ export const InvoiceScanner: React.FC = () => {
   const [updating, setUpdating] = useState<Set<string>>(new Set());
   const [updated, setUpdated] = useState<Set<string>>(new Set());
   const [apiKey, setApiKey] = useState(localStorage.getItem('geminiApiKey') || '');
+  const [linkingIndex, setLinkingIndex] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const saveApiKey = () => {
@@ -94,24 +76,16 @@ export const InvoiceScanner: React.FC = () => {
     setUpdated(new Set());
 
     try {
-      const mimeType = file.type || 'image/jpeg';
-      const base64 = await new Promise<string>((res, rej) => {
-        const reader = new FileReader();
-        reader.onload = () => res((reader.result as string).split(',')[1]);
-        reader.onerror = rej;
-        reader.readAsDataURL(file);
-      });
+      const { base64, mimeType } = await prepareImageForGemini(file);
 
       const extracted = await scanInvoiceWithGemini(base64, mimeType);
 
-      // Match against pantry ingredients
+      // Match against pantry ingredients using the same fuzzy matcher Catalog/Pantry
+      // use elsewhere, rather than a plain substring check — handles this app's
+      // "Item - Descriptor" naming (e.g. Gemini's "Dill" matching Pantry's "Dill - Fresh").
       const matched = extracted.map(line => {
-        const nameLower = line.name.toLowerCase();
-        const ing = ingredients.find(i =>
-          i.name.toLowerCase() === nameLower ||
-          i.name.toLowerCase().includes(nameLower) ||
-          nameLower.includes(i.name.toLowerCase())
-        );
+        const match = findBestIngredientMatch(line.name, ingredients);
+        const ing = match?.ingredient;
         if (!ing) return line;
 
         const pref = ing.suppliers?.find(s => s.isPreferred) || ing.suppliers?.[0];
@@ -145,10 +119,26 @@ export const InvoiceScanner: React.FC = () => {
     try {
       const ing = ingredients.find(i => i.id === key);
       if (!ing) throw new Error('Ingredient not found');
-      const updatedSuppliers = (ing.suppliers || []).map((s, i) => {
-        if (i === 0 || s.isPreferred) return { ...s, packCost: line.packCost, packSize: line.packSize, packUnit: line.packUnit as any };
-        return s;
-      });
+      const suppliers = ing.suppliers || [];
+      const supplierIndex = suppliers.findIndex(s => s.name.toLowerCase() === (line.supplier || '').toLowerCase());
+      let updatedSuppliers;
+      if (supplierIndex >= 0) {
+        updatedSuppliers = suppliers.map((s, i) => i === supplierIndex ? { ...s, packCost: line.packCost, packSize: line.packSize, packUnit: line.packUnit as any } : s);
+      } else if (suppliers.some(s => s.isPreferred)) {
+        // Fall back to updating whichever supplier is preferred, matching the invoice's
+        // supplier not being an exact name match to anything already linked (e.g. "Booker" vs
+        // a slightly different name Gemini extracted).
+        updatedSuppliers = suppliers.map((s, i) => (i === 0 || s.isPreferred) ? { ...s, packCost: line.packCost, packSize: line.packSize, packUnit: line.packUnit as any } : s);
+      } else {
+        // No existing supplier at all (e.g. a freshly manually-linked ingredient) — add one.
+        updatedSuppliers = [...suppliers, {
+          name: line.supplier || 'Unknown',
+          packCost: line.packCost,
+          packSize: line.packSize,
+          packUnit: line.packUnit as any,
+          isPreferred: suppliers.length === 0
+        }];
+      }
       await updateIngredient.mutateAsync({ id: key, data: { suppliers: updatedSuppliers } });
       setUpdated(prev => new Set(prev).add(key));
       showToast(`Updated price for ${line.matchedIngredientName}`, 'success');
@@ -159,8 +149,32 @@ export const InvoiceScanner: React.FC = () => {
     }
   };
 
-  const changedLines = lines.filter(l => l.diffPct !== undefined && Math.abs(l.diffPct) >= 5);
-  const unchangedLines = lines.filter(l => l.diffPct === undefined || Math.abs(l.diffPct) < 5);
+  // Manually links a line that the fuzzy matcher missed — recomputes the same
+  // current-price/diff fields the automatic match would have, so it slots into the
+  // Price Changes / Unmatched sections identically either way.
+  const applyManualLink = (index: number, ingredientId: string) => {
+    const ing = ingredients.find(i => i.id === ingredientId);
+    if (!ing) return;
+
+    setLines(prev => prev.map((line, i) => {
+      if (i !== index) return line;
+      const pref = ing.suppliers?.find(s => s.isPreferred) || ing.suppliers?.[0];
+      const currentPackCost = pref?.packCost ?? 0;
+      const diffPct = currentPackCost > 0 ? ((line.packCost - currentPackCost) / currentPackCost) * 100 : null;
+      return {
+        ...line,
+        matchedIngredientId: ing.id,
+        matchedIngredientName: ing.name,
+        currentPackCost,
+        diffPct: diffPct ?? undefined
+      };
+    }));
+    setLinkingIndex(null);
+  };
+
+  const indexedLines = lines.map((line, idx) => ({ line, idx }));
+  const changedLines = indexedLines.filter(({ line }) => line.diffPct !== undefined && Math.abs(line.diffPct) >= 5);
+  const unchangedLines = indexedLines.filter(({ line }) => line.diffPct === undefined || Math.abs(line.diffPct) < 5);
 
   if (!isManager) {
     return (
@@ -251,11 +265,11 @@ export const InvoiceScanner: React.FC = () => {
               Price Changes ({changedLines.length})
             </h3>
             <div className="flex flex-col gap-2">
-              {changedLines.map((line, i) => {
+              {changedLines.map(({ line, idx }) => {
                 const isUpdating = updating.has(line.matchedIngredientId!);
                 const isDone = updated.has(line.matchedIngredientId!);
                 return (
-                  <div key={i} className="border border-outline-variant rounded-sm p-4 flex items-center gap-4 bg-surface">
+                  <div key={idx} className="border border-outline-variant rounded-sm p-4 flex items-center gap-4 bg-surface">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-sm text-on-surface">{line.matchedIngredientName || line.name}</span>
@@ -306,13 +320,45 @@ export const InvoiceScanner: React.FC = () => {
               No Price Change / Unmatched ({unchangedLines.length})
             </h3>
             <div className="flex flex-col gap-1.5">
-              {unchangedLines.map((line, i) => (
-                <div key={i} className="border border-outline-variant rounded-sm px-4 py-2.5 flex items-center justify-between text-xs bg-surface">
-                  <span className={`font-semibold ${line.matchedIngredientName ? 'text-on-surface' : 'text-outline'}`}>
-                    {line.matchedIngredientName || line.name}
-                    {!line.matchedIngredientId && <span className="ml-2 text-[10px] text-outline italic">no pantry match</span>}
-                  </span>
-                  <span className="data-tabular text-on-surface-variant">£{line.packCost.toFixed(2)}</span>
+              {unchangedLines.map(({ line, idx }) => (
+                <div key={idx} className="border border-outline-variant rounded-sm px-4 py-2.5 text-xs bg-surface">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className={`font-semibold ${line.matchedIngredientName ? 'text-on-surface' : 'text-outline'}`}>
+                      {line.matchedIngredientName || line.name}
+                      {!line.matchedIngredientId && <span className="ml-2 text-[10px] text-outline italic">no pantry match</span>}
+                    </span>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="data-tabular text-on-surface-variant">£{line.packCost.toFixed(2)}</span>
+                      {!line.matchedIngredientId && linkingIndex !== idx && (
+                        <button
+                          onClick={() => setLinkingIndex(idx)}
+                          className="text-[11px] font-bold text-primary hover:underline"
+                        >
+                          Link to Pantry Item
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {linkingIndex === idx && (
+                    <div className="flex gap-2 mt-2 pt-2 border-t border-outline-variant">
+                      <select
+                        defaultValue=""
+                        onChange={e => e.target.value && applyManualLink(idx, e.target.value)}
+                        className="flex-1 px-2 py-1.5 border border-outline-variant bg-surface-container-lowest text-xs rounded-sm"
+                      >
+                        <option value="" disabled>Select Pantry Ingredient...</option>
+                        {ingredients.map(ing => (
+                          <option key={ing.id} value={ing.id}>{ing.name}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => setLinkingIndex(null)}
+                        className="h-7 px-3 text-[11px] font-semibold text-outline hover:text-on-surface border border-outline rounded-sm"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
